@@ -116,6 +116,37 @@
             border-right: none;
         }
         
+        /* Hierarchical structure styling */
+        .parent-header-row {
+            background-color: #f8f9fa !important;
+            border-top: 2px solid #dee2e6 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .sub-header-row {
+            background-color: #f1f3f4 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .sub-total-row {
+            background-color: #e8f4fd !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .parent-total-row {
+            background-color: #d4edda !important;
+            border-bottom: 2px solid #28a745 !important;
+        }
+        
+        .calculated-total-row {
+            background-color: #fff3cd !important;
+            border-bottom: 2px solid #ffc107 !important;
+        }
+        
+        .account-row {
+            border-bottom: 1px solid #f0f0f0 !important;
+        }
+        
         /* Fix header positioning for horizontal scroll */
         .dataTables_wrapper .dataTables_scrollHead {
             overflow: hidden !important;
@@ -587,13 +618,27 @@
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% else %}account-row{% endif %}">
-                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' %}{% else %}{{ row.account_code }}{% endif %}</td>
-                            <td>{{ row.account_name }}</td>
+                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'calculated_total' %}calculated-total-row{% else %}account-row{% endif %}">
+                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}{% else %}{{ row.account_code }}{% endif %}</td>
+                            <td>
+                                {% if row.type == 'parent_header' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'sub_header' %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                {% elif row.type == 'sub_total' %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;<strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'parent_total' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'calculated_total' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% else %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                {% endif %}
+                            </td>
                             {% for period in periods %}
                                 {% for company in companies %}
                                     <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {% if row.type == 'parent_header' or row.type == 'sub_header' %}
+                                        {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}
                                             <strong>{{ row.periods|get_item:period|get_item:company.code|format_number }}</strong>
                                         {% else %}
                                             {{ row.periods|get_item:period|get_item:company.code|format_number }}
@@ -604,14 +649,6 @@
                                     <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
                                 </td>
                             {% endfor %}
-                            {% for company in companies %}
-                                <td class="{% if row.grand_totals|get_item:company.code < 0 %}negative{% elif row.grand_totals|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                    <strong>{{ row.grand_totals|get_item:company.code|format_number }}</strong>
-                                </td>
-                            {% endfor %}
-                            <td class="{% if row.grand_totals|get_item:'OVERALL' < 0 %}negative{% elif row.grand_totals|get_item:'OVERALL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                <strong>{{ row.grand_totals|get_item:'OVERALL'|format_number }}</strong>
-                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

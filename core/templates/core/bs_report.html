@@ -237,6 +237,37 @@
         #bsTable th:last-child, #bsTable td:last-child {
             border-right: none;
         }
+        
+        /* Hierarchical structure styling */
+        .parent-header-row {
+            background-color: #f8f9fa !important;
+            border-top: 2px solid #dee2e6 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .sub-header-row {
+            background-color: #f1f3f4 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .sub-total-row {
+            background-color: #e8f4fd !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        .parent-total-row {
+            background-color: #d4edda !important;
+            border-bottom: 2px solid #28a745 !important;
+        }
+        
+        .check-row {
+            background-color: #f8d7da !important;
+            border-bottom: 2px solid #dc3545 !important;
+        }
+        
+        .account-row {
+            border-bottom: 1px solid #f0f0f0 !important;
+        }
     </style>
 </head>
 <body>
@@ -355,13 +386,31 @@
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.is_header %}header-row{% elif row.account_type == 'ASSET' %}asset-row{% elif row.account_type == 'LIABILITY' %}liability-row{% elif row.account_type == 'EQUITY' %}equity-row{% endif %}">
-                            <td>{{ row.account_code }}</td>
-                            <td>{{ row.account_name }}</td>
+                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% else %}account-row{% endif %}">
+                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}{% else %}{{ row.account_code }}{% endif %}</td>
+                            <td>
+                                {% if row.type == 'parent_header' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'sub_header' %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                {% elif row.type == 'sub_total' %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;<strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'parent_total' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% elif row.type == 'check_row' %}
+                                    <strong>{{ row.account_name }}</strong>
+                                {% else %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                {% endif %}
+                            </td>
                             {% for period in periods %}
                                 {% for company in companies %}
                                     <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {{ row.periods|get_item:period|get_item:company.code|format_number }}
+                                        {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}
+                                            <strong>{{ row.periods|get_item:period|get_item:company.code|format_number }}</strong>
+                                        {% else %}
+                                            {{ row.periods|get_item:period|get_item:company.code|format_number }}
+                                        {% endif %}
                                     </td>
                                 {% endfor %}
                                 <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">

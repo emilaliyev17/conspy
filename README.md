@@ -1,6 +1,6 @@
 # Financial Consolidator
 
-A Django application for managing financial data consolidation across multiple companies and accounts.
+A Django application for managing financial data consolidation across multiple companies and accounts with **hierarchical reporting capabilities**.
 
 ## Features
 
@@ -9,8 +9,9 @@ A Django application for managing financial data consolidation across multiple c
 - **Chart of Accounts View**: Browse all accounts with search, hierarchical display, and export functionality
 - **Account Management**: Organize accounts by type (Asset, Liability, Equity, Revenue, Expense)
 - **Financial Data**: Store and manage financial data with different types (Actual, Budget, Forecast)
-- **P&L Reports**: Generate profit and loss reports with filtering and export capabilities
-- **Balance Sheet Reports**: Generate balance sheet reports with filtering and export capabilities
+- **Hierarchical P&L Reports**: Generate profit and loss reports with automatic grouping by Parent Category and Sub Category, including calculated totals (Gross Profit, Net Profit Before Tax, Net Profit After Tax)
+- **Hierarchical Balance Sheet Reports**: Generate balance sheet reports with automatic grouping by Parent Category and Sub Category, including calculated totals and balance check
+- **Data Backup & Restore**: Automatic backup functionality before overwriting financial data
 - **Admin Interface**: Full Django admin interface for data management
 
 ## Models
@@ -196,6 +197,10 @@ The application includes a bulk upload feature for Financial Data:
 1. **Access Upload Page**: Navigate to `/upload/financial-data/`
 2. **Download Template**: Click "Download Template" to get a sample Excel file
 3. **Select Parameters**: Choose Company and Data Type (Actual/Budget/Forecast)
+4. **Dynamic Period Detection**: System automatically detects periods from column headers (Jan-24, Feb-24, etc.)
+5. **Number Format Support**: Handles various number formats including commas, parentheses for negatives, and text formatting
+6. **Automatic Backup**: Creates backup of existing data before overwriting
+7. **Overwrite Confirmation**: Shows warning for existing data and confirms overwrite action
 4. **Prepare Your Data**: Fill in the template with your financial data
 5. **Upload File**: Select your Excel file and click "Upload Financial Data"
 6. **Automatic Detection**: System automatically detects periods from column headers
@@ -262,36 +267,56 @@ The application includes automatic backup functionality to protect against data 
 - **Periods**: List of periods that were backed up
 - **User**: Who made the upload that triggered the backup
 
-## Reports
+## Hierarchical Reports
 
-The application includes comprehensive financial reporting capabilities:
+The application includes **advanced hierarchical reporting capabilities** that automatically group accounts by Parent Category and Sub Category, providing professional financial statements with calculated totals.
 
-### P&L Report
+### Hierarchical P&L Report
 - **URL**: `/reports/pl/`
-- **Features**: 
-  - Shows INCOME and EXPENSE accounts
-  - Groups data by period (columns) and account (rows)
-  - Companies as sub-columns under each period
-  - Calculates TOTAL column for each period
-  - Orders accounts by ChartOfAccounts.sort_order
-  - Period filtering (from-to date selectors)
-  - Data type filtering (Actual/Budget/Forecast)
-  - Export to Excel functionality
-  - Print functionality
-  - **Sticky Headers**: Account Code and Account Name columns stay fixed when scrolling horizontally
-  - **Sticky Period Headers**: Period headers stay fixed when scrolling vertically
-  - **Responsive Scrolling**: Both horizontal and vertical scrolling with proper header visibility
+- **Hierarchical Structure**:
+  - **Parent Categories**: INCOME, COST OF FUNDS, OVERHEADS, TAXES
+  - **Sub Categories**: Interest Income, Fee Income, Salaries, Marketing, etc.
+  - **Individual Accounts**: Detailed account lines within each sub-category
+  - **Automatic Subtotals**: Calculated for each sub-category
+  - **Parent Totals**: Calculated for each parent category
+  - **Calculated Totals**: 
+    - **GROSS PROFIT**: TOTAL INCOME - TOTAL COST OF FUNDS
+    - **NET PROFIT BEFORE TAX**: GROSS PROFIT - TOTAL OVERHEADS
+    - **NET PROFIT AFTER TAX**: NET PROFIT BEFORE TAX - TAXES
 
-### Balance Sheet Report
+- **Visual Features**:
+  - **Color-coded Sections**: Different background colors for headers, subtotals, and totals
+  - **Indentation**: Clear visual hierarchy with proper indentation
+  - **Bold Formatting**: Headers and totals displayed in bold
+  - **Company Columns**: F2001 (light blue), GL001 (light green), TOTAL (light gray)
+  - **DataTables Integration**: Fixed columns, scrolling, no sorting to preserve hierarchy
+  - **Responsive Design**: Works on all screen sizes
+
+### Hierarchical Balance Sheet Report
 - **URL**: `/reports/bs/`
-- **Features**:
-  - Shows ASSET, LIABILITY, and EQUITY accounts
-  - Same structure as P&L (periods as columns, accounts as rows)
-  - Groups by categories from ChartOfAccounts
-  - Orders by sort_order
-  - Period filtering (from-to date selectors)
-  - Data type filtering (Actual/Budget/Forecast)
-  - Export to Excel functionality
+- **Hierarchical Structure**:
+  - **Parent Categories**: ASSETS, LIABILITIES, EQUITY
+  - **Sub Categories**: Current Assets, Fixed Assets, Current Liabilities, etc.
+  - **Individual Accounts**: Detailed account lines within each sub-category
+  - **Automatic Subtotals**: Calculated for each sub-category
+  - **Parent Totals**: Calculated for each parent category
+  - **Balance Check**: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
+
+- **Visual Features**:
+  - **Color-coded Sections**: Different background colors for headers, subtotals, and totals
+  - **Indentation**: Clear visual hierarchy with proper indentation
+  - **Bold Formatting**: Headers and totals displayed in bold
+  - **Company Columns**: F2001 (light blue), GL001 (light green), TOTAL (light gray)
+  - **DataTables Integration**: Fixed columns, scrolling, no sorting to preserve hierarchy
+  - **Responsive Design**: Works on all screen sizes
+
+### Report Features
+- **Period Filtering**: From/To month and year selectors
+- **Data Type Filtering**: Actual, Budget, Forecast
+- **Export to Excel**: Download reports in Excel format
+- **Print Functionality**: Print-friendly reports
+- **Navigation Menu**: Easy switching between P&L and Balance Sheet
+- **Debug Information**: Detailed troubleshooting information when no data is found
   - Print functionality
   - **Sticky Headers**: Account Code and Account Name columns stay fixed when scrolling horizontally
   - **Sticky Period Headers**: Period headers stay fixed when scrolling vertically

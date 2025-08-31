@@ -1,62 +1,81 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
 from .models import Company, Account, FinancialData, ChartOfAccounts, DataBackup
-import json
 import pandas as pd
 import csv
-from datetime import datetime
-import calendar
-from django.db.models import Sum
-from django.template.defaultfilters import register
+from datetime import datetime, date
+import json
 import re
 from decimal import Decimal, InvalidOperation
 import logging
+import calendar
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 def clean_number_value(value):
-    """
-    Clean and parse number values from Excel, handling various formats.
-    
-    Args:
-        value: The raw value from Excel (could be string, number, or None)
-    
-    Returns:
-        Decimal: Parsed number value
-        None: If value is empty/null/not parseable
-    """
+    """Clean and parse number values from Excel, handling various formats."""
     if value is None or pd.isna(value):
         return None
     
-    # Convert to string and strip whitespace
     value_str = str(value).strip()
-    
-    # Handle empty strings
     if not value_str or value_str == '':
         return None
     
-    # Remove apostrophes and quotes from beginning and end
     value_str = value_str.strip("'\"")
-    
-    # Remove spaces
     value_str = value_str.replace(' ', '')
     
-    # Handle negative numbers in parentheses: (1,234.56) -> -1234.56
     if value_str.startswith('(') and value_str.endswith(')'):
         value_str = '-' + value_str[1:-1]
     
-    # Remove thousand separators (commas)
     value_str = value_str.replace(',', '')
     
-    # Try to parse as decimal
     try:
         return Decimal(value_str)
     except (InvalidOperation, ValueError):
         return None
+
+def parse_period_header(period_header):
+    """Parse period headers in various formats to date objects."""
+    if not period_header:
+        return None
+    
+    period_str = str(period_header).strip()
+    
+    # Try different date formats
+    formats_to_try = [
+        '%Y-%m', '%m/%Y', '%Y/%m', '%b-%y', '%y-%b', '%B %Y', '%Y %B'
+    ]
+    
+    for fmt in formats_to_try:
+        try:
+            parsed_date = datetime.strptime(period_str, fmt)
+            # If year is 2 digits, assume 20xx
+            if parsed_date.year < 100:
+                parsed_date = parsed_date.replace(year=2000 + parsed_date.year)
+            # Validate year range
+            if 2020 <= parsed_date.year <= 2099:
+                return parsed_date.date()
+        except ValueError:
+            continue
+    
+    return None
+
+def convert_month_year_to_date_range(month, year):
+    """Convert separate month and year to date range (first day to last day of month)."""
+    if not month or not year:
+        return None, None
+    
+    try:
+        month_int = int(month)
+        year_int = int(year)
+        first_day = date(year_int, month_int, 1)
+        last_day = date(year_int, month_int, calendar.monthrange(year_int, month_int)[1])
+        return first_day, last_day
+    except (ValueError, AttributeError):
+        return None, None
 
 def home(request):
     """Home page view with navigation to upload functionality."""
@@ -64,13 +83,9 @@ def home(request):
 
 def chart_of_accounts_view(request):
     """View for displaying Chart of Accounts with search and hierarchical display."""
-    # Get search parameter
     search_query = request.GET.get('search', '')
-    
-    # Get all ChartOfAccounts records ordered by sort_order
     accounts = ChartOfAccounts.objects.all().order_by('sort_order')
     
-    # Apply search filter if provided
     if search_query:
         accounts = accounts.filter(
             Q(account_code__icontains=search_query) |
@@ -80,7 +95,6 @@ def chart_of_accounts_view(request):
             Q(sub_category__icontains=search_query)
         )
     
-    # Prepare hierarchical data
     hierarchical_accounts = []
     parent_categories = {}
     
@@ -92,150 +106,308 @@ def chart_of_accounts_view(request):
         else:
             hierarchical_accounts.append(account)
     
-    # Add accounts with parent categories
     for parent_category, sub_accounts in parent_categories.items():
-        # Add parent category as header if it doesn't exist
         parent_header = next((acc for acc in hierarchical_accounts if acc.account_name == parent_category), None)
         if not parent_header:
             hierarchical_accounts.append(ChartOfAccounts(
                 account_name=parent_category,
-                is_header=True,
-                sort_order=min(sub_accounts, key=lambda x: x.sort_order).sort_order - 1
+                account_type='',
+                parent_category='',
+                sub_category='',
+                sort_order=0,
+                is_header=True
             ))
-        
-        # Add sub-accounts
         hierarchical_accounts.extend(sub_accounts)
-    
-    # Sort by sort_order
-    hierarchical_accounts.sort(key=lambda x: x.sort_order)
     
     context = {
         'accounts': hierarchical_accounts,
-        'search_query': search_query,
+        'search_query': search_query
     }
-    
     return render(request, 'core/chart_of_accounts_simple.html', context)
 
 @csrf_exempt
 def download_chart_of_accounts(request):
     """Download Chart of Accounts as CSV/Excel."""
-    # Get all ChartOfAccounts records ordered by sort_order
     accounts = ChartOfAccounts.objects.all().order_by('sort_order')
     
-    # Get format parameter (csv or excel)
-    format_type = request.GET.get('format', 'csv')
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="chart_of_accounts.csv"'
     
-    if format_type == 'excel':
-        # Create Excel file
-        data = []
-        for account in accounts:
-            data.append([
-                account.sort_order,
-                account.account_code or '',
-                account.account_name,
-                account.account_type or '',
-                account.parent_category or '',
-                account.sub_category or ''
-            ])
-        
-        # Create DataFrame
-        df = pd.DataFrame(data, columns=[
-            'Sort Order', 'Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category'
+    writer = csv.writer(response)
+    writer.writerow(['Sort Order', 'Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category'])
+    
+    for account in accounts:
+        writer.writerow([
+            account.sort_order,
+            account.account_code or '',
+            account.account_name,
+            account.account_type or '',
+            account.parent_category or '',
+            account.sub_category or ''
         ])
-        
-        # Create Excel response
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="chart_of_accounts_{datetime.now().strftime("%Y%m%d")}.xlsx"'
-        
-        # Write to Excel
-        with pd.ExcelWriter(response, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Chart of Accounts', index=False)
-        
-        return response
-    else:
-        # Create CSV file
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="chart_of_accounts_{datetime.now().strftime("%Y%m%d")}.csv"'
-        
-        writer = csv.writer(response)
-        
-        # Write headers
-        writer.writerow(['Sort Order', 'Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category'])
-        
-        # Write data
-        for account in accounts:
-            writer.writerow([
-                account.sort_order,
-                account.account_code or '',
-                account.account_name,
-                account.account_type or '',
-                account.parent_category or '',
-                account.sub_category or ''
-            ])
-        
-        return response
-
-def convert_month_to_date_range(month_str):
-    """Convert month string (YYYY-MM) to date range (first day to last day of month)."""
-    if not month_str:
-        return None, None
     
-    try:
-        from datetime import datetime, date
-        import calendar
-        
-        # Parse the month string (YYYY-MM format)
-        year, month = map(int, month_str.split('-'))
-        
-        # Get first day of month
-        first_day = date(year, month, 1)
-        
-        # Get last day of month
-        last_day = date(year, month, calendar.monthrange(year, month)[1])
-        
-        return first_day, last_day
-    except (ValueError, AttributeError):
-        return None, None
+    return response
 
-def convert_month_year_to_date_range(month, year):
-    """Convert separate month and year to date range (first day to last day of month)."""
-    if not month or not year:
-        return None, None
+def upload_chart_of_accounts(request):
+    """Upload Chart of Accounts from CSV/Excel file."""
+    if request.method == 'POST':
+        uploaded_file = request.FILES['file']
+        replace_existing = request.POST.get('replace_existing') == 'on'
+
+        try:
+            if replace_existing:
+                existing_count = ChartOfAccounts.objects.count()
+                if existing_count > 0:
+                    ChartOfAccounts.objects.all().delete()
+                    logger.info(f"Deleted {existing_count} existing ChartOfAccounts records for replacement")
+                    messages.warning(request, f'Deleted {existing_count} existing Chart of Accounts records. Proceeding with import.')
+                else:
+                    messages.info(request, 'No existing Chart of Accounts to replace.')
+
+            # Read file
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            
+            # Check column count
+            if len(df.columns) < 6:
+                messages.error(request, f'File must have at least 6 columns. Found {len(df.columns)} columns.')
+                return render(request, 'core/upload_chart_of_accounts.html')
+            
+            success_count = 0
+            error_count = 0
+            errors = []
+            
+            for index, row in df.iterrows():
+                try:
+                    sort_order = int(row.iloc[0]) if pd.notna(row.iloc[0]) else 0
+                    account_code = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
+                    account_name = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ''
+                    account_type = str(row.iloc[3]).strip() if pd.notna(row.iloc[3]) else ''
+                    parent_category = str(row.iloc[4]).strip() if pd.notna(row.iloc[4]) else ''
+                    sub_category = str(row.iloc[5]).strip() if pd.notna(row.iloc[5]) else ''
+
+                    if not replace_existing and account_code and ChartOfAccounts.objects.filter(account_code=account_code).exists():
+                        errors.append(f"Row {index + 2}: Account Code '{account_code}' already exists")
+                        error_count += 1
+                        continue
+
+                    ChartOfAccounts.objects.create(
+                        sort_order=sort_order,
+                        account_code=account_code if account_code else None,
+                        account_name=account_name,
+                        account_type=account_type if account_type else '',
+                        parent_category=parent_category,
+                        sub_category=sub_category,
+                        formula='',
+                        is_header=is_header
+                    )
+                    success_count += 1
+                except Exception as e:
+                    errors.append(f"Row {index + 2}: {str(e)}")
+                    error_count += 1
+            
+            if success_count > 0:
+                if replace_existing:
+                    messages.success(request, f'Successfully replaced Chart of Accounts with {success_count} new records.')
+                else:
+                    messages.success(request, f'Successfully added/updated {success_count} records.')
+        except Exception as e:
+            messages.error(request, f'Error processing file: {str(e)}')
     
-    try:
-        from datetime import datetime, date
-        import calendar
-        
-        # Parse month and year
-        month_int = int(month)
-        year_int = int(year)
-        
-        # Get first day of month
-        first_day = date(year_int, month_int, 1)
-        
-        # Get last day of month
-        last_day = date(year_int, month_int, calendar.monthrange(year_int, month_int)[1])
-        
-        return first_day, last_day
-    except (ValueError, AttributeError):
-        return None, None
+    return render(request, 'core/upload_chart_of_accounts.html')
 
+def upload_financial_data(request):
+    """Upload Financial Data from CSV/Excel file."""
+    companies = Company.objects.all().order_by('name')
+    
+    if request.method == 'POST':
+        uploaded_file = request.FILES['file']
+        company_id = request.POST.get('company')
+        data_type = request.POST.get('data_type', 'actual')
+        
+        try:
+            company = Company.objects.get(id=company_id)
+            
+            # Read file
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            
+            # Check minimum columns
+            if len(df.columns) < 3:
+                messages.error(request, 'File must have at least 3 columns: Account Code, Account Name, and at least one period column.')
+                return render(request, 'core/upload_financial_data.html', {'companies': companies})
+            
+            # Parse period columns (starting from column 3)
+            period_columns = []
+            for col in df.columns[2:]:
+                period_date = parse_period_header(col)
+                if period_date:
+                    period_columns.append((col, period_date))
+            
+            if not period_columns:
+                messages.error(request, 'No valid period columns found. Please ensure column headers are in format like "Jan-24", "2024-01", etc.')
+                return render(request, 'core/upload_financial_data.html', {'companies': companies})
+            
+            # Check for existing data
+            existing_periods = []
+            for col, period_date in period_columns:
+                existing_data = FinancialData.objects.filter(
+                    company=company,
+                    period=period_date,
+                    data_type=data_type
+                )
+                if existing_data.exists():
+                    existing_periods.append(col)
+            
+            if existing_periods:
+                # Create backup before overwriting
+                backup_data = []
+                for col, period_date in period_columns:
+                    if col in existing_periods:
+                        existing_records = FinancialData.objects.filter(
+                            company=company,
+                            period=period_date,
+                            data_type=data_type
+                        )
+                        for record in existing_records:
+                            backup_data.append({
+                                'account_code': record.account.code,
+                                'amount': float(record.amount),
+                                'period': record.period.isoformat()
+                            })
+                
+                if backup_data:
+                    DataBackup.objects.create(
+                        company=company,
+                        data_type=data_type,
+                        periods=json.dumps([col for col, _ in period_columns if col in existing_periods]),
+                        backup_data=backup_data,
+                        user=request.user.username if request.user.is_authenticated else 'Anonymous',
+                        description=f"Backup before upload on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                    )
+                    messages.warning(request, f'Backup created for existing data in periods: {", ".join(existing_periods)}. You can restore previous data from Admin panel.')
+                
+                # Delete existing data
+                for col, period_date in period_columns:
+                    if col in existing_periods:
+                        FinancialData.objects.filter(
+                            company=company,
+                            period=period_date,
+                            data_type=data_type
+                        ).delete()
+            
+            success_count = 0
+            error_count = 0
+            errors = []
+            
+            for index, row in df.iterrows():
+                try:
+                    account_code = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
+                    account_name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
+                    
+                    if not account_code:
+                        continue
+                    
+                    # Get or create account
+                    account, created = Account.objects.get_or_create(
+                        code=account_code,
+                        defaults={'name': account_name, 'type': 'asset'}
+                    )
+                    
+                    # Process each period column
+                    for col, period_date in period_columns:
+                        amount_value = row[col]
+                        if pd.notna(amount_value):
+                            cleaned_amount = clean_number_value(amount_value)
+                            if cleaned_amount is not None:
+                                FinancialData.objects.create(
+                                    company=company,
+                                    account=account,
+                                    period=period_date,
+                                    amount=cleaned_amount,
+                                    data_type=data_type
+                                )
+                                success_count += 1
+                
+                except Exception as e:
+                    errors.append(f"Row {index + 2}: {str(e)}")
+                    error_count += 1
+            
+            if success_count > 0:
+                messages.success(request, f'Successfully uploaded {success_count} records for {len(period_columns)} periods.')
+            if errors:
+                messages.warning(request, f'Encountered {len(errors)} errors. Please check the data format.')
+        
+        except Exception as e:
+            messages.error(request, f'Error processing file: {str(e)}')
+    
+    return render(request, 'core/upload_financial_data.html', {'companies': companies})
 
+@csrf_exempt
+def download_financial_data_template(request):
+    """Download Financial Data template as Excel."""
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="financial_data_template.xlsx"'
+    
+    # Create sample data
+    sample_data = [
+        ['4113000', 'Interest Income', 60000, 80000, 104363, 130182, 150000, 175000],
+        ['5216100', 'Interest Expense', 20000, 25000, 30000, 35000, 40000, 45000],
+        ['6011100', 'Basic Salary', 50000, 50000, 52000, 52000, 54000, 54000]
+    ]
+    
+    # Create DataFrame
+    df = pd.DataFrame(sample_data, columns=[
+        'Account Code', 'Account Name', 'Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24', 'Jun-24'
+    ])
+    
+    # Write to Excel
+    with pd.ExcelWriter(response, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Financial Data', index=False)
+    
+    return response
+
+@csrf_exempt
+def download_template(request):
+    """Download Chart of Accounts template as CSV."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="chart_of_accounts_template.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Sort Order', 'Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category'])
+    
+    # Sample data
+    sample_data = [
+        [1, '', 'TOTAL INCOME', '', '', ''],
+        [2, '4113000', 'Interest Income', 'INCOME', 'TOTAL INCOME', ''],
+        [45, '', 'COST OF FUNDS', '', '', ''],
+        [46, '5216100', 'Interest Expense', 'EXPENSE', 'COST OF FUNDS', ''],
+        [49, 'GROSS_PROFIT', 'Gross Profit', '', '', ''],
+        [60, '', 'OVERHEADS', '', '', ''],
+        [95, '', 'Marketing', '', 'OVERHEADS', ''],
+        [96, '6011202', 'Marketing Expense', 'EXPENSE', 'OVERHEADS', 'Marketing']
+    ]
+    
+    for row in sample_data:
+        writer.writerow(row)
+    
+    return response
 
 def pl_report(request):
     """P&L Report view with hierarchical grouping by parent_category and sub_category."""
-    # Get filter parameters
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
-    # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
     
     logger.info(f"P&L Report - Filters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
@@ -307,28 +479,96 @@ def pl_report(request):
         
         grouped_data[parent_category][sub_category].append(account)
     
-    # Prepare hierarchical report data
+    # Define P&L structure order
+    pl_structure = ['INCOME', 'COST OF FUNDS', 'OVERHEADS', 'TAXES']
+    
+    # Calculate all totals first
+    parent_totals = {}
+    sub_category_totals = {}
+    
+    # Initialize totals structure
+    for parent_category in pl_structure:
+        parent_totals[parent_category] = {}
+        for period in periods:
+            parent_totals[parent_category][period] = {}
+            for company in companies:
+                parent_totals[parent_category][period][company.code] = 0
+            parent_totals[parent_category][period]['TOTAL'] = 0
+    
+    # Calculate totals for each account
+    for parent_category, sub_categories in grouped_data.items():
+        for sub_category, sub_accounts in sub_categories.items():
+            sub_category_totals[f"{parent_category}_{sub_category}"] = {}
+            for period in periods:
+                sub_category_totals[f"{parent_category}_{sub_category}"][period] = {}
+                for company in companies:
+                    sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] = 0
+                sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] = 0
+            
+            for account in sub_accounts:
+                for period in periods:
+                    for company in companies:
+                        try:
+                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
+                            if account_obj:
+                                amount = FinancialData.objects.filter(
+                                    company=company,
+                                    account=account_obj,
+                                    period=period,
+                                    data_type=data_type
+                                ).aggregate(total=Sum('amount'))['total'] or 0
+                            else:
+                                amount = 0
+                            
+                            # Add to sub category total
+                            sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] += amount
+                            sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] += amount
+                            
+                            # Add to parent category total
+                            parent_totals[parent_category][period][company.code] += amount
+                            parent_totals[parent_category][period]['TOTAL'] += amount
+                            
+                        except Account.DoesNotExist:
+                            continue
+    
+    # Build hierarchical report structure
     report_data = []
     
-    # Process each parent category
-    for parent_category, sub_categories in grouped_data.items():
-        # Calculate parent category totals
-        parent_totals = {}
-        parent_total_overall = 0
-        parent_periods = {}
-        
-        # Process each sub category
-        for sub_category, sub_accounts in sub_categories.items():
-            # Calculate sub category totals
-            sub_totals = {}
-            sub_total_overall = 0
-            sub_periods = {}
+    for parent_category in pl_structure:
+        if parent_category not in grouped_data:
+            continue
             
-            # Process individual accounts in this sub category
+        # Add parent category header
+        report_data.append({
+            'type': 'parent_header',
+            'account_code': '',
+            'account_name': parent_category,
+            'account_type': '',
+            'parent_category': parent_category,
+            'sub_category': '',
+            'is_header': True,
+            'periods': parent_totals[parent_category],
+            'grand_totals': {}
+        })
+        
+        # Process sub categories
+        for sub_category, sub_accounts in grouped_data[parent_category].items():
+            # Add sub category header
+            report_data.append({
+                'type': 'sub_header',
+                'account_code': '',
+                'account_name': sub_category,
+                'account_type': '',
+                'parent_category': parent_category,
+                'sub_category': sub_category,
+                'is_header': True,
+                'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
+                'grand_totals': {}
+            })
+            
+            # Add individual accounts
             for account in sub_accounts:
-                logger.info(f"Processing account: {account.account_code} - {account.account_name}")
-                
-                row_data = {
+                account_data = {
                     'type': 'account',
                     'account_code': account.account_code or '',
                     'account_name': account.account_name,
@@ -346,136 +586,124 @@ def pl_report(request):
                     
                     for company in companies:
                         try:
-                            account_obj = None
-                            if account.account_code:
-                                try:
-                                    account_obj = Account.objects.get(code=account.account_code)
-                                except Account.DoesNotExist:
-                                    logger.warning(f"Account with code '{account.account_code}' not found in Account model")
-                            
+                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
                             if account_obj:
-                                financial_data = FinancialData.objects.filter(
+                                amount = FinancialData.objects.filter(
                                     company=company,
                                     account=account_obj,
                                     period=period,
                                     data_type=data_type
-                                )
-                                amount = financial_data.aggregate(total=Sum('amount'))['total'] or 0
+                                ).aggregate(total=Sum('amount'))['total'] or 0
                             else:
                                 amount = 0
                             
                             period_data[company.code] = amount
                             period_total += amount
-                            
-                        except Exception as e:
-                            logger.error(f"Error processing {company.code} - {account.account_code} - {period}: {e}")
+                        except Account.DoesNotExist:
                             period_data[company.code] = 0
                     
                     period_data['TOTAL'] = period_total
-                    row_data['periods'][period] = period_data
-                    
-                    # Add to sub category periods
-                    if period not in sub_periods:
-                        sub_periods[period] = {}
-                    for company in companies:
-                        if company.code not in sub_periods[period]:
-                            sub_periods[period][company.code] = 0
-                        sub_periods[period][company.code] += period_data[company.code]
-                    if 'TOTAL' not in sub_periods[period]:
-                        sub_periods[period]['TOTAL'] = 0
-                    sub_periods[period]['TOTAL'] += period_total
+                    account_data['periods'][period] = period_data
                 
-                # Calculate Grand Totals for this account
-                grand_totals = {}
-                grand_total_overall = 0
-                
-                for company in companies:
-                    company_total = 0
-                    for period in periods:
-                        company_total += row_data['periods'][period][company.code]
-                    grand_totals[company.code] = company_total
-                    grand_total_overall += company_total
-                
-                grand_totals['OVERALL'] = grand_total_overall
-                row_data['grand_totals'] = grand_totals
-                
-                # Only add rows where Grand Total is not zero
-                if grand_total_overall != 0:
-                    report_data.append(row_data)
-                    
-                    # Add to sub category totals
-                    for company in companies:
-                        if company.code not in sub_totals:
-                            sub_totals[company.code] = 0
-                        sub_totals[company.code] += grand_totals[company.code]
-                    sub_total_overall += grand_total_overall
-                else:
-                    logger.info(f"Skipping account {account.account_code} - {account.account_name} (Grand Total = 0)")
-            
-            # Add sub category header with calculated data
-            sub_totals['OVERALL'] = sub_total_overall
-            sub_header = {
-                'type': 'sub_header',
-                'account_code': '',
-                'account_name': sub_category,
-                'account_type': '',
-                'parent_category': parent_category,
-                'sub_category': sub_category,
-                'is_header': True,
-                'periods': sub_periods,
-                'grand_totals': sub_totals
-            }
-            report_data.append(sub_header)
-            
-            # Add to parent category totals and periods
-            for company in companies:
-                if company.code not in parent_totals:
-                    parent_totals[company.code] = 0
-                if company.code in sub_totals:
-                    parent_totals[company.code] += sub_totals[company.code]
-            parent_total_overall += sub_total_overall
-            
-            # Add sub category periods to parent periods
-            for period in sub_periods:
-                if period not in parent_periods:
-                    parent_periods[period] = {}
-                for company in companies:
-                    if company.code not in parent_periods[period]:
-                        parent_periods[period][company.code] = 0
-                    if company.code in sub_periods[period]:
-                        parent_periods[period][company.code] += sub_periods[period][company.code]
-                if 'TOTAL' not in parent_periods[period]:
-                    parent_periods[period]['TOTAL'] = 0
-                if 'TOTAL' in sub_periods[period]:
-                    parent_periods[period]['TOTAL'] += sub_periods[period]['TOTAL']
+                report_data.append(account_data)
         
-        # Add parent category header with calculated data
-        parent_totals['OVERALL'] = parent_total_overall
+        # Add sub category subtotal
+        if parent_category in grouped_data:
+            for sub_category in grouped_data[parent_category].keys():
+                report_data.append({
+                    'type': 'sub_total',
+                    'account_code': '',
+                    'account_name': f'Subtotal {sub_category}',
+                    'account_type': '',
+                    'parent_category': parent_category,
+                    'sub_category': sub_category,
+                    'is_header': True,
+                    'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
+                    'grand_totals': {}
+                })
         
-        # Map parent category codes to proper display names
-        category_display_names = {
-            'IN': 'INCOME TOTAL',
-            'EX': 'EXPENSE TOTAL',
-            'EXP': 'EXPENSE TOTAL',
-            'AS': 'ASSET TOTAL',
-            'LI': 'LIABILITY TOTAL',
-            'EQ': 'EQUITY TOTAL'
-        }
-        
-        display_name = category_display_names.get(parent_category, parent_category.upper())
-        
-        parent_header = {
-            'type': 'parent_header',
+        # Add parent category total
+        report_data.append({
+            'type': 'parent_total',
             'account_code': '',
-            'account_name': display_name,
+            'account_name': f'TOTAL {parent_category}',
             'account_type': '',
             'parent_category': parent_category,
             'sub_category': '',
             'is_header': True,
-            'periods': parent_periods,
-            'grand_totals': parent_totals
-        }
-        report_data.append(parent_header)
+            'periods': parent_totals[parent_category],
+            'grand_totals': {}
+        })
+        
+        # Add calculated totals for specific categories
+        if parent_category == 'INCOME':
+            # Add GROSS PROFIT calculation
+            gross_profit = {}
+            for period in periods:
+                gross_profit[period] = {}
+                for company in companies:
+                    income = parent_totals['INCOME'][period][company.code]
+                    cost_of_funds = parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)
+                    gross_profit[period][company.code] = income - cost_of_funds
+                gross_profit[period]['TOTAL'] = parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)
+            
+            report_data.append({
+                'type': 'calculated_total',
+                'account_code': '',
+                'account_name': 'GROSS PROFIT',
+                'account_type': '',
+                'parent_category': 'CALCULATED',
+                'sub_category': '',
+                'is_header': True,
+                'periods': gross_profit,
+                'grand_totals': {}
+            })
+        
+        elif parent_category == 'OVERHEADS':
+            # Add NET PROFIT BEFORE TAX calculation
+            net_profit_before_tax = {}
+            for period in periods:
+                net_profit_before_tax[period] = {}
+                for company in companies:
+                    gross_profit = parent_totals['INCOME'][period][company.code] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)
+                    overheads = parent_totals['OVERHEADS'][period][company.code]
+                    net_profit_before_tax[period][company.code] = gross_profit - overheads
+                net_profit_before_tax[period]['TOTAL'] = (parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals['OVERHEADS'][period]['TOTAL']
+            
+            report_data.append({
+                'type': 'calculated_total',
+                'account_code': '',
+                'account_name': 'NET PROFIT BEFORE TAX',
+                'account_type': '',
+                'parent_category': 'CALCULATED',
+                'sub_category': '',
+                'is_header': True,
+                'periods': net_profit_before_tax,
+                'grand_totals': {}
+            })
+        
+        elif parent_category == 'TAXES':
+            # Add NET PROFIT AFTER TAX calculation
+            net_profit_after_tax = {}
+            for period in periods:
+                net_profit_after_tax[period] = {}
+                for company in companies:
+                    net_profit_before_tax = (parent_totals['INCOME'][period][company.code] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)) - parent_totals.get('OVERHEADS', {}).get(period, {}).get(company.code, 0)
+                    taxes = parent_totals['TAXES'][period][company.code]
+                    net_profit_after_tax[period][company.code] = net_profit_before_tax - taxes
+                net_profit_after_tax[period]['TOTAL'] = ((parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals.get('OVERHEADS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals['TAXES'][period]['TOTAL']
+            
+            report_data.append({
+                'type': 'calculated_total',
+                'account_code': '',
+                'account_name': 'NET PROFIT AFTER TAX',
+                'account_type': '',
+                'parent_category': 'CALCULATED',
+                'sub_category': '',
+                'is_header': True,
+                'periods': net_profit_after_tax,
+                'grand_totals': {}
+            })
     
     logger.info(f"Generated hierarchical report with {len(report_data)} rows")
     
@@ -503,35 +731,29 @@ def pl_report(request):
 
 def bs_report(request):
     """Balance Sheet Report view."""
-    # Get filter parameters
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
-    # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
     
-    # Get all companies
     companies = Company.objects.all().order_by('name')
     
-    # Include all Balance Sheet account types (standard and QuickBooks formats)
     bs_types = [
-        'ASSET', 'LIABILITY', 'EQUITY',  # Standard
-        'Bank', 'Fixed Asset', 'Other Current Asset', 'Other Asset',  # QuickBooks Assets
-        'Other Current Liabilities', 'Other Current Liability',  # QuickBooks Liabilities
-        'Equity'  # Already correct
+        'ASSET', 'LIABILITY', 'EQUITY',
+        'Bank', 'Fixed Asset', 'Other Current Asset', 'Other Asset',
+        'Other Current Liabilities', 'Other Current Liability',
+        'Equity'
     ]
     accounts = ChartOfAccounts.objects.filter(
         account_type__in=bs_types
     ).order_by('sort_order')
     
-    # Get unique periods from FinancialData
     try:
         periods_query = FinancialData.objects.filter(
             account__type__in=['asset', 'liability', 'equity']
@@ -546,10 +768,8 @@ def bs_report(request):
     except:
         periods = []
     
-    # Prepare report data
     report_data = []
     
-    # If no periods or accounts, return empty report
     if not periods or not accounts:
         context = {
             'report_data': [],
@@ -565,46 +785,199 @@ def bs_report(request):
         }
         return render(request, 'core/bs_report.html', context)
     
+    # Group accounts by parent_category and sub_category
+    grouped_data = {}
+    
     for account in accounts:
-        row_data = {
-            'account_code': account.account_code or '',
-            'account_name': account.account_name,
-            'account_type': account.account_type,
-            'parent_category': account.parent_category,
-            'sub_category': account.sub_category,
-            'is_header': account.is_header,
-            'periods': {}
-        }
+        parent_category = account.parent_category or 'UNCATEGORIZED'
+        sub_category = account.sub_category or 'UNCATEGORIZED'
         
-        # Get data for each period and company
+        if parent_category not in grouped_data:
+            grouped_data[parent_category] = {}
+        
+        if sub_category not in grouped_data[parent_category]:
+            grouped_data[parent_category][sub_category] = []
+        
+        grouped_data[parent_category][sub_category].append(account)
+    
+    # Define Balance Sheet structure order
+    bs_structure = ['ASSETS', 'LIABILITIES', 'EQUITY']
+    
+    # Calculate all totals first
+    parent_totals = {}
+    sub_category_totals = {}
+    
+    # Initialize totals structure
+    for parent_category in bs_structure:
+        parent_totals[parent_category] = {}
         for period in periods:
-            period_data = {}
-            period_total = 0
-            
+            parent_totals[parent_category][period] = {}
             for company in companies:
-                try:
-                    # Get the account from Account model
-                    account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
-                    
-                    if account_obj:
-                        amount = FinancialData.objects.filter(
-                            company=company,
-                            account=account_obj,
-                            period=period,
-                            data_type=data_type
-                        ).aggregate(total=Sum('amount'))['total'] or 0
-                    else:
-                        amount = 0
-                    
-                    period_data[company.code] = amount
-                    period_total += amount
-                except Account.DoesNotExist:
-                    period_data[company.code] = 0
+                parent_totals[parent_category][period][company.code] = 0
+            parent_totals[parent_category][period]['TOTAL'] = 0
+    
+    # Calculate totals for each account
+    for parent_category, sub_categories in grouped_data.items():
+        for sub_category, sub_accounts in sub_categories.items():
+            sub_category_totals[f"{parent_category}_{sub_category}"] = {}
+            for period in periods:
+                sub_category_totals[f"{parent_category}_{sub_category}"][period] = {}
+                for company in companies:
+                    sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] = 0
+                sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] = 0
             
-            period_data['TOTAL'] = period_total
-            row_data['periods'][period] = period_data
+            for account in sub_accounts:
+                for period in periods:
+                    for company in companies:
+                        try:
+                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
+                            if account_obj:
+                                amount = FinancialData.objects.filter(
+                                    company=company,
+                                    account=account_obj,
+                                    period=period,
+                                    data_type=data_type
+                                ).aggregate(total=Sum('amount'))['total'] or 0
+                            else:
+                                amount = 0
+                            
+                            # Add to sub category total
+                            sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] += amount
+                            sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] += amount
+                            
+                            # Add to parent category total
+                            parent_totals[parent_category][period][company.code] += amount
+                            parent_totals[parent_category][period]['TOTAL'] += amount
+                            
+                        except Account.DoesNotExist:
+                            continue
+    
+    # Build hierarchical report structure
+    for parent_category in bs_structure:
+        if parent_category not in grouped_data:
+            continue
+            
+        # Add parent category header
+        report_data.append({
+            'type': 'parent_header',
+            'account_code': '',
+            'account_name': parent_category,
+            'account_type': '',
+            'parent_category': parent_category,
+            'sub_category': '',
+            'is_header': True,
+            'periods': parent_totals[parent_category],
+            'grand_totals': {}
+        })
         
-        report_data.append(row_data)
+        # Process sub categories
+        for sub_category, sub_accounts in grouped_data[parent_category].items():
+            # Add sub category header
+            report_data.append({
+                'type': 'sub_header',
+                'account_code': '',
+                'account_name': sub_category,
+                'account_type': '',
+                'parent_category': parent_category,
+                'sub_category': sub_category,
+                'is_header': True,
+                'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
+                'grand_totals': {}
+            })
+            
+            # Add individual accounts
+            for account in sub_accounts:
+                account_data = {
+                    'type': 'account',
+                    'account_code': account.account_code or '',
+                    'account_name': account.account_name,
+                    'account_type': account.account_type,
+                    'parent_category': account.parent_category,
+                    'sub_category': account.sub_category,
+                    'is_header': account.is_header,
+                    'periods': {}
+                }
+                
+                # Get data for each period and company
+                for period in periods:
+                    period_data = {}
+                    period_total = 0
+                    
+                    for company in companies:
+                        try:
+                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
+                            if account_obj:
+                                amount = FinancialData.objects.filter(
+                                    company=company,
+                                    account=account_obj,
+                                    period=period,
+                                    data_type=data_type
+                                ).aggregate(total=Sum('amount'))['total'] or 0
+                            else:
+                                amount = 0
+                            
+                            period_data[company.code] = amount
+                            period_total += amount
+                        except Account.DoesNotExist:
+                            period_data[company.code] = 0
+                    
+                    period_data['TOTAL'] = period_total
+                    account_data['periods'][period] = period_data
+                
+                report_data.append(account_data)
+        
+        # Add sub category subtotal
+        if parent_category in grouped_data:
+            for sub_category in grouped_data[parent_category].keys():
+                report_data.append({
+                    'type': 'sub_total',
+                    'account_code': '',
+                    'account_name': f'Subtotal {sub_category}',
+                    'account_type': '',
+                    'parent_category': parent_category,
+                    'sub_category': sub_category,
+                    'is_header': True,
+                    'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
+                    'grand_totals': {}
+                })
+        
+        # Add parent category total
+        report_data.append({
+            'type': 'parent_total',
+            'account_code': '',
+            'account_name': f'TOTAL {parent_category}',
+            'account_type': '',
+            'parent_category': parent_category,
+            'sub_category': '',
+            'is_header': True,
+            'periods': parent_totals[parent_category],
+            'grand_totals': {}
+        })
+    
+    # Add CHECK row at bottom: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
+    check_row = {}
+    for period in periods:
+        check_row[period] = {}
+        for company in companies:
+            total_assets = parent_totals.get('ASSETS', {}).get(period, {}).get(company.code, 0)
+            total_liabilities = parent_totals.get('LIABILITIES', {}).get(period, {}).get(company.code, 0)
+            total_equity = parent_totals.get('EQUITY', {}).get(period, {}).get(company.code, 0)
+            check_row[period][company.code] = total_assets - total_liabilities - total_equity
+        check_row[period]['TOTAL'] = (parent_totals.get('ASSETS', {}).get(period, {}).get('TOTAL', 0) - 
+                                     parent_totals.get('LIABILITIES', {}).get(period, {}).get('TOTAL', 0) - 
+                                     parent_totals.get('EQUITY', {}).get(period, {}).get('TOTAL', 0))
+    
+    report_data.append({
+        'type': 'check_row',
+        'account_code': '',
+        'account_name': 'CHECK (Assets - Liabilities - Equity)',
+        'account_type': '',
+        'parent_category': 'CALCULATED',
+        'sub_category': '',
+        'is_header': True,
+        'periods': check_row,
+        'grand_totals': {}
+    })
     
     context = {
         'report_data': report_data,
@@ -630,11 +1003,9 @@ def export_report_excel(request):
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
-    # Get the same data as the report views
     companies = Company.objects.all().order_by('name')
     
     if report_type == 'pl':
@@ -648,7 +1019,6 @@ def export_report_excel(request):
         ).order_by('sort_order')
         report_title = 'Balance Sheet Report'
     
-    # Get periods
     periods_query = FinancialData.objects.filter(
         account__chartofaccounts__account_type__in=accounts.values_list('account_type', flat=True)
     )
@@ -663,32 +1033,23 @@ def export_report_excel(request):
     # Prepare Excel data
     excel_data = []
     
-    # Header row
-    header = ['Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category']
+    # Add headers
+    header_row = ['Account Code', 'Account Name']
     for period in periods:
         for company in companies:
-            header.append(f'{period.strftime("%b-%y")} - {company.code}')
-        header.append(f'{period.strftime("%b-%y")} - TOTAL')
+            header_row.append(f"{period.strftime('%Y-%m')} {company.code}")
+        header_row.append(f"{period.strftime('%Y-%m')} TOTAL")
+    excel_data.append(header_row)
     
-    excel_data.append(header)
-    
-    # Data rows
+    # Add data rows
     for account in accounts:
-        row = [
-            account.account_code or '',
-            account.account_name,
-            account.account_type or '',
-            account.parent_category or '',
-            account.sub_category or ''
-        ]
+        row = [account.account_code or '', account.account_name]
         
         for period in periods:
             period_total = 0
-            
             for company in companies:
                 try:
                     account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
-                    
                     if account_obj:
                         amount = FinancialData.objects.filter(
                             company=company,
@@ -698,583 +1059,21 @@ def export_report_excel(request):
                         ).aggregate(total=Sum('amount'))['total'] or 0
                     else:
                         amount = 0
-                    
-                    row.append(amount)
+                    row.append(float(amount))
                     period_total += amount
                 except Account.DoesNotExist:
-                    row.append(0)
-            
-            row.append(period_total)
+                    row.append(0.0)
+            row.append(float(period_total))
         
         excel_data.append(row)
     
-    # Create DataFrame and Excel response
+    # Create DataFrame and export
     df = pd.DataFrame(excel_data[1:], columns=excel_data[0])
     
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}_report_{data_type}.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="{report_title.lower().replace(" ", "_")}.xlsx"'
     
     with pd.ExcelWriter(response, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name=report_title, index=False)
     
     return response
-
-def upload_chart_of_accounts(request):
-    """View for uploading Chart of Accounts from CSV/Excel file."""
-    if request.method == 'POST':
-        if 'file' not in request.FILES:
-            messages.error(request, 'Please select a file to upload.')
-            return render(request, 'core/upload_chart_of_accounts.html')
-        
-        uploaded_file = request.FILES['file']
-        replace_existing = request.POST.get('replace_existing') == 'on'
-        
-        # Check file extension
-        if not uploaded_file.name.endswith(('.csv', '.xlsx', '.xls')):
-            messages.error(request, 'Please upload a CSV or Excel file.')
-            return render(request, 'core/upload_chart_of_accounts.html')
-        
-        try:
-            # Handle replace option
-            if replace_existing:
-                existing_count = ChartOfAccounts.objects.count()
-                if existing_count > 0:
-                    ChartOfAccounts.objects.all().delete()
-                    logger.info(f"Deleted {existing_count} existing ChartOfAccounts records for replacement")
-                    messages.warning(request, f'Deleted {existing_count} existing Chart of Accounts records. Proceeding with import.')
-                else:
-                    messages.info(request, 'No existing Chart of Accounts to replace.')
-            
-            # Read the file based on its type
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            
-            # Check if we have at least 6 columns
-            if len(df.columns) < 6:
-                messages.error(request, f'File must have at least 6 columns. Found {len(df.columns)} columns.')
-                return render(request, 'core/upload_chart_of_accounts.html')
-            
-            logger.info(f"Uploading Chart of Accounts - File has {len(df.columns)} columns")
-            logger.info(f"Column names: {list(df.columns)}")
-            
-            # Process each row
-            success_count = 0
-            error_count = 0
-            errors = []
-            
-            for index, row in df.iterrows():
-                try:
-                    # Read by column index (0-5) to ensure consistency with template
-                    # Column 0: Sort Order
-                    # Column 1: Account Code  
-                    # Column 2: Account Name
-                    # Column 3: Type
-                    # Column 4: Parent Category
-                    # Column 5: Sub Category
-                    
-                    sort_order = int(row.iloc[0]) if pd.notna(row.iloc[0]) else 0
-                    account_code = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
-                    account_name = str(row.iloc[2]).strip() if pd.notna(row.iloc[2]) else ''
-                    account_type = str(row.iloc[3]).strip() if pd.notna(row.iloc[3]) else ''
-                    parent_category = str(row.iloc[4]).strip() if pd.notna(row.iloc[4]) else ''
-                    sub_category = str(row.iloc[5]).strip() if pd.notna(row.iloc[5]) else ''
-                    
-                    # Debug logging for first row
-                    if index == 0:
-                        logger.info(f"First row data:")
-                        logger.info(f"  Column 0 (Sort Order): '{row.iloc[0]}' -> {sort_order}")
-                        logger.info(f"  Column 1 (Account Code): '{row.iloc[1]}' -> '{account_code}'")
-                        logger.info(f"  Column 2 (Account Name): '{row.iloc[2]}' -> '{account_name}'")
-                        logger.info(f"  Column 3 (Type): '{row.iloc[3]}' -> '{account_type}'")
-                        logger.info(f"  Column 4 (Parent Category): '{row.iloc[4]}' -> '{parent_category}'")
-                        logger.info(f"  Column 5 (Sub Category): '{row.iloc[5]}' -> '{sub_category}'")
-                    
-                    # Validate account name
-                    if not account_name:
-                        errors.append(f"Row {index + 2}: Account Name is required")
-                        error_count += 1
-                        continue
-                    
-                    # Determine if this is a header row
-                    is_header = not account_code or account_name.upper() in ['TOTAL INCOME', 'COST OF FUNDS', 'OVERHEADS', 'MARKETING']
-                    
-                    # Check if account code already exists (only for non-header rows with codes, and only if not replacing)
-                    if not replace_existing and account_code and ChartOfAccounts.objects.filter(account_code=account_code).exists():
-                        errors.append(f"Row {index + 2}: Account Code '{account_code}' already exists")
-                        error_count += 1
-                        continue
-                    
-                    # Create the record
-                    ChartOfAccounts.objects.create(
-                        sort_order=sort_order,
-                        account_code=account_code if account_code else None,
-                        account_name=account_name,
-                        account_type=account_type if account_type else '',
-                        parent_category=parent_category,
-                        sub_category=sub_category,
-                        formula='',  # Set to empty string since Formula column was removed
-                        is_header=is_header
-                    )
-                    success_count += 1
-                    
-                except Exception as e:
-                    errors.append(f"Row {index + 2}: {str(e)}")
-                    error_count += 1
-            
-            # Show results
-            if success_count > 0:
-                if replace_existing:
-                    messages.success(request, f'Successfully replaced Chart of Accounts with {success_count} new records.')
-                else:
-                    messages.success(request, f'Successfully added/updated {success_count} records.')
-            
-            if error_count > 0:
-                messages.warning(request, f'Failed to import {error_count} accounts. Check the errors below.')
-                for error in errors[:10]:  # Show first 10 errors
-                    messages.error(request, error)
-                if len(errors) > 10:
-                    messages.error(request, f'... and {len(errors) - 10} more errors.')
-            
-        except Exception as e:
-            messages.error(request, f'Error processing file: {str(e)}')
-    
-    return render(request, 'core/upload_chart_of_accounts.html')
-
-def upload_financial_data(request):
-    """View for uploading Financial Data from CSV/Excel file."""
-    companies = Company.objects.all().order_by('name')
-    
-    if request.method == 'POST':
-        if 'file' not in request.FILES:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Please select a file to upload.'})
-            messages.error(request, 'Please select a file to upload.')
-            return render(request, 'core/upload_financial_data.html', {'companies': companies})
-        
-        uploaded_file = request.FILES['file']
-        company_id = request.POST.get('company')
-        data_type = request.POST.get('data_type')
-        confirm_overwrite = request.POST.get('confirm_overwrite') == 'true'
-        
-        # Validate form data
-        if not company_id:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Please select a company.'})
-            messages.error(request, 'Please select a company.')
-            return render(request, 'core/upload_financial_data.html', {'companies': companies})
-        
-        if not data_type:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Please select a data type.'})
-            messages.error(request, 'Please select a data type.')
-            return render(request, 'core/upload_financial_data.html', {'companies': companies})
-        
-        try:
-            company = Company.objects.get(id=company_id)
-        except Company.DoesNotExist:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Selected company does not exist.'})
-            messages.error(request, 'Selected company does not exist.')
-            return render(request, 'core/upload_financial_data.html', {'companies': companies})
-        
-        # Check file extension
-        if not uploaded_file.name.endswith(('.csv', '.xlsx', '.xls')):
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Please upload a CSV or Excel file.'})
-            messages.error(request, 'Please upload a CSV or Excel file.')
-            return render(request, 'core/upload_financial_data.html', {'companies': companies})
-        
-        try:
-            # Read the file based on its type
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            
-            # Check if required columns exist
-            if len(df.columns) < 3:
-                messages.error(request, 'File must have at least Account Code, Account Name, and one period column.')
-                return render(request, 'core/upload_financial_data.html', {'companies': companies})
-            
-            # Get period columns (columns C onwards)
-            period_columns = df.columns[2:].tolist()
-            
-            if not period_columns:
-                messages.error(request, 'No period columns found. File must have Account Code, Account Name, and period columns.')
-                return render(request, 'core/upload_financial_data.html', {'companies': companies})
-            
-            # Parse all period headers first
-            period_dates = []
-            valid_period_columns = []
-            
-            for col_idx, period_header in enumerate(period_columns):
-                period_date = parse_period_header(period_header)
-                if period_date:
-                    period_dates.append(period_date)
-                    valid_period_columns.append((col_idx, period_header, period_date))
-                else:
-                    error_msg = f'Cannot parse period format "{period_header}" in column {col_idx + 3}. Supported formats: Jan-24, 24-Jan, January 2024, 01/2024, 2024-01'
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return JsonResponse({'status': 'error', 'message': error_msg})
-                    messages.error(request, error_msg)
-                    return render(request, 'core/upload_financial_data.html', {'companies': companies})
-            
-            if not valid_period_columns:
-                messages.error(request, 'No valid period columns found.')
-                return render(request, 'core/upload_financial_data.html', {'companies': companies})
-            
-            # Check for existing data
-            existing_periods = []
-            for col_idx, period_header, period_date in valid_period_columns:
-                if FinancialData.objects.filter(
-                    company=company,
-                    period=period_date,
-                    data_type=data_type
-                ).exists():
-                    existing_periods.append(period_header)
-            
-            # If there are existing periods and user hasn't confirmed overwrite
-            if existing_periods and not confirm_overwrite:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    message = f"Data already exists for periods: {', '.join(existing_periods)}. Do you want to overwrite?"
-                    return JsonResponse({
-                        'status': 'confirmation_needed',
-                        'message': message
-                    })
-                else:
-                    # For non-AJAX requests, show warning but proceed
-                    messages.warning(request, f"Data already exists for periods: {', '.join(existing_periods)}. Existing data will be overwritten.")
-            
-            # If there are existing periods, create backup
-            backup_created = False
-            if existing_periods:
-                # Create backup of existing data
-                try:
-                    existing_data = FinancialData.objects.filter(
-                        company=company,
-                        data_type=data_type
-                    )
-                    
-                    if existing_data.exists():
-                        # Prepare backup data
-                        backup_data = []
-                        for record in existing_data:
-                            backup_data.append({
-                                'company_id': record.company.id,
-                                'account_id': record.account.id,
-                                'period': record.period.strftime('%Y-%m-%d'),
-                                'amount': str(record.amount),
-                                'data_type': record.data_type
-                            })
-                        
-                        # Get periods as strings for backup
-                        periods_str = [p.strftime('%Y-%m-%d') for p in period_dates]
-                        
-                        # Create backup record
-                        DataBackup.objects.create(
-                            company=company,
-                            data_type=data_type,
-                            periods=json.dumps(periods_str),
-                            backup_data=backup_data,
-                            user=request.user.username if request.user.is_authenticated else 'Anonymous',
-                            description=f"Backup before upload on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                        )
-                        backup_created = True
-                        
-                except Exception as e:
-                    messages.error(request, f'Error creating backup: {str(e)}')
-                
-                messages.warning(request, f'Data already exists for periods: {", ".join(existing_periods)}. Existing data will be overwritten.')
-                if backup_created:
-                    messages.info(request, 'Backup created. You can restore previous data from Admin panel.')
-            
-            # Process the upload
-            success_count = 0
-            updated_count = 0
-            error_count = 0
-            errors = []
-            earliest_period = min(period_dates)
-            latest_period = max(period_dates)
-            
-            for index, row in df.iterrows():
-                try:
-                    # Get account code and name
-                    account_code = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ''
-                    account_name = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ''
-                    
-                    # Validate account code
-                    if not account_code:
-                        errors.append(f"Row {index + 2}: Account Code is required")
-                        error_count += 1
-                        continue
-                    
-                    # First try to find the account type from ChartOfAccounts
-                    chart_account = ChartOfAccounts.objects.filter(account_code=account_code).first()
-
-                    if chart_account and chart_account.account_type:
-                        # Map ChartOfAccounts types to Account types (handle both standard and QuickBooks)
-                        type_mapping = {
-                            # Standard mappings
-                            'ASSET': 'asset',
-                            'LIABILITY': 'liability',
-                            'EQUITY': 'equity',
-                            'INCOME': 'revenue',
-                            'EXPENSE': 'expense',
-                            
-                            # QuickBooks-style mappings
-                            'BANK': 'asset',
-                            'FIXED ASSET': 'asset',
-                            'OTHER CURRENT ASSET': 'asset',
-                            'OTHER ASSET': 'asset',
-                            'OTHER CURRENT LIABILITIES': 'liability',
-                            'OTHER CURRENT LIABILITY': 'liability',
-                            'COST OF GOODS SOLD': 'expense',
-                            'COGS': 'expense',
-                        }
-                        account_type = type_mapping.get(chart_account.account_type.upper(), 'asset')
-                    else:
-                        # Default to asset if not found in ChartOfAccounts
-                        account_type = 'asset'
-
-                    # Get or create account with the correct type
-                    account, created = Account.objects.get_or_create(
-                        code=account_code,
-                        defaults={'name': account_name, 'type': account_type}
-                    )
-
-                    # If account exists but type is wrong, update it
-                    if not created and account.type != account_type:
-                        account.type = account_type
-                        account.save()
-                    
-                    # Process each period column
-                    for col_idx, period_header, period_date in valid_period_columns:
-                        try:
-                            # Get amount value
-                            amount_value = row.iloc[col_idx + 2]
-                            
-                            # Clean and parse the number value
-                            amount = clean_number_value(amount_value)
-                            
-                            # Skip if value is None (empty/null)
-                            if amount is None:
-                                continue
-                            
-                            # Convert Decimal to float for database storage
-                            try:
-                                amount_float = float(amount)
-                            except (ValueError, TypeError):
-                                errors.append(f"Row {index + 2}, Column {col_idx + 3}: Unable to parse number '{amount_value}'. Make sure numbers don't have text formatting in Excel.")
-                                error_count += 1
-                                continue
-                            
-                            # Check if record already exists
-                            existing_record = FinancialData.objects.filter(
-                                company=company,
-                                account=account,
-                                period=period_date,
-                                data_type=data_type
-                            ).first()
-                            
-                            if existing_record:
-                                # Update existing record
-                                existing_record.amount = amount_float
-                                existing_record.save()
-                                updated_count += 1
-                            else:
-                                # Create new record
-                                FinancialData.objects.create(
-                                    company=company,
-                                    account=account,
-                                    period=period_date,
-                                    amount=amount_float,
-                                    data_type=data_type
-                                )
-                                success_count += 1
-                            
-                        except Exception as e:
-                            errors.append(f"Row {index + 2}, Column {col_idx + 3}: {str(e)}")
-                            error_count += 1
-                    
-                except Exception as e:
-                    errors.append(f"Row {index + 2}: {str(e)}")
-                    error_count += 1
-            
-            # Show results
-            if success_count > 0 or updated_count > 0:
-                period_range = f"from {earliest_period.strftime('%b %Y')} to {latest_period.strftime('%b %Y')}"
-                if updated_count > 0:
-                    success_msg = f'Successfully uploaded {success_count} accounts for {len(valid_period_columns)} periods ({period_range}). Updated {updated_count} existing records.'
-                    if backup_created:
-                        success_msg += ' Previous data backed up and can be restored from Admin > Data Backups.'
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return JsonResponse({'status': 'success', 'message': success_msg})
-                    messages.success(request, success_msg)
-                else:
-                    success_msg = f'Successfully uploaded {success_count} accounts for {len(valid_period_columns)} periods ({period_range}).'
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return JsonResponse({'status': 'success', 'message': success_msg})
-                    messages.success(request, success_msg)
-            
-            if error_count > 0:
-                error_msg = f'Failed to import {error_count} records. Check the errors below.'
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({'status': 'error', 'message': error_msg})
-                messages.warning(request, error_msg)
-                for error in errors[:10]:  # Show first 10 errors
-                    messages.error(request, error)
-                if len(errors) > 10:
-                    messages.error(request, f'... and {len(errors) - 10} more errors.')
-            
-        except Exception as e:
-            error_msg = f'Error processing file: {str(e)}'
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': error_msg})
-            messages.error(request, error_msg)
-    
-    return render(request, 'core/upload_financial_data.html', {'companies': companies})
-
-@csrf_exempt
-def download_financial_data_template(request):
-    """View for downloading the Financial Data template."""
-    # Create sample data with diverse period headers
-    period_headers = ['Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24', 'Jun-24', 'Jul-24', 'Aug-24']
-    
-    # Create Excel file using pandas with various number formats
-    sample_data = [
-        ['1000000', 'Cash', 100000, 105000, 110000, 115000, 120000, 125000, 130000, 135000],
-        ['2000000', 'Accounts Payable', 50000, 52000, 54000, 56000, 58000, 60000, 62000, 64000],
-        ['4113000', 'Interest Income', 5000, 5200, 5400, 5600, 5800, 6000, 6200, 6400],
-        ['5216100', 'Interest Expense', -2000, -2100, -2200, -2300, -2400, -2500, -2600, -2700],
-        ['6011202', 'Marketing Expense', 15000, 16000, 17000, 18000, 19000, 20000, 21000, 22000],
-    ]
-    
-    # Create DataFrame
-    columns = ['Account Code', 'Account Name'] + period_headers
-    df = pd.DataFrame(sample_data, columns=columns)
-    
-    # Create Excel response
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="financial_data_template.xlsx"'
-    
-    # Write to Excel
-    with pd.ExcelWriter(response, engine='openpyxl') as writer:
-        df.to_excel(writer, sheet_name='Financial Data', index=False)
-    
-    return response
-
-@csrf_exempt
-def download_template(request):
-    """View for downloading the Chart of Accounts template."""
-    # Create sample data with hierarchical structure (6 columns)
-    sample_data = [
-        [1, '', 'TOTAL INCOME', '', '', ''],
-        [2, '4113000', 'Interest Income', 'INCOME', 'TOTAL INCOME', ''],
-        [45, '', 'COST OF FUNDS', '', '', ''],
-        [46, '5216100', 'Interest Expense', 'EXPENSE', 'COST OF FUNDS', ''],
-        [49, 'GROSS_PROFIT', 'Gross Profit', '', '', ''],
-        [60, '', 'OVERHEADS', '', '', ''],
-        [95, '', 'Marketing', '', 'OVERHEADS', ''],
-        [96, '6011202', 'Marketing Expense', 'EXPENSE', 'OVERHEADS', 'Marketing'],
-    ]
-    
-    # Create CSV response
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="chart_of_accounts_template.csv"'
-    
-    writer = csv.writer(response)
-    
-    # Write headers (6 columns without Formula)
-    writer.writerow(['Sort Order', 'Account Code', 'Account Name', 'Type', 'Parent Category', 'Sub Category'])
-    
-    # Write sample data
-    for row in sample_data:
-        writer.writerow(row)
-    
-    return response
-
-def parse_period_header(period_header):
-    """Parse period header to date object supporting multiple formats."""
-    try:
-        period_header = str(period_header).strip()
-        
-        # Month name mapping
-        month_map = {
-            'jan': 1, 'january': 1,
-            'feb': 2, 'february': 2,
-            'mar': 3, 'march': 3,
-            'apr': 4, 'april': 4,
-            'may': 5,
-            'jun': 6, 'june': 6,
-            'jul': 7, 'july': 7,
-            'aug': 8, 'august': 8,
-            'sep': 9, 'september': 9,
-            'oct': 10, 'october': 10,
-            'nov': 11, 'november': 11,
-            'dec': 12, 'december': 12
-        }
-        
-        # Handle formats with hyphens
-        if '-' in period_header and len(period_header.split('-')) == 2:
-            parts = period_header.split('-')
-            part1 = parts[0].strip()
-            part2 = parts[1].strip()
-            
-            # Format 1: 'YY-Mon' (e.g., '24-Jan', '25-Feb')
-            if part1.isdigit() and len(part1) == 2 and part2.lower() in month_map:
-                year_part = part1
-                month_part = part2.lower()
-                month = month_map[month_part]
-                # Interpret YY as 20YY
-                full_year = 2000 + int(year_part)
-                if 2020 <= full_year <= 2099:
-                    return datetime(full_year, month, 1).date()
-            
-            # Format 2: 'Mon-YY' (e.g., 'Jan-24', 'Feb-25')
-            elif part1.lower() in month_map and part2.isdigit() and len(part2) == 2:
-                month_part = part1.lower()
-                year_part = part2
-                month = month_map[month_part]
-                # Interpret YY as 20YY
-                full_year = 2000 + int(year_part)
-                if 2020 <= full_year <= 2099:
-                    return datetime(full_year, month, 1).date()
-            
-            # Format 3: 'YYYY-MM' (e.g., '2024-01', '2025-12')
-            elif part1.isdigit() and len(part1) == 4 and part2.isdigit() and len(part2) == 2:
-                full_year = int(part1)
-                month = int(part2)
-                if 1 <= month <= 12 and 2020 <= full_year <= 2099:
-                    return datetime(full_year, month, 1).date()
-        
-        # Format 4: 'Month YYYY' (e.g., 'January 2024', 'Feb 2025')
-        for month_name, month_num in month_map.items():
-            if month_name in period_header.lower():
-                # Extract year from the string
-                import re
-                year_match = re.search(r'\b(20\d{2})\b', period_header)
-                if year_match:
-                    full_year = int(year_match.group(1))
-                    if 2020 <= full_year <= 2099:
-                        return datetime(full_year, month_num, 1).date()
-        
-        # Format 5: 'MM/YYYY' (e.g., '01/2024', '12/2025')
-        if '/' in period_header:
-            parts = period_header.split('/')
-            if len(parts) == 2:
-                month_part = parts[0].strip()
-                year_part = parts[1].strip()
-                
-                if month_part.isdigit() and year_part.isdigit():
-                    month = int(month_part)
-                    full_year = int(year_part)
-                    
-                    if 1 <= month <= 12 and 2020 <= full_year <= 2099:
-                        return datetime(full_year, month, 1).date()
-        
-        return None
-        
-    except Exception as e:
-        return None
