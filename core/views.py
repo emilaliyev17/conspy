@@ -57,7 +57,8 @@ def parse_period_header(period_header):
                 parsed_date = parsed_date.replace(year=2000 + parsed_date.year)
             # Validate year range
             if 2020 <= parsed_date.year <= 2099:
-                return parsed_date.date()
+                # Always use first day of month
+                return parsed_date.replace(day=1).date()
         except ValueError:
             continue
     
