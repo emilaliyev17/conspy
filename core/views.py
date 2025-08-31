@@ -449,10 +449,23 @@ def pl_report(request):
         
         # Add parent category header with calculated data
         parent_totals['OVERALL'] = parent_total_overall
+        
+        # Map parent category codes to proper display names
+        category_display_names = {
+            'IN': 'INCOME TOTAL',
+            'EX': 'EXPENSE TOTAL',
+            'EXP': 'EXPENSE TOTAL',
+            'AS': 'ASSET TOTAL',
+            'LI': 'LIABILITY TOTAL',
+            'EQ': 'EQUITY TOTAL'
+        }
+        
+        display_name = category_display_names.get(parent_category, parent_category.upper())
+        
         parent_header = {
             'type': 'parent_header',
             'account_code': '',
-            'account_name': parent_category.upper(),
+            'account_name': display_name,
             'account_type': '',
             'parent_category': parent_category,
             'sub_category': '',
