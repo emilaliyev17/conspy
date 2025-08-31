@@ -107,6 +107,87 @@
             background-color: rgba(211, 211, 211, 0.3); /* Light gray */
         }
         
+        /* Column separators */
+        #plTable th, #plTable td {
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        #plTable th:last-child, #plTable td:last-child {
+            border-right: none;
+        }
+        
+        /* Fix header positioning for horizontal scroll */
+        .dataTables_wrapper .dataTables_scrollHead {
+            overflow: hidden !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollHeadInner {
+            width: 100% !important;
+        }
+        
+        /* Ensure fixed columns don't overlap with header */
+        .dataTables_wrapper .DTFC_LeftWrapper {
+            z-index: 100 !important;
+        }
+        
+        .dataTables_wrapper .DTFC_LeftHeadWrapper {
+            z-index: 101 !important;
+        }
+        
+        /* Alternative header positioning */
+        .dataTables_wrapper .dataTables_scrollHead {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody {
+            position: relative !important;
+            z-index: 0 !important;
+        }
+        
+        /* Manual fixed columns using CSS */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1),
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
+            position: sticky !important;
+            left: 0 !important;
+            background-color: white !important;
+            z-index: 10 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
+            left: 80px !important; /* Adjust based on first column width */
+        }
+        
+        .dataTables_wrapper .dataTables_scrollHead th:nth-child(1),
+        .dataTables_wrapper .dataTables_scrollHead th:nth-child(2) {
+            position: sticky !important;
+            left: 0 !important;
+            background-color: white !important;
+            z-index: 11 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollHead th:nth-child(2) {
+            left: 80px !important; /* Adjust based on first column width */
+        }
+        
+        /* Fix vertical alignment - force consistent height */
+        #plTable th, #plTable td,
+        .dataTables_wrapper .dataTables_scrollHead th,
+        .dataTables_wrapper .dataTables_scrollBody td {
+            padding: 8px 4px !important;
+            vertical-align: middle !important;
+            line-height: 1.2 !important;
+            min-height: 35px !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Ensure header text is properly spaced */
+        #plTable th br {
+            display: block;
+            content: "";
+            margin-top: 1px;
+        }
+        
         /* Table alignment fixes - minimal approach */
         #plTable th {
             vertical-align: middle !important;
@@ -115,6 +196,40 @@
         
         #plTable td {
             vertical-align: middle !important;
+            text-align: right !important;
+        }
+        
+        /* Keep Account Code and Account Name left-aligned */
+        #plTable td:nth-child(1),
+        #plTable td:nth-child(2) {
+            text-align: left !important;
+        }
+        
+        /* Force right alignment for all data cells (except first two columns) */
+        #plTable tbody td:nth-child(n+3) {
+            text-align: right !important;
+        }
+        
+        /* Override DataTables default alignment */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
+            text-align: right !important;
+        }
+        
+        /* Maximum specificity override for all data cells */
+        body .dataTables_wrapper .dataTables_scrollBody table.dataTable tbody tr td:nth-child(n+3) {
+            text-align: right !important;
+        }
+        
+        /* Force alignment for all numerical data */
+        #plTable tbody tr td:nth-child(n+3),
+        .dataTables_scrollBody tbody tr td:nth-child(n+3),
+        table.dataTable tbody tr td:nth-child(n+3) {
+            text-align: right !important;
+        }
+        
+        /* Override any inline styles */
+        #plTable tbody tr td:nth-child(n+3)[style*="text-align"] {
+            text-align: right !important;
         }
         .btn {
             background-color: #007bff;
@@ -167,7 +282,8 @@
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            max-width: 200px !important;
+            max-width: 150px !important;
+            width: 150px !important;
         }
         
         /* Reduce font size for Account Code column */
@@ -426,15 +542,35 @@
             $('#plTable').DataTable({
                 scrollX: true,
                 scrollY: "500px",
-                fixedColumns: {
-                    left: 2
-                },
                 paging: false,
                 searching: false,
                 ordering: false,  // DISABLE SORTING COMPLETELY
                 info: false,      // Remove "Showing X entries" text
-                autoWidth: false
+                autoWidth: false,
+                columnDefs: [
+                    {
+                        targets: [0, 1], // Account Code and Account Name
+                        className: 'text-left'
+                    },
+                    {
+                        targets: '_all', // All other columns
+                        className: 'text-right'
+                    }
+                ]
             });
+            
+            // Force alignment after table is initialized
+            setTimeout(function() {
+                // Force right alignment for all data cells (except first two columns)
+                $('#plTable tbody tr').each(function() {
+                    $(this).find('td:nth-child(n+3)').attr('style', 'text-align: right !important');
+                });
+                
+                // Force left alignment for Account Code and Account Name
+                $('#plTable tbody tr').each(function() {
+                    $(this).find('td:nth-child(1), td:nth-child(2)').attr('style', 'text-align: left !important');
+                });
+            }, 500);
         });
     </script>
 </body>
