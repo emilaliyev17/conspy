@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart of Accounts - Financial Consolidator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Chart of Accounts</h1>
+        
+        <!-- Search Form -->
+        <form method="get" class="mb-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" 
+                               class="form-control" 
+                               name="search" 
+                               value="{{ search_query }}" 
+                               placeholder="Search accounts...">
+                        <button type="submit" class="btn btn-outline-secondary">Search</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Chart of Accounts Table -->
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Sort Order</th>
+                        <th>Account Code</th>
+                        <th>Account Name</th>
+                        <th>Type</th>
+                        <th>Parent Category</th>
+                        <th>Sub Category</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in accounts %}
+                    <tr>
+                        <td>{{ account.sort_order }}</td>
+                        <td>{{ account.account_code|default:"-" }}</td>
+                        <td>{{ account.account_name }}</td>
+                        <td>{{ account.account_type|default:"-" }}</td>
+                        <td>{{ account.parent_category|default:"-" }}</td>
+                        <td>{{ account.sub_category|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">No accounts found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Export Buttons -->
+        <div class="mt-4">
+            <a href="{% url 'core:download_chart_of_accounts' %}?format=csv" class="btn btn-success">Export CSV</a>
+            <a href="{% url 'core:download_chart_of_accounts' %}?format=excel" class="btn btn-info">Export Excel</a>
+            <a href="{% url 'core:home' %}" class="btn btn-secondary">Back to Home</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

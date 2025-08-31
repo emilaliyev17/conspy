@@ -1,0 +1,375 @@
+{% load report_filters %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balance Sheet Report</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.2.2/css/fixedColumns.dataTables.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .nav-menu {
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .nav-menu a {
+            color: #495057;
+            text-decoration: none;
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav-menu a:hover {
+            background-color: #e9ecef;
+        }
+        .nav-menu a.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .filters {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .filter-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .filter-group label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .filter-group input,
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .month-select {
+            min-width: 65px;
+            max-width: 75px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        
+        .year-select {
+            min-width: 65px;
+            max-width: 75px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .actions {
+            padding: 15px 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .table-container {
+            padding: 20px;
+        }
+        /* Smaller font size for table headers to prevent wrapping */
+        .dataTables_wrapper .dataTables_scrollHead th {
+            font-size: 11px !important;
+            line-height: 1.2 !important;
+            padding: 4px 6px !important;
+        }
+        
+        /* Prevent text wrapping in Account Name column and reduce font size */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
+            font-size: 11px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 200px !important;
+        }
+        
+        /* Reduce font size for Account Code column */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1) {
+            font-size: 11px !important;
+        }
+        
+        /* Reduce font size for all data cells (numerical values) */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
+            font-size: 11px !important;
+            text-align: right !important;
+        }
+        
+        .header-row {
+            background-color: #e3f2fd;
+            font-weight: bold;
+        }
+        .asset-row {
+            background-color: #e8f5e8;
+        }
+        .liability-row {
+            background-color: #fff3cd;
+        }
+        .equity-row {
+            background-color: #f3e5f5;
+        }
+        .total-row {
+            background-color: #e8f5e8;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .positive {
+            color: #000000;
+        }
+        .zero {
+            color: #6c757d;
+        }
+        @media print {
+            .nav-menu, .filters, .actions {
+                display: none;
+            }
+            .container {
+                box-shadow: none;
+            }
+        }
+        @media (max-width: 768px) {
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Balance Sheet Report</h1>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <div class="nav-menu">
+            <a href="{% url 'core:home' %}">🏠 Home</a>
+            <a href="{% url 'core:upload_chart_of_accounts' %}">📋 Chart of Accounts</a>
+            <a href="{% url 'core:upload_financial_data' %}">💰 Financial Data</a>
+            <a href="{% url 'core:pl_report' %}">📊 P&L Report</a>
+            <a href="{% url 'core:bs_report' %}" class="active">📈 Balance Sheet</a>
+            <a href="/admin/">⚙️ Admin</a>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <form method="get" id="filterForm">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="from_month">From Month:</label>
+                        <select id="from_month" name="from_month" class="month-select">
+                            <option value="">Select Month</option>
+                            <option value="01" {% if from_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if from_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if from_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if from_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if from_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if from_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if from_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if from_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if from_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if from_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if from_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if from_month == '12' %}selected{% endif %}>Dec</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="from_year">From Year:</label>
+                        <select id="from_year" name="from_year" class="year-select">
+                            <option value="">Select Year</option>
+                            {% for year in year_range %}
+                                <option value="{{ year }}" {% if from_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="to_month">To Month:</label>
+                        <select id="to_month" name="to_month" class="month-select">
+                            <option value="">Select Month</option>
+                            <option value="01" {% if to_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if to_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if to_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if to_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if to_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if to_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if to_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if to_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if to_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if to_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if to_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if to_month == '12' %}selected{% endif %}>Dec</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="to_year">To Year:</label>
+                        <select id="to_year" name="to_year" class="year-select">
+                            <option value="">Select Year</option>
+                            {% for year in year_range %}
+                                <option value="{{ year }}" {% if to_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="data_type">Data Type:</label>
+                        <select id="data_type" name="data_type">
+                            <option value="actual" {% if data_type == 'actual' %}selected{% endif %}>Actual</option>
+                            <option value="budget" {% if data_type == 'budget' %}selected{% endif %}>Budget</option>
+                            <option value="forecast" {% if data_type == 'forecast' %}selected{% endif %}>Forecast</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn">🔍 Apply Filters</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Actions -->
+        <div class="actions">
+            <a href="{% url 'core:export_report_excel' %}?type=bs&from_month={{ from_month }}&from_year={{ from_year }}&to_month={{ to_month }}&to_year={{ to_year }}&data_type={{ data_type }}" class="btn btn-success">
+                📥 Export to Excel
+            </a>
+            <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+        </div>
+        
+        <!-- Report Table -->
+        <div class="table-container">
+            {% if report_data %}
+            <table id="bsTable" class="display">
+                <thead>
+                    <tr>
+                        <th>Account Code</th>
+                        <th>Account Name</th>
+                        {% for period in periods %}
+                            {% for company in companies %}
+                                <th>{{ period|date:"M-y" }}<br>{{ company.code }}</th>
+                            {% endfor %}
+                            <th>{{ period|date:"M-y" }}<br>TOTAL</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report_data %}
+                        <tr class="{% if row.is_header %}header-row{% elif row.account_type == 'ASSET' %}asset-row{% elif row.account_type == 'LIABILITY' %}liability-row{% elif row.account_type == 'EQUITY' %}equity-row{% endif %}">
+                            <td>{{ row.account_code }}</td>
+                            <td>{{ row.account_name }}</td>
+                            {% for period in periods %}
+                                {% for company in companies %}
+                                    <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %}">
+                                        {{ row.periods|get_item:period|get_item:company.code|format_number }}
+                                    </td>
+                                {% endfor %}
+                                <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %}">
+                                    <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="text-align: center; padding: 40px; color: #6c757d;">
+                <h3>No data available</h3>
+                <p>Please upload financial data and ensure you have ASSET, LIABILITY, and EQUITY accounts configured.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/fixedcolumns/4.2.2/js/dataTables.fixedColumns.min.js"></script>
+    <script>
+        // Auto-submit form when filters change
+        document.getElementById('data_type').addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+        
+        // Initialize DataTable with fixed columns
+        $(document).ready(function() {
+            $('#bsTable').DataTable({
+                scrollX: true,
+                scrollY: "500px",
+                fixedColumns: {
+                    left: 2
+                },
+                paging: false,
+                searching: false,
+                ordering: false,  // DISABLE SORTING COMPLETELY
+                info: false,      // Remove "Showing X entries" text
+                autoWidth: false
+            });
+        });
+    </script>
+</body>
+</html>
