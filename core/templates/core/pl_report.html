@@ -372,8 +372,6 @@
             font-weight: bold !important;
             font-size: 16px !important;
             color: #d32f2f !important; /* Dark red text */
-            position: relative !important;
-            z-index: 1000 !important;
         }
         
         .parent-header-row:last-child td {
@@ -676,7 +674,7 @@
         $(document).ready(function() {
             $('#plTable').DataTable({
                 scrollX: true,
-                scrollY: false, // Remove height restriction to show all rows including EXPENSE TOTAL
+                scrollY: "800px", // Increased height to show more rows including EXPENSE TOTAL
                 paging: false,
                 searching: false,
                 ordering: false,  // DISABLE SORTING COMPLETELY

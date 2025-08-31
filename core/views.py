@@ -907,7 +907,10 @@ def upload_financial_data(request):
                     period_dates.append(period_date)
                     valid_period_columns.append((col_idx, period_header, period_date))
                 else:
-                    messages.error(request, f'Cannot parse period format "{period_header}" in column {col_idx + 3}. Supported formats: Jan-24, 24-Jan, January 2024, 01/2024, 2024-01')
+                    error_msg = f'Cannot parse period format "{period_header}" in column {col_idx + 3}. Supported formats: Jan-24, 24-Jan, January 2024, 01/2024, 2024-01'
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'status': 'error', 'message': error_msg})
+                    messages.error(request, error_msg)
                     return render(request, 'core/upload_financial_data.html', {'companies': companies})
             
             if not valid_period_columns:
@@ -1172,33 +1175,40 @@ def parse_period_header(period_header):
             'dec': 12, 'december': 12
         }
         
-        # Format 1: 'YY-Mon' (e.g., '24-Jan', '25-Feb')
+        # Handle formats with hyphens
         if '-' in period_header and len(period_header.split('-')) == 2:
             parts = period_header.split('-')
-            year_part = parts[0].strip()
-            month_part = parts[1].strip().lower()
+            part1 = parts[0].strip()
+            part2 = parts[1].strip()
             
-            if month_part in month_map and year_part.isdigit():
+            # Format 1: 'YY-Mon' (e.g., '24-Jan', '25-Feb')
+            if part1.isdigit() and len(part1) == 2 and part2.lower() in month_map:
+                year_part = part1
+                month_part = part2.lower()
                 month = month_map[month_part]
                 # Interpret YY as 20YY
                 full_year = 2000 + int(year_part)
-                if 2020 <= full_year <= 2099:  # Extended range for financial data
+                if 2020 <= full_year <= 2099:
                     return datetime(full_year, month, 1).date()
-        
-        # Format 2: 'Mon-YY' (e.g., 'Jan-24', 'Feb-25')
-        if '-' in period_header and len(period_header.split('-')) == 2:
-            parts = period_header.split('-')
-            month_part = parts[0].strip().lower()
-            year_part = parts[1].strip()
             
-            if month_part in month_map and year_part.isdigit():
+            # Format 2: 'Mon-YY' (e.g., 'Jan-24', 'Feb-25')
+            elif part1.lower() in month_map and part2.isdigit() and len(part2) == 2:
+                month_part = part1.lower()
+                year_part = part2
                 month = month_map[month_part]
                 # Interpret YY as 20YY
                 full_year = 2000 + int(year_part)
-                if 2020 <= full_year <= 2099:  # Extended range for financial data
+                if 2020 <= full_year <= 2099:
+                    return datetime(full_year, month, 1).date()
+            
+            # Format 3: 'YYYY-MM' (e.g., '2024-01', '2025-12')
+            elif part1.isdigit() and len(part1) == 4 and part2.isdigit() and len(part2) == 2:
+                full_year = int(part1)
+                month = int(part2)
+                if 1 <= month <= 12 and 2020 <= full_year <= 2099:
                     return datetime(full_year, month, 1).date()
         
-        # Format 3: 'Month YYYY' (e.g., 'January 2024', 'Feb 2025')
+        # Format 4: 'Month YYYY' (e.g., 'January 2024', 'Feb 2025')
         for month_name, month_num in month_map.items():
             if month_name in period_header.lower():
                 # Extract year from the string
@@ -1209,7 +1219,7 @@ def parse_period_header(period_header):
                     if 2020 <= full_year <= 2099:
                         return datetime(full_year, month_num, 1).date()
         
-        # Format 4: 'MM/YYYY' (e.g., '01/2024', '12/2025')
+        # Format 5: 'MM/YYYY' (e.g., '01/2024', '12/2025')
         if '/' in period_header:
             parts = period_header.split('/')
             if len(parts) == 2:
@@ -1222,19 +1232,6 @@ def parse_period_header(period_header):
                     
                     if 1 <= month <= 12 and 2020 <= full_year <= 2099:
                         return datetime(full_year, month, 1).date()
-        
-        # Format 5: 'YYYY-MM' (e.g., '2024-01', '2025-12')
-        if '-' in period_header and len(period_header.split('-')) == 2:
-            parts = period_header.split('-')
-            year_part = parts[0].strip()
-            month_part = parts[1].strip()
-            
-            if year_part.isdigit() and month_part.isdigit():
-                full_year = int(year_part)
-                month = int(month_part)
-                
-                if 1 <= month <= 12 and 2020 <= full_year <= 2099:
-                    return datetime(full_year, month, 1).date()
         
         return None
         
