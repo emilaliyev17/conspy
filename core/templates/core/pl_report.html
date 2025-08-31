@@ -80,9 +80,16 @@
             font-size: 14px;
         }
         
-        .period-select {
-            min-width: 120px; /* Increased width for period selection */
-            max-width: 150px;
+        .month-select {
+            min-width: 65px;
+            max-width: 75px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        
+        .year-select {
+            min-width: 65px;
+            max-width: 75px;
             padding: 6px 8px;
             font-size: 13px;
         }
@@ -481,42 +488,56 @@
             <form method="get" id="filterForm">
                 <div class="filter-row">
                     <div class="filter-group">
-                        <label for="from_period">From Period:</label>
-                        <select id="from_period" name="from_period" class="period-select">
-                            <option value="">Select Period</option>
+                        <label for="from_month">From Month:</label>
+                        <select id="from_month" name="from_month" class="month-select">
+                            <option value="">Select Month</option>
+                            <option value="01" {% if from_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if from_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if from_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if from_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if from_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if from_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if from_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if from_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if from_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if from_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if from_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if from_month == '12' %}selected{% endif %}>Dec</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="from_year">From Year:</label>
+                        <select id="from_year" name="from_year" class="year-select">
+                            <option value="">Select Year</option>
                             {% for year in year_range %}
-                                <option value="01-{{ year }}" {% if from_period == '01-'|add:year %}selected{% endif %}>Jan {{ year }}</option>
-                                <option value="02-{{ year }}" {% if from_period == '02-'|add:year %}selected{% endif %}>Feb {{ year }}</option>
-                                <option value="03-{{ year }}" {% if from_period == '03-'|add:year %}selected{% endif %}>Mar {{ year }}</option>
-                                <option value="04-{{ year }}" {% if from_period == '04-'|add:year %}selected{% endif %}>Apr {{ year }}</option>
-                                <option value="05-{{ year }}" {% if from_period == '05-'|add:year %}selected{% endif %}>May {{ year }}</option>
-                                <option value="06-{{ year }}" {% if from_period == '06-'|add:year %}selected{% endif %}>Jun {{ year }}</option>
-                                <option value="07-{{ year }}" {% if from_period == '07-'|add:year %}selected{% endif %}>Jul {{ year }}</option>
-                                <option value="08-{{ year }}" {% if from_period == '08-'|add:year %}selected{% endif %}>Aug {{ year }}</option>
-                                <option value="09-{{ year }}" {% if from_period == '09-'|add:year %}selected{% endif %}>Sep {{ year }}</option>
-                                <option value="10-{{ year }}" {% if from_period == '10-'|add:year %}selected{% endif %}>Oct {{ year }}</option>
-                                <option value="11-{{ year }}" {% if from_period == '11-'|add:year %}selected{% endif %}>Nov {{ year }}</option>
-                                <option value="12-{{ year }}" {% if from_period == '12-'|add:year %}selected{% endif %}>Dec {{ year }}</option>
+                                <option value="{{ year }}" {% if from_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label for="to_period">To Period:</label>
-                        <select id="to_period" name="to_period" class="period-select">
-                            <option value="">Select Period</option>
+                        <label for="to_month">To Month:</label>
+                        <select id="to_month" name="to_month" class="month-select">
+                            <option value="">Select Month</option>
+                            <option value="01" {% if to_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if to_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if to_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if to_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if to_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if to_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if to_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if to_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if to_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if to_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if to_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if to_month == '12' %}selected{% endif %}>Dec</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="to_year">To Year:</label>
+                        <select id="to_year" name="to_year" class="year-select">
+                            <option value="">Select Year</option>
                             {% for year in year_range %}
-                                <option value="01-{{ year }}" {% if to_period == '01-'|add:year %}selected{% endif %}>Jan {{ year }}</option>
-                                <option value="02-{{ year }}" {% if to_period == '02-'|add:year %}selected{% endif %}>Feb {{ year }}</option>
-                                <option value="03-{{ year }}" {% if to_period == '03-'|add:year %}selected{% endif %}>Mar {{ year }}</option>
-                                <option value="04-{{ year }}" {% if to_period == '04-'|add:year %}selected{% endif %}>Apr {{ year }}</option>
-                                <option value="05-{{ year }}" {% if to_period == '05-'|add:year %}selected{% endif %}>May {{ year }}</option>
-                                <option value="06-{{ year }}" {% if to_period == '06-'|add:year %}selected{% endif %}>Jun {{ year }}</option>
-                                <option value="07-{{ year }}" {% if to_period == '07-'|add:year %}selected{% endif %}>Jul {{ year }}</option>
-                                <option value="08-{{ year }}" {% if to_period == '08-'|add:year %}selected{% endif %}>Aug {{ year }}</option>
-                                <option value="09-{{ year }}" {% if to_period == '09-'|add:year %}selected{% endif %}>Sep {{ year }}</option>
-                                <option value="10-{{ year }}" {% if to_period == '10-'|add:year %}selected{% endif %}>Oct {{ year }}</option>
-                                <option value="11-{{ year }}" {% if to_period == '11-'|add:year %}selected{% endif %}>Nov {{ year }}</option>
-                                <option value="12-{{ year }}" {% if to_period == '12-'|add:year %}selected{% endif %}>Dec {{ year }}</option>
+                                <option value="{{ year }}" {% if to_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -538,7 +559,7 @@
         
         <!-- Actions -->
         <div class="actions">
-            <a href="{% url 'core:export_report_excel' %}?type=pl&from_period={{ from_period }}&to_period={{ to_period }}&data_type={{ data_type }}" class="btn btn-success">
+            <a href="{% url 'core:export_report_excel' %}?type=pl&from_month={{ from_month }}&from_year={{ from_year }}&to_month={{ to_month }}&to_year={{ to_year }}&data_type={{ data_type }}" class="btn btn-success">
                 📥 Export to Excel
             </a>
             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>

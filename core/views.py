@@ -220,45 +220,25 @@ def convert_month_year_to_date_range(month, year):
     except (ValueError, AttributeError):
         return None, None
 
-def convert_period_to_date_range(period):
-    """Convert period format (MM-YYYY) to date range (first day to last day of month)."""
-    if not period:
-        return None, None
-    
-    try:
-        from datetime import datetime, date
-        import calendar
-        
-        # Parse period format (MM-YYYY)
-        month_str, year_str = period.split('-')
-        month_int = int(month_str)
-        year_int = int(year_str)
-        
-        # Get first day of month
-        first_day = date(year_int, month_int, 1)
-        
-        # Get last day of month
-        last_day = date(year_int, month_int, calendar.monthrange(year_int, month_int)[1])
-        
-        return first_day, last_day
-    except (ValueError, AttributeError):
-        return None, None
+
 
 def pl_report(request):
     """P&L Report view with hierarchical grouping by parent_category and sub_category."""
     # Get filter parameters
-    from_period = request.GET.get('from_period', '')
-    to_period = request.GET.get('to_period', '')
+    from_month = request.GET.get('from_month', '')
+    from_year = request.GET.get('from_year', '')
+    to_month = request.GET.get('to_month', '')
+    to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert period inputs to date ranges
-    from_date_start, from_date_end = convert_period_to_date_range(from_period)
-    to_date_start, to_date_end = convert_period_to_date_range(to_period)
+    # Convert month/year inputs to date ranges
+    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
+    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
     # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
     
-    logger.info(f"P&L Report - Filters: from_period={from_period}, to_period={to_period}, data_type={data_type}")
+    logger.info(f"P&L Report - Filters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
     
     # Get all companies
     companies = list(Company.objects.all().order_by('name'))
@@ -295,8 +275,10 @@ def pl_report(request):
             'report_data': [],
             'companies': companies,
             'periods': [],
-            'from_period': from_period,
-            'to_period': to_period,
+            'from_month': from_month,
+            'from_year': from_year,
+            'to_month': to_month,
+            'to_year': to_year,
             'data_type': data_type,
             'report_type': 'pl',
             'year_range': year_range,
@@ -501,8 +483,10 @@ def pl_report(request):
         'report_data': report_data,
         'companies': companies,
         'periods': periods,
-        'from_period': from_period,
-        'to_period': to_period,
+        'from_month': from_month,
+        'from_year': from_year,
+        'to_month': to_month,
+        'to_year': to_year,
         'data_type': data_type,
         'report_type': 'pl',
         'year_range': year_range,
@@ -520,13 +504,15 @@ def pl_report(request):
 def bs_report(request):
     """Balance Sheet Report view."""
     # Get filter parameters
-    from_period = request.GET.get('from_period', '')
-    to_period = request.GET.get('to_period', '')
+    from_month = request.GET.get('from_month', '')
+    from_year = request.GET.get('from_year', '')
+    to_month = request.GET.get('to_month', '')
+    to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert period inputs to date ranges
-    from_date_start, from_date_end = convert_period_to_date_range(from_period)
-    to_date_start, to_date_end = convert_period_to_date_range(to_period)
+    # Convert month/year inputs to date ranges
+    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
+    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
     # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
@@ -569,8 +555,10 @@ def bs_report(request):
             'report_data': [],
             'companies': companies,
             'periods': [],
-            'from_period': from_period,
-            'to_period': to_period,
+            'from_month': from_month,
+            'from_year': from_year,
+            'to_month': to_month,
+            'to_year': to_year,
             'data_type': data_type,
             'report_type': 'bs',
             'year_range': year_range
@@ -622,8 +610,10 @@ def bs_report(request):
         'report_data': report_data,
         'companies': companies,
         'periods': periods,
-        'from_period': from_period,
-        'to_period': to_period,
+        'from_month': from_month,
+        'from_year': from_year,
+        'to_month': to_month,
+        'to_year': to_year,
         'data_type': data_type,
         'report_type': 'bs',
         'year_range': year_range
@@ -634,13 +624,15 @@ def bs_report(request):
 def export_report_excel(request):
     """Export report data to Excel."""
     report_type = request.GET.get('type', 'pl')
-    from_period = request.GET.get('from_period', '')
-    to_period = request.GET.get('to_period', '')
+    from_month = request.GET.get('from_month', '')
+    from_year = request.GET.get('from_year', '')
+    to_month = request.GET.get('to_month', '')
+    to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert period inputs to date ranges
-    from_date_start, from_date_end = convert_period_to_date_range(from_period)
-    to_date_start, to_date_end = convert_period_to_date_range(to_period)
+    # Convert month/year inputs to date ranges
+    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
+    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
     # Get the same data as the report views
     companies = Company.objects.all().order_by('name')
