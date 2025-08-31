@@ -468,11 +468,15 @@ def pl_report(request):
     companies = list(Company.objects.all().order_by('name'))
     logger.info(f"Found {len(companies)} companies")
     
-    # Get INCOME and EXPENSE accounts ordered by sort_order
-    accounts = list(ChartOfAccounts.objects.filter(
+    # Get INCOME and EXPENSE accounts from ChartOfAccounts
+    chart_accounts = list(ChartOfAccounts.objects.filter(
         account_type__in=['INCOME', 'EXPENSE', 'Income', 'Expense']
     ).order_by('sort_order'))
-    logger.info(f"Found {len(accounts)} INCOME/EXPENSE accounts in ChartOfAccounts")
+    logger.info(f"Found {len(chart_accounts)} INCOME/EXPENSE accounts in ChartOfAccounts")
+    
+    # Debug: Log parent categories found
+    parent_categories = set(acc.parent_category for acc in chart_accounts if acc.parent_category)
+    logger.info(f"Parent categories found: {parent_categories}")
     
     # Get unique periods from FinancialData with proper filtering
     try:
@@ -494,7 +498,7 @@ def pl_report(request):
     data_type_records = FinancialData.objects.filter(data_type=data_type).count()
     
     # If no periods or accounts, return empty report
-    if not periods or not accounts:
+    if not periods or not chart_accounts:
         context = {
             'report_data': [],
             'companies': companies,
@@ -509,17 +513,35 @@ def pl_report(request):
             'debug_info': {
                 'total_financial_records': total_financial_records,
                 'data_type_records': data_type_records,
-                'accounts_found': len(accounts),
+                'accounts_found': len(chart_accounts),
                 'companies_found': len(companies),
                 'periods_found': len(periods)
             }
         }
         return render(request, 'core/pl_report.html', context)
     
+    # Pre-fetch all FinancialData for better performance
+    financial_data = {}
+    for period in periods:
+        financial_data[period] = {}
+        for company in companies:
+            financial_data[period][company.code] = {}
+    
+    # Get all FinancialData in one query
+    all_financial_data = FinancialData.objects.filter(
+        data_type=data_type,
+        period__in=periods
+    ).select_related('company', 'account')
+    
+    # Organize financial data by period, company, and account
+    for fd in all_financial_data:
+        if fd.period in financial_data and fd.company.code in financial_data[fd.period]:
+            financial_data[fd.period][fd.company.code][fd.account.code] = fd.amount
+    
     # Group accounts by parent_category and sub_category
     grouped_data = {}
     
-    for account in accounts:
+    for account in chart_accounts:
         parent_category = account.parent_category or 'UNCATEGORIZED'
         sub_category = account.sub_category or 'UNCATEGORIZED'
         
@@ -530,6 +552,7 @@ def pl_report(request):
             grouped_data[parent_category][sub_category] = []
         
         grouped_data[parent_category][sub_category].append(account)
+        logger.info(f"Grouped account {account.account_code} under {parent_category} -> {sub_category}")
     
     # Define P&L structure order
     pl_structure = ['INCOME', 'COST OF FUNDS', 'OVERHEADS', 'TAXES']
@@ -547,47 +570,42 @@ def pl_report(request):
                 parent_totals[parent_category][period][company.code] = 0
             parent_totals[parent_category][period]['TOTAL'] = 0
     
-    # Calculate totals for each account
+    # Calculate totals for each account (only once)
     for parent_category, sub_categories in grouped_data.items():
         for sub_category, sub_accounts in sub_categories.items():
-            sub_category_totals[f"{parent_category}_{sub_category}"] = {}
+            sub_category_key = f"{parent_category}_{sub_category}"
+            sub_category_totals[sub_category_key] = {}
+            
             for period in periods:
-                sub_category_totals[f"{parent_category}_{sub_category}"][period] = {}
+                sub_category_totals[sub_category_key][period] = {}
                 for company in companies:
-                    sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] = 0
-                sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] = 0
+                    sub_category_totals[sub_category_key][period][company.code] = 0
+                sub_category_totals[sub_category_key][period]['TOTAL'] = 0
             
             for account in sub_accounts:
+                if not account.account_code:
+                    continue
+                    
                 for period in periods:
                     for company in companies:
-                        try:
-                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
-                            if account_obj:
-                                amount = FinancialData.objects.filter(
-                                    company=company,
-                                    account=account_obj,
-                                    period=period,
-                                    data_type=data_type
-                                ).aggregate(total=Sum('amount'))['total'] or 0
-                            else:
-                                amount = 0
-                            
-                            # Add to sub category total
-                            sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code] += amount
-                            sub_category_totals[f"{parent_category}_{sub_category}"][period]['TOTAL'] += amount
-                            
-                            # Add to parent category total
+                        # Get amount from pre-fetched data
+                        amount = financial_data[period][company.code].get(account.account_code, 0)
+                        
+                        # Add to sub category total
+                        sub_category_totals[sub_category_key][period][company.code] += amount
+                        sub_category_totals[sub_category_key][period]['TOTAL'] += amount
+                        
+                        # Add to parent category total
+                        if parent_category in parent_totals:
                             parent_totals[parent_category][period][company.code] += amount
                             parent_totals[parent_category][period]['TOTAL'] += amount
-                            
-                        except Account.DoesNotExist:
-                            continue
     
     # Build hierarchical report structure
     report_data = []
     
     for parent_category in pl_structure:
         if parent_category not in grouped_data:
+            logger.info(f"Parent category {parent_category} not found in grouped_data")
             continue
             
         # Calculate grand totals for parent category
@@ -621,11 +639,12 @@ def pl_report(request):
             # Calculate grand totals for sub category
             sub_grand_totals = {}
             sub_grand_total_overall = 0
+            sub_category_key = f"{parent_category}_{sub_category}"
             
             for company in companies:
                 company_total = 0
                 for period in periods:
-                    company_total += sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code]
+                    company_total += sub_category_totals[sub_category_key][period][company.code]
                 sub_grand_totals[company.code] = company_total
                 sub_grand_total_overall += company_total
             
@@ -640,15 +659,18 @@ def pl_report(request):
                 'parent_category': parent_category,
                 'sub_category': sub_category,
                 'is_header': True,
-                'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
+                'periods': sub_category_totals[sub_category_key],
                 'grand_totals': sub_grand_totals
             })
             
             # Add individual accounts
             for account in sub_accounts:
+                if not account.account_code:
+                    continue
+                    
                 account_data = {
                     'type': 'account',
-                    'account_code': account.account_code or '',
+                    'account_code': account.account_code,
                     'account_name': account.account_name,
                     'account_type': account.account_type,
                     'parent_category': account.parent_category,
@@ -663,42 +685,14 @@ def pl_report(request):
                     period_total = 0
                     
                     for company in companies:
-                        try:
-                            account_obj = Account.objects.get(code=account.account_code) if account.account_code else None
-                            if account_obj:
-                                amount = FinancialData.objects.filter(
-                                    company=company,
-                                    account=account_obj,
-                                    period=period,
-                                    data_type=data_type
-                                ).aggregate(total=Sum('amount'))['total'] or 0
-                            else:
-                                amount = 0
-                            
-                            period_data[company.code] = amount
-                            period_total += amount
-                        except Account.DoesNotExist:
-                            period_data[company.code] = 0
+                        amount = financial_data[period][company.code].get(account.account_code, 0)
+                        period_data[company.code] = amount
+                        period_total += amount
                     
                     period_data['TOTAL'] = period_total
                     account_data['periods'][period] = period_data
                 
                 report_data.append(account_data)
-        
-        # Add sub category subtotal
-        if parent_category in grouped_data:
-            for sub_category in grouped_data[parent_category].keys():
-                report_data.append({
-                    'type': 'sub_total',
-                    'account_code': '',
-                    'account_name': f'Subtotal {sub_category}',
-                    'account_type': '',
-                    'parent_category': parent_category,
-                    'sub_category': sub_category,
-                    'is_header': True,
-                    'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
-                    'grand_totals': {}
-                })
         
         # Add parent category total
         report_data.append({
@@ -712,76 +706,79 @@ def pl_report(request):
             'periods': parent_totals[parent_category],
             'grand_totals': {}
         })
+    
+    # Add calculated totals after all parent categories are processed
+    # GROSS PROFIT = TOTAL INCOME - TOTAL COST OF FUNDS
+    if 'INCOME' in parent_totals and 'COST OF FUNDS' in parent_totals:
+        gross_profit = {}
+        for period in periods:
+            gross_profit[period] = {}
+            for company in companies:
+                income = parent_totals['INCOME'][period][company.code]
+                cost_of_funds = parent_totals['COST OF FUNDS'][period][company.code]
+                gross_profit[period][company.code] = income - cost_of_funds
+            gross_profit[period]['TOTAL'] = parent_totals['INCOME'][period]['TOTAL'] - parent_totals['COST OF FUNDS'][period]['TOTAL']
         
-        # Add calculated totals for specific categories
-        if parent_category == 'INCOME':
-            # Add GROSS PROFIT calculation
-            gross_profit = {}
-            for period in periods:
-                gross_profit[period] = {}
-                for company in companies:
-                    income = parent_totals['INCOME'][period][company.code]
-                    cost_of_funds = parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)
-                    gross_profit[period][company.code] = income - cost_of_funds
-                gross_profit[period]['TOTAL'] = parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)
-            
-            report_data.append({
-                'type': 'calculated_total',
-                'account_code': '',
-                'account_name': 'GROSS PROFIT',
-                'account_type': '',
-                'parent_category': 'CALCULATED',
-                'sub_category': '',
-                'is_header': True,
-                'periods': gross_profit,
-                'grand_totals': {}
-            })
+        report_data.append({
+            'type': 'calculated_total',
+            'account_code': '',
+            'account_name': 'GROSS PROFIT',
+            'account_type': '',
+            'parent_category': 'CALCULATED',
+            'sub_category': '',
+            'is_header': True,
+            'periods': gross_profit,
+            'grand_totals': {}
+        })
+    
+    # NET PROFIT BEFORE TAX = GROSS PROFIT - TOTAL OVERHEADS
+    if 'INCOME' in parent_totals and 'COST OF FUNDS' in parent_totals and 'OVERHEADS' in parent_totals:
+        net_profit_before_tax = {}
+        for period in periods:
+            net_profit_before_tax[period] = {}
+            for company in companies:
+                income = parent_totals['INCOME'][period][company.code]
+                cost_of_funds = parent_totals['COST OF FUNDS'][period][company.code]
+                overheads = parent_totals['OVERHEADS'][period][company.code]
+                net_profit_before_tax[period][company.code] = (income - cost_of_funds) - overheads
+            net_profit_before_tax[period]['TOTAL'] = (parent_totals['INCOME'][period]['TOTAL'] - parent_totals['COST OF FUNDS'][period]['TOTAL']) - parent_totals['OVERHEADS'][period]['TOTAL']
         
-        elif parent_category == 'OVERHEADS':
-            # Add NET PROFIT BEFORE TAX calculation
-            net_profit_before_tax = {}
-            for period in periods:
-                net_profit_before_tax[period] = {}
-                for company in companies:
-                    gross_profit = parent_totals['INCOME'][period][company.code] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)
-                    overheads = parent_totals['OVERHEADS'][period][company.code]
-                    net_profit_before_tax[period][company.code] = gross_profit - overheads
-                net_profit_before_tax[period]['TOTAL'] = (parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals['OVERHEADS'][period]['TOTAL']
-            
-            report_data.append({
-                'type': 'calculated_total',
-                'account_code': '',
-                'account_name': 'NET PROFIT BEFORE TAX',
-                'account_type': '',
-                'parent_category': 'CALCULATED',
-                'sub_category': '',
-                'is_header': True,
-                'periods': net_profit_before_tax,
-                'grand_totals': {}
-            })
+        report_data.append({
+            'type': 'calculated_total',
+            'account_code': '',
+            'account_name': 'NET PROFIT BEFORE TAX',
+            'account_type': '',
+            'parent_category': 'CALCULATED',
+            'sub_category': '',
+            'is_header': True,
+            'periods': net_profit_before_tax,
+            'grand_totals': {}
+        })
+    
+    # NET PROFIT AFTER TAX = NET PROFIT BEFORE TAX - TOTAL TAXES
+    if 'INCOME' in parent_totals and 'COST OF FUNDS' in parent_totals and 'OVERHEADS' in parent_totals and 'TAXES' in parent_totals:
+        net_profit_after_tax = {}
+        for period in periods:
+            net_profit_after_tax[period] = {}
+            for company in companies:
+                income = parent_totals['INCOME'][period][company.code]
+                cost_of_funds = parent_totals['COST OF FUNDS'][period][company.code]
+                overheads = parent_totals['OVERHEADS'][period][company.code]
+                taxes = parent_totals['TAXES'][period][company.code]
+                net_profit_after_tax[period][company.code] = ((income - cost_of_funds) - overheads) - taxes
+            net_profit_after_tax[period]['TOTAL'] = ((parent_totals['INCOME'][period]['TOTAL'] - parent_totals['COST OF FUNDS'][period]['TOTAL']) - parent_totals['OVERHEADS'][period]['TOTAL']) - parent_totals['TAXES'][period]['TOTAL']
         
-        elif parent_category == 'TAXES':
-            # Add NET PROFIT AFTER TAX calculation
-            net_profit_after_tax = {}
-            for period in periods:
-                net_profit_after_tax[period] = {}
-                for company in companies:
-                    net_profit_before_tax = (parent_totals['INCOME'][period][company.code] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get(company.code, 0)) - parent_totals.get('OVERHEADS', {}).get(period, {}).get(company.code, 0)
-                    taxes = parent_totals['TAXES'][period][company.code]
-                    net_profit_after_tax[period][company.code] = net_profit_before_tax - taxes
-                net_profit_after_tax[period]['TOTAL'] = ((parent_totals['INCOME'][period]['TOTAL'] - parent_totals.get('COST OF FUNDS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals.get('OVERHEADS', {}).get(period, {}).get('TOTAL', 0)) - parent_totals['TAXES'][period]['TOTAL']
-            
-            report_data.append({
-                'type': 'calculated_total',
-                'account_code': '',
-                'account_name': 'NET PROFIT AFTER TAX',
-                'account_type': '',
-                'parent_category': 'CALCULATED',
-                'sub_category': '',
-                'is_header': True,
-                'periods': net_profit_after_tax,
-                'grand_totals': {}
-            })
+        report_data.append({
+            'type': 'calculated_total',
+            'account_code': '',
+            'account_name': 'NET PROFIT AFTER TAX',
+            'account_type': '',
+            'parent_category': 'CALCULATED',
+            'sub_category': '',
+            'is_header': True,
+            'periods': net_profit_after_tax,
+            'grand_totals': {}
+        })
     
     logger.info(f"Generated hierarchical report with {len(report_data)} rows")
     
@@ -799,9 +796,10 @@ def pl_report(request):
         'debug_info': {
             'total_financial_records': total_financial_records,
             'data_type_records': data_type_records,
-            'accounts_found': len(accounts),
+            'accounts_found': len(chart_accounts),
             'companies_found': len(companies),
-            'periods_found': len(periods)
+            'periods_found': len(periods),
+            'parent_categories': list(parent_categories)
         }
     }
     
