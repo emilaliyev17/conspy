@@ -352,7 +352,53 @@
             font-size: 11px !important;
         }
         
-
+        /* Hierarchical grouping styles */
+        .parent-header-row {
+            background-color: #e8f5e8 !important; /* Light green background */
+            font-weight: bold !important;
+            font-size: 14px !important;
+            text-transform: uppercase !important;
+        }
+        
+        .sub-header-row {
+            background-color: #f8f9fa !important; /* Light gray background */
+            font-weight: bold !important;
+            font-size: 12px !important;
+        }
+        
+        .account-row {
+            background-color: white !important;
+            font-size: 11px !important;
+        }
+        
+        /* Indentation for sub-categories and accounts */
+        .sub-header-row td:nth-child(2) {
+            padding-left: 20px !important;
+        }
+        
+        .account-row td:nth-child(2) {
+            padding-left: 40px !important;
+        }
+        
+        /* Hide account code for headers */
+        .parent-header-row td:nth-child(1),
+        .sub-header-row td:nth-child(1) {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        /* Ensure proper text alignment for headers */
+        .parent-header-row td,
+        .sub-header-row td {
+            text-align: left !important;
+            vertical-align: middle !important;
+        }
+        
+        /* Keep numerical data right-aligned even in headers */
+        .parent-header-row td:nth-child(n+3),
+        .sub-header-row td:nth-child(n+3) {
+            text-align: right !important;
+        }
         
         .header-row {
             background-color: #e3f2fd;
@@ -515,13 +561,17 @@
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.is_header %}header-row{% elif row.account_type == 'INCOME' %}positive{% elif row.account_type == 'EXPENSE' %}negative{% endif %}">
-                            <td>{{ row.account_code }}</td>
+                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% else %}account-row{% endif %}">
+                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' %}{% else %}{{ row.account_code }}{% endif %}</td>
                             <td>{{ row.account_name }}</td>
                             {% for period in periods %}
                                 {% for company in companies %}
                                     <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {{ row.periods|get_item:period|get_item:company.code|format_number }}
+                                        {% if row.type == 'parent_header' or row.type == 'sub_header' %}
+                                            <strong>{{ row.periods|get_item:period|get_item:company.code|format_number }}</strong>
+                                        {% else %}
+                                            {{ row.periods|get_item:period|get_item:company.code|format_number }}
+                                        {% endif %}
                                     </td>
                                 {% endfor %}
                                 <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">

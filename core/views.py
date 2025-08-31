@@ -221,7 +221,7 @@ def convert_month_year_to_date_range(month, year):
         return None, None
 
 def pl_report(request):
-    """P&L Report view with debugging and proper data joining."""
+    """P&L Report view with hierarchical grouping by parent_category and sub_category."""
     # Get filter parameters
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
@@ -248,51 +248,27 @@ def pl_report(request):
     ).order_by('sort_order'))
     logger.info(f"Found {len(accounts)} INCOME/EXPENSE accounts in ChartOfAccounts")
     
-    # Debug: Show account details
-    for account in accounts:
-        logger.info(f"Account: {account.account_code} - {account.account_name} ({account.account_type})")
-    
     # Get unique periods from FinancialData with proper filtering
     try:
-        # First, get all FinancialData records for the data type
         financial_data_query = FinancialData.objects.filter(data_type=data_type)
         
-        # Apply date filters if provided
         if from_date_start:
             financial_data_query = financial_data_query.filter(period__gte=from_date_start)
         if to_date_end:
             financial_data_query = financial_data_query.filter(period__lte=to_date_end)
         
-        # Get periods
         periods = list(financial_data_query.values_list('period', flat=True).distinct().order_by('period'))
         logger.info(f"Found {len(periods)} periods in FinancialData")
-        
-        # Debug: Show periods
-        for period in periods:
-            logger.info(f"Period: {period}")
-            
     except Exception as e:
         logger.error(f"Error getting periods: {e}")
         periods = []
     
-    # Debug: Check if we have any FinancialData records
+    # Debug info
     total_financial_records = FinancialData.objects.count()
-    logger.info(f"Total FinancialData records: {total_financial_records}")
-    
-    # Check for records with the specified data_type
     data_type_records = FinancialData.objects.filter(data_type=data_type).count()
-    logger.info(f"FinancialData records with data_type '{data_type}': {data_type_records}")
     
-    # Prepare report data
-    report_data = []
-    
-    # If no periods or accounts, return empty report with debug info
-    if not periods:
-        logger.warning("No periods found - this could be due to:")
-        logger.warning("1. No FinancialData records exist")
-        logger.warning("2. Date filters are too restrictive")
-        logger.warning("3. Data type filter doesn't match existing data")
-        
+    # If no periods or accounts, return empty report
+    if not periods or not accounts:
         context = {
             'report_data': [],
             'companies': companies,
@@ -314,105 +290,179 @@ def pl_report(request):
         }
         return render(request, 'core/pl_report.html', context)
     
-    if not accounts:
-        logger.warning("No INCOME/EXPENSE accounts found in ChartOfAccounts")
-        context = {
-            'report_data': [],
-            'companies': companies,
-            'periods': periods,
-            'from_month': from_month,
-            'from_year': from_year,
-            'to_month': to_month,
-            'to_year': to_year,
-            'data_type': data_type,
-            'report_type': 'pl',
-            'year_range': year_range,
-            'debug_info': {
-                'total_financial_records': total_financial_records,
-                'data_type_records': data_type_records,
-                'accounts_found': len(accounts),
-                'companies_found': len(companies),
-                'periods_found': len(periods)
-            }
-        }
-        return render(request, 'core/pl_report.html', context)
+    # Group accounts by parent_category and sub_category
+    grouped_data = {}
     
-    # Process each account
     for account in accounts:
-        logger.info(f"Processing account: {account.account_code} - {account.account_name}")
+        parent_category = account.parent_category or 'UNCATEGORIZED'
+        sub_category = account.sub_category or 'UNCATEGORIZED'
         
-        row_data = {
-            'account_code': account.account_code or '',
-            'account_name': account.account_name,
-            'account_type': account.account_type,
-            'parent_category': account.parent_category,
-            'sub_category': account.sub_category,
-            'is_header': account.is_header,
-            'periods': {}
-        }
+        if parent_category not in grouped_data:
+            grouped_data[parent_category] = {}
         
-        # Get data for each period and company
-        for period in periods:
-            period_data = {}
-            period_total = 0
-            
-            for company in companies:
-                try:
-                    # Try to find the account in Account model by code
-                    account_obj = None
-                    if account.account_code:
-                        try:
-                            account_obj = Account.objects.get(code=account.account_code)
-                            logger.debug(f"Found Account object: {account_obj.code} - {account_obj.name}")
-                        except Account.DoesNotExist:
-                            logger.warning(f"Account with code '{account.account_code}' not found in Account model")
-                    
-                    if account_obj:
-                        # Get financial data for this account, company, period, and data type
-                        financial_data = FinancialData.objects.filter(
-                            company=company,
-                            account=account_obj,
-                            period=period,
-                            data_type=data_type
-                        )
-                        
-                        amount = financial_data.aggregate(total=Sum('amount'))['total'] or 0
-                        logger.debug(f"Amount for {company.code} - {account_obj.code} - {period}: {amount}")
-                    else:
-                        amount = 0
-                        logger.debug(f"No Account object found for {account.account_code}, amount set to 0")
-                    
-                    period_data[company.code] = amount
-                    period_total += amount
-                    
-                except Exception as e:
-                    logger.error(f"Error processing {company.code} - {account.account_code} - {period}: {e}")
-                    period_data[company.code] = 0
-            
-            period_data['TOTAL'] = period_total
-            row_data['periods'][period] = period_data
+        if sub_category not in grouped_data[parent_category]:
+            grouped_data[parent_category][sub_category] = []
         
-        # Calculate Grand Totals for each company and overall
-        grand_totals = {}
-        grand_total_overall = 0
-        
-        for company in companies:
-            company_total = 0
-            for period in periods:
-                company_total += row_data['periods'][period][company.code]
-            grand_totals[company.code] = company_total
-            grand_total_overall += company_total
-        
-        grand_totals['OVERALL'] = grand_total_overall
-        row_data['grand_totals'] = grand_totals
-        
-        # Only add rows where Grand Total is not zero
-        if grand_total_overall != 0:
-            report_data.append(row_data)
-        else:
-            logger.info(f"Skipping account {account.account_code} - {account.account_name} (Grand Total = 0)")
+        grouped_data[parent_category][sub_category].append(account)
     
-    logger.info(f"Generated report with {len(report_data)} account rows")
+    # Prepare hierarchical report data
+    report_data = []
+    
+    # Process each parent category
+    for parent_category, sub_categories in grouped_data.items():
+        # Calculate parent category totals
+        parent_totals = {}
+        parent_total_overall = 0
+        parent_periods = {}
+        
+        # Process each sub category
+        for sub_category, sub_accounts in sub_categories.items():
+            # Calculate sub category totals
+            sub_totals = {}
+            sub_total_overall = 0
+            sub_periods = {}
+            
+            # Process individual accounts in this sub category
+            for account in sub_accounts:
+                logger.info(f"Processing account: {account.account_code} - {account.account_name}")
+                
+                row_data = {
+                    'type': 'account',
+                    'account_code': account.account_code or '',
+                    'account_name': account.account_name,
+                    'account_type': account.account_type,
+                    'parent_category': account.parent_category,
+                    'sub_category': account.sub_category,
+                    'is_header': account.is_header,
+                    'periods': {}
+                }
+                
+                # Get data for each period and company
+                for period in periods:
+                    period_data = {}
+                    period_total = 0
+                    
+                    for company in companies:
+                        try:
+                            account_obj = None
+                            if account.account_code:
+                                try:
+                                    account_obj = Account.objects.get(code=account.account_code)
+                                except Account.DoesNotExist:
+                                    logger.warning(f"Account with code '{account.account_code}' not found in Account model")
+                            
+                            if account_obj:
+                                financial_data = FinancialData.objects.filter(
+                                    company=company,
+                                    account=account_obj,
+                                    period=period,
+                                    data_type=data_type
+                                )
+                                amount = financial_data.aggregate(total=Sum('amount'))['total'] or 0
+                            else:
+                                amount = 0
+                            
+                            period_data[company.code] = amount
+                            period_total += amount
+                            
+                        except Exception as e:
+                            logger.error(f"Error processing {company.code} - {account.account_code} - {period}: {e}")
+                            period_data[company.code] = 0
+                    
+                    period_data['TOTAL'] = period_total
+                    row_data['periods'][period] = period_data
+                    
+                    # Add to sub category periods
+                    if period not in sub_periods:
+                        sub_periods[period] = {}
+                    for company in companies:
+                        if company.code not in sub_periods[period]:
+                            sub_periods[period][company.code] = 0
+                        sub_periods[period][company.code] += period_data[company.code]
+                    if 'TOTAL' not in sub_periods[period]:
+                        sub_periods[period]['TOTAL'] = 0
+                    sub_periods[period]['TOTAL'] += period_total
+                
+                # Calculate Grand Totals for this account
+                grand_totals = {}
+                grand_total_overall = 0
+                
+                for company in companies:
+                    company_total = 0
+                    for period in periods:
+                        company_total += row_data['periods'][period][company.code]
+                    grand_totals[company.code] = company_total
+                    grand_total_overall += company_total
+                
+                grand_totals['OVERALL'] = grand_total_overall
+                row_data['grand_totals'] = grand_totals
+                
+                # Only add rows where Grand Total is not zero
+                if grand_total_overall != 0:
+                    report_data.append(row_data)
+                    
+                    # Add to sub category totals
+                    for company in companies:
+                        if company.code not in sub_totals:
+                            sub_totals[company.code] = 0
+                        sub_totals[company.code] += grand_totals[company.code]
+                    sub_total_overall += grand_total_overall
+                else:
+                    logger.info(f"Skipping account {account.account_code} - {account.account_name} (Grand Total = 0)")
+            
+            # Add sub category header with calculated data
+            sub_totals['OVERALL'] = sub_total_overall
+            sub_header = {
+                'type': 'sub_header',
+                'account_code': '',
+                'account_name': sub_category,
+                'account_type': '',
+                'parent_category': parent_category,
+                'sub_category': sub_category,
+                'is_header': True,
+                'periods': sub_periods,
+                'grand_totals': sub_totals
+            }
+            report_data.append(sub_header)
+            
+            # Add to parent category totals and periods
+            for company in companies:
+                if company.code not in parent_totals:
+                    parent_totals[company.code] = 0
+                if company.code in sub_totals:
+                    parent_totals[company.code] += sub_totals[company.code]
+            parent_total_overall += sub_total_overall
+            
+            # Add sub category periods to parent periods
+            for period in sub_periods:
+                if period not in parent_periods:
+                    parent_periods[period] = {}
+                for company in companies:
+                    if company.code not in parent_periods[period]:
+                        parent_periods[period][company.code] = 0
+                    if company.code in sub_periods[period]:
+                        parent_periods[period][company.code] += sub_periods[period][company.code]
+                if 'TOTAL' not in parent_periods[period]:
+                    parent_periods[period]['TOTAL'] = 0
+                if 'TOTAL' in sub_periods[period]:
+                    parent_periods[period]['TOTAL'] += sub_periods[period]['TOTAL']
+        
+        # Add parent category header with calculated data
+        parent_totals['OVERALL'] = parent_total_overall
+        parent_header = {
+            'type': 'parent_header',
+            'account_code': '',
+            'account_name': parent_category.upper(),
+            'account_type': '',
+            'parent_category': parent_category,
+            'sub_category': '',
+            'is_header': True,
+            'periods': parent_periods,
+            'grand_totals': parent_totals
+        }
+        report_data.append(parent_header)
+    
+    logger.info(f"Generated hierarchical report with {len(report_data)} rows")
     
     context = {
         'report_data': report_data,
