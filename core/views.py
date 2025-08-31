@@ -223,11 +223,21 @@ def upload_financial_data(request):
     companies = Company.objects.all().order_by('name')
     
     if request.method == 'POST':
-        uploaded_file = request.FILES['file']
-        company_id = request.POST.get('company')
-        data_type = request.POST.get('data_type', 'actual')
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         
         try:
+            uploaded_file = request.FILES['file']
+            company_id = request.POST.get('company')
+            data_type = request.POST.get('data_type', 'actual')
+            
+            if not company_id:
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': 'Please select a company.'})
+                else:
+                    messages.error(request, 'Please select a company.')
+                    return render(request, 'core/upload_financial_data.html', {'companies': companies})
+            
             company = Company.objects.get(id=company_id)
             
             # Read file
@@ -238,8 +248,12 @@ def upload_financial_data(request):
             
             # Check minimum columns
             if len(df.columns) < 3:
-                messages.error(request, 'File must have at least 3 columns: Account Code, Account Name, and at least one period column.')
-                return render(request, 'core/upload_financial_data.html', {'companies': companies})
+                error_msg = 'File must have at least 3 columns: Account Code, Account Name, and at least one period column.'
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': error_msg})
+                else:
+                    messages.error(request, error_msg)
+                    return render(request, 'core/upload_financial_data.html', {'companies': companies})
             
             # Parse period columns (starting from column 3)
             period_columns = []
@@ -249,8 +263,12 @@ def upload_financial_data(request):
                     period_columns.append((col, period_date))
             
             if not period_columns:
-                messages.error(request, 'No valid period columns found. Please ensure column headers are in format like "Jan-24", "2024-01", etc.')
-                return render(request, 'core/upload_financial_data.html', {'companies': companies})
+                error_msg = 'No valid period columns found. Please ensure column headers are in format like "Jan-24", "2024-01", etc.'
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': error_msg})
+                else:
+                    messages.error(request, error_msg)
+                    return render(request, 'core/upload_financial_data.html', {'companies': companies})
             
             # Check for existing data
             existing_periods = []
@@ -263,8 +281,19 @@ def upload_financial_data(request):
                 if existing_data.exists():
                     existing_periods.append(col)
             
+            # If there's existing data and no confirmation, ask for confirmation
+            if existing_periods and not request.POST.get('confirm_overwrite'):
+                if is_ajax:
+                    return JsonResponse({
+                        'status': 'confirmation_needed',
+                        'message': f'Data already exists for periods: {", ".join(existing_periods)}. Do you want to overwrite it?'
+                    })
+                else:
+                    messages.warning(request, f'Data already exists for periods: {", ".join(existing_periods)}. Please confirm overwrite.')
+                    return render(request, 'core/upload_financial_data.html', {'companies': companies})
+            
+            # Create backup before overwriting if there's existing data
             if existing_periods:
-                # Create backup before overwriting
                 backup_data = []
                 for col, period_date in period_columns:
                     if col in existing_periods:
@@ -289,7 +318,12 @@ def upload_financial_data(request):
                         user=request.user.username if request.user.is_authenticated else 'Anonymous',
                         description=f"Backup before upload on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
                     )
-                    messages.warning(request, f'Backup created for existing data in periods: {", ".join(existing_periods)}. You can restore previous data from Admin panel.')
+                    backup_msg = f'Backup created for existing data in periods: {", ".join(existing_periods)}. You can restore previous data from Admin panel.'
+                    if is_ajax:
+                        # We'll include this in the success message
+                        pass
+                    else:
+                        messages.warning(request, backup_msg)
                 
                 # Delete existing data
                 for col, period_date in period_columns:
@@ -337,13 +371,31 @@ def upload_financial_data(request):
                     errors.append(f"Row {index + 2}: {str(e)}")
                     error_count += 1
             
+            # Prepare response message
             if success_count > 0:
-                messages.success(request, f'Successfully uploaded {success_count} records for {len(period_columns)} periods.')
-            if errors:
-                messages.warning(request, f'Encountered {len(errors)} errors. Please check the data format.')
+                success_msg = f'Successfully uploaded {success_count} records for {len(period_columns)} periods.'
+                if existing_periods:
+                    success_msg += f' Backup created for overwritten data.'
+                if errors:
+                    success_msg += f' Encountered {len(errors)} errors. Please check the data format.'
+                
+                if is_ajax:
+                    return JsonResponse({'status': 'success', 'message': success_msg})
+                else:
+                    messages.success(request, success_msg)
+            else:
+                error_msg = 'No valid data was uploaded. Please check your file format.'
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': error_msg})
+                else:
+                    messages.error(request, error_msg)
         
         except Exception as e:
-            messages.error(request, f'Error processing file: {str(e)}')
+            error_msg = f'Error processing file: {str(e)}'
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': error_msg})
+            else:
+                messages.error(request, error_msg)
     
     return render(request, 'core/upload_financial_data.html', {'companies': companies})
 
