@@ -94,6 +94,47 @@
             font-size: 13px;
         }
         
+        /* Table borders */
+        #plTable {
+            border-collapse: collapse;
+            border: 1px solid #ddd;
+        }
+        
+        #plTable th,
+        #plTable td {
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+        }
+        
+        /* Thicker borders for TOTAL columns */
+        .total-column {
+            border-left: 2px solid #999 !important;
+            border-right: 2px solid #999 !important;
+            background-color: #f8f8f8;
+        }
+        
+        /* Header styling */
+        #plTable thead th {
+            border-bottom: 2px solid #999;
+            background-color: #f5f5f5;
+        }
+        
+        /* Section headers (INCOME, OVERHEADS, etc) */
+        .parent-header {
+            background-color: #e8e8e8;
+            font-weight: bold;
+            border-top: 2px solid #999;
+            border-bottom: 2px solid #999;
+        }
+        
+        /* Calculated totals (GROSS PROFIT, NET PROFIT) */
+        .calculated-total {
+            background-color: #e0f0ff;
+            font-weight: bold;
+            border-top: 2px solid #666;
+            border-bottom: 2px solid #666;
+        }
+        
         /* Column color styling */
         .company-f2001 {
             background-color: rgba(173, 216, 230, 0.3); /* Light blue */
@@ -101,19 +142,6 @@
         
         .company-gl001 {
             background-color: rgba(144, 238, 144, 0.3); /* Light green */
-        }
-        
-        .total-column {
-            background-color: rgba(211, 211, 211, 0.3); /* Light gray */
-        }
-        
-        /* Column separators */
-        #plTable th, #plTable td {
-            border-right: 1px solid #e0e0e0;
-        }
-        
-        #plTable th:last-child, #plTable td:last-child {
-            border-right: none;
         }
         
         /* Hierarchical structure styling */
@@ -223,6 +251,39 @@
             padding-top: 0 !important;
         }
         
+        /* ELIMINATE GAP BETWEEN HEADER AND FIRST DATA ROW */
+        .dataTables_wrapper .dataTables_scrollHead table {
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody table {
+            margin-top: 0 !important;
+            border-top: none !important;
+        }
+        
+        /* Force no gap between thead and tbody */
+        #plTable thead {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        #plTable tbody {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Remove any DataTables default spacing */
+        .dataTables_wrapper .dataTables_scrollHeadInner {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBodyInner {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
         /* Remove any spacing between header and body */
         .dataTables_wrapper .dataTables_scrollHeadInner {
             margin-bottom: 0 !important;
@@ -247,6 +308,17 @@
         }
         
         .dataTables_wrapper .dataTables_scrollBody td:first-child {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        /* ELIMINATE GAP - Target first row specifically */
+        #plTable tbody tr:first-child td {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody tr:first-child td {
             padding-top: 0 !important;
             margin-top: 0 !important;
         }
@@ -618,7 +690,7 @@
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'calculated_total' %}calculated-total-row{% else %}account-row{% endif %}">
+                        <tr class="{% if row.type == 'parent_header' %}parent-header-row parent-header{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'calculated_total' %}calculated-total-row calculated-total{% else %}account-row{% endif %}">
                             <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}{% else %}{{ row.account_code }}{% endif %}</td>
                             <td>
                                 {% if row.type == 'parent_header' %}

@@ -1,4 +1,5 @@
 {% load report_filters %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,6 +8,7 @@
     <title>Balance Sheet Report</title>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.2.2/css/fixedColumns.dataTables.min.css">
+    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,11 +17,12 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
             background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 0;
+            box-shadow: none;
             overflow: hidden;
         }
         .header {
@@ -142,34 +145,34 @@
             flex-wrap: wrap;
         }
         .table-container {
-            padding: 20px;
-        }
-        /* Smaller font size for table headers to prevent wrapping */
-        .dataTables_wrapper .dataTables_scrollHead th {
-            font-size: 11px !important;
-            line-height: 1.2 !important;
-            padding: 4px 6px !important;
+            padding: 5px;
         }
         
-        /* Prevent text wrapping in Account Name column and reduce font size */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            font-size: 11px !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 200px !important;
+        /* Responsive design for different screen sizes */
+        @media (min-width: 1920px) {
+            .table-container {
+                padding: 10px 20px;
+            }
         }
         
-        /* Reduce font size for Account Code column */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1) {
-            font-size: 11px !important;
+        @media (min-width: 1440px) and (max-width: 1919px) {
+            .table-container {
+                padding: 8px 15px;
+            }
         }
         
-        /* Reduce font size for all data cells (numerical values) */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
-            font-size: 11px !important;
-            text-align: right !important;
+        @media (min-width: 1024px) and (max-width: 1439px) {
+            .table-container {
+                padding: 5px 10px;
+            }
         }
+        
+        @media (max-width: 1023px) {
+            .table-container {
+                padding: 3px 5px;
+            }
+        }
+
         
         .header-row {
             background-color: #e3f2fd;
@@ -246,8 +249,43 @@
         }
         
         .sub-header-row {
-            background-color: #f1f3f4 !important;
+            background-color: #f8f9fa !important; /* Light gray background */
+            font-weight: bold !important;
+            font-size: 12px !important;
             border-bottom: 1px solid #dee2e6 !important;
+        }
+        
+        /* Smaller font size for table headers to prevent wrapping */
+        .dataTables_wrapper .dataTables_scrollHead th {
+            font-size: 11px !important;
+            line-height: 1.2 !important;
+            padding: 4px 6px !important;
+        }
+        
+        /* Prevent text wrapping in Account Name column and reduce font size */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
+            font-size: 11px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 200px !important;
+        }
+        
+        /* Reduce font size for Account Code column */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1) {
+            font-size: 11px !important;
+        }
+        
+        /* Reduce font size for all data cells (numerical values) */
+        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
+            font-size: 11px !important;
+            text-align: right !important;
+        }
+        
+        .account-row {
+            background-color: white !important;
+            font-size: 11px !important;
+            border-bottom: 1px solid #f0f0f0 !important;
         }
         
         .sub-total-row {
@@ -266,7 +304,178 @@
         }
         
         .account-row {
+            background-color: white !important;
             border-bottom: 1px solid #f0f0f0 !important;
+        }
+        
+        /* Indentation for sub-categories and accounts */
+        .sub-header-row td:nth-child(2) {
+            padding-left: 20px !important;
+        }
+        
+        .account-row td:nth-child(2) {
+            padding-left: 40px !important;
+        }
+        
+        /* Hide account code for headers */
+        .parent-header-row td:nth-child(1),
+        .sub-header-row td:nth-child(1) {
+            background-color: transparent !important;
+            border: none !important;
+        }
+        
+        /* Ensure proper text alignment for headers */
+        .parent-header-row td,
+        .sub-header-row td {
+            text-align: left !important;
+            vertical-align: middle !important;
+        }
+        
+        /* Keep numerical data right-aligned even in headers */
+        .parent-header-row td:nth-child(n+3),
+        .sub-header-row td:nth-child(n+3) {
+            text-align: right !important;
+        }
+        
+        /* Fixed columns styling */
+        .DTFC_LeftWrapper {
+            background-color: white !important;
+            border-right: 2px solid #999 !important;
+        }
+        
+        .DTFC_LeftHeadWrapper {
+            background-color: #f5f5f5 !important;
+            border-right: 2px solid #999 !important;
+        }
+        
+        .DTFC_LeftBodyWrapper {
+            background-color: white !important;
+            border-right: 2px solid #999 !important;
+        }
+        
+        /* Ensure proper column widths for fixed columns */
+        .DTFC_LeftWrapper table,
+        .DTFC_LeftHeadWrapper table,
+        .DTFC_LeftBodyWrapper table {
+            width: 100% !important;
+        }
+        
+        /* Fix column alignment issues with fixed columns */
+        .DTFC_LeftBodyWrapper td:nth-child(1) {
+            width: 120px !important;
+            min-width: 120px !important;
+        }
+        
+        .DTFC_LeftBodyWrapper td:nth-child(2) {
+            width: 250px !important;
+            min-width: 250px !important;
+        }
+        
+        /* Table borders */
+        #bsTable {
+            border-collapse: collapse;
+            border: 1px solid #ddd;
+        }
+        
+        #bsTable th,
+        #bsTable td {
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+        }
+        
+        /* Thicker borders for TOTAL columns */
+        .total-column {
+            border-left: 2px solid #999 !important;
+            border-right: 2px solid #999 !important;
+            background-color: #f8f8f8;
+        }
+        
+        /* Header styling */
+        #bsTable thead th {
+            border-bottom: 2px solid #999;
+            background-color: #f5f5f5;
+        }
+        
+        /* Section headers (ASSETS, LIABILITIES, etc) */
+        .parent-header {
+            background-color: #e8e8e8;
+            font-weight: bold;
+            border-top: 2px solid #999;
+            border-bottom: 2px solid #999;
+        }
+        
+        /* ELIMINATE GAP BETWEEN HEADER AND FIRST DATA ROW */
+        .dataTables_wrapper .dataTables_scrollHead {
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody {
+            margin-top: 0 !important;
+            border-top: none !important;
+            padding-top: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollHead table {
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody table {
+            margin-top: 0 !important;
+            border-top: none !important;
+        }
+        
+        /* Force no gap between thead and tbody */
+        #bsTable thead {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        #bsTable tbody {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Remove any DataTables default spacing */
+        .dataTables_wrapper .dataTables_scrollHeadInner {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBodyInner {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
+        /* ELIMINATE GAP - Target first row specifically */
+        #bsTable tbody tr:first-child td {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody tr:first-child td {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+        
+        /* Remove extra spacing from DataTables */
+        .dataTables_scrollBody {
+            margin-top: 0 !important;
+        }
+        
+        .dataTables_scrollHead {
+            margin-bottom: 0 !important;
+        }
+        
+        #bsTable tbody tr:first-child td {
+            padding-top: 8px !important;  /* Same as P&L */
+        }
+        
+        /* Remove any wrapper spacing */
+        .dataTables_wrapper .dataTables_scroll {
+            margin-top: 0 !important;
         }
     </style>
 </head>
@@ -371,72 +580,84 @@
         <!-- Report Table -->
         <div class="table-container">
             {% if report_data %}
+            <div id="bs-report">
             <table id="bsTable" class="display">
+                <colgroup>
+                    <col style="width: 110px;">
+                    <col style="width: 240px;">
+                    {% for period in periods %}
+                        {% for company in companies %}
+                            <col style="width: 120px;">
+                        {% endfor %}
+                        <col style="width: 120px;">
+                    {% endfor %}
+                    {% for company in companies %}
+                        <col style="width: 120px;">
+                    {% endfor %}
+                    <col style="width: 120px;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Account Code</th>
                         <th>Account Name</th>
                         {% for period in periods %}
                             {% for company in companies %}
-                                <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">{{ period|date:"M-y" }}<br>{{ company.code }}</th>
+                                                                    <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}"><div class="th-wrap"><span class="th-top">{{ period|date:"M-y" }}</span><span class="th-bottom">{{ company.code }}</span></div></th>
                             {% endfor %}
-                            <th class="total-column">{{ period|date:"M-y" }}<br>TOTAL</th>
+                                                                <th class="total-column"><div class="th-wrap"><span class="th-top">{{ period|date:"M-y" }}</span><span class="th-bottom">TOTAL</span></div></th>
                         {% endfor %}
                         {% for company in companies %}
-                            <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">Grand Total<br>{{ company.code }}</th>
+                                                            <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}"><div class="th-wrap"><span class="th-top">Grand Total</span><span class="th-bottom">{{ company.code }}</span></div></th>
                         {% endfor %}
-                        <th class="total-column">Grand Total</th>
+                                                        <th class="total-column"><div class="th-wrap"><span class="th-top">Grand Total</span><span class="th-bottom">TOTAL</span></div></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% else %}account-row{% endif %}">
+                        <tr class="{% if row.type == 'parent_header' %}parent-header-row parent-header{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% else %}account-row{% endif %}">
                             <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}{% else %}{{ row.account_code }}{% endif %}</td>
-                            <td>
-                                {% if row.type == 'parent_header' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'sub_header' %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
-                                {% elif row.type == 'sub_total' %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;<strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'parent_total' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'check_row' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% else %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
-                                {% endif %}
+                            <td class="label {% if row.type == 'parent_header' or row.type == 'parent_total' %}lvl-0{% elif row.type == 'sub_header' or row.type == 'sub_total' %}lvl-1{% else %}lvl-2{% endif %}">
+                                {% if row.type in 'parent_header,parent_total,check_row' %}<strong>{{ row.account_name }}</strong>{% else %}{{ row.account_name }}{% endif %}
                             </td>
                             {% for period in periods %}
                                 {% for company in companies %}
                                     <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}
-                                            <strong>{{ row.periods|get_item:period|get_item:company.code|format_number }}</strong>
+                                        {% if row.type == 'sub_header' %}
+                                            <!-- Sub-category headers show no data -->
                                         {% else %}
                                             {{ row.periods|get_item:period|get_item:company.code|format_number }}
                                         {% endif %}
                                     </td>
                                 {% endfor %}
                                 <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                    <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
+                                    {% if row.type == 'sub_header' %}
+                                        <!-- Sub-category headers show no data -->
+                                    {% else %}
+                                        {{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}
+                                    {% endif %}
                                 </td>
                             {% endfor %}
                             {% for company in companies %}
                                 <td class="{% if row.grand_totals|get_item:company.code < 0 %}negative{% elif row.grand_totals|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                    {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}
-                                        <strong>{{ row.grand_totals|get_item:company.code|format_number }}</strong>
+                                    {% if row.type == 'sub_header' %}
+                                        <!-- Sub-category headers show no data -->
                                     {% else %}
                                         {{ row.grand_totals|get_item:company.code|format_number }}
                                     {% endif %}
                                 </td>
                             {% endfor %}
                             <td class="{% if row.grand_totals|get_item:'TOTAL' < 0 %}negative{% elif row.grand_totals|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                <strong>{{ row.grand_totals|get_item:'TOTAL'|format_number }}</strong>
+                                {% if row.type == 'sub_header' %}
+                                    <!-- Sub-category headers show no data -->
+                                {% else %}
+                                    {{ row.grand_totals|get_item:'TOTAL'|format_number }}
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <div style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>No data available</h3>
@@ -455,19 +676,66 @@
             document.getElementById('filterForm').submit();
         });
         
-        // Initialize DataTable with fixed columns
+        // Initialize DataTable with responsive design
         $(document).ready(function() {
-            $('#bsTable').DataTable({
+            // Get screen dimensions
+            var screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+            var screenHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+            
+            // Calculate optimal table height based on screen size
+            var tableHeight = Math.max(400, screenHeight * 0.6);
+            
+            // Determine column widths based on screen size
+            var columnDefs = [
+                { targets: [0, 1], className: 'text-left' },
+                { targets: '_all', className: 'text-right' }
+            ];
+            
+            // Adjust column widths for different screen sizes
+            if (screenWidth >= 1920) {
+                // 4K and large screens
+                columnDefs.push({ targets: 0, width: '120px' }); // Account Code
+                columnDefs.push({ targets: 1, width: '300px' }); // Account Name
+            } else if (screenWidth >= 1440) {
+                // Full HD and larger
+                columnDefs.push({ targets: 0, width: '100px' });
+                columnDefs.push({ targets: 1, width: '250px' });
+            } else if (screenWidth >= 1024) {
+                // HD and larger
+                columnDefs.push({ targets: 0, width: '90px' });
+                columnDefs.push({ targets: 1, width: '200px' });
+            } else {
+                // Smaller screens
+                columnDefs.push({ targets: 0, width: '80px' });
+                columnDefs.push({ targets: 1, width: '180px' });
+            }
+            
+            var dt = $('#bsTable').DataTable({
                 scrollX: true,
-                scrollY: "500px",
-                fixedColumns: {
-                    left: 2
-                },
+                scrollY: tableHeight + "px",
                 paging: false,
                 searching: false,
-                ordering: false,  // DISABLE SORTING COMPLETELY
-                info: false,      // Remove "Showing X entries" text
-                autoWidth: false
+                ordering: false,
+                info: false,
+                autoWidth: true,
+                columnDefs: columnDefs,
+                responsive: true
+            });
+            
+            // Adjust columns after initialization
+            dt.columns.adjust().draw(false);
+            
+            // Handle window resize
+            $(window).resize(function() {
+                var newScreenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+                var newScreenHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+                var newTableHeight = Math.max(400, newScreenHeight * 0.6);
+                
+                // Update table height
+                dt.scrollY(newTableHeight + "px");
+                
+                // Recalculate column widths
+                dt.columns.adjust().draw(false);
             });
         });
     </script>

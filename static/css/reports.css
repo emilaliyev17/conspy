@@ -1,0 +1,92 @@
+/* base */
+#bsTable { width:100%; table-layout: auto; border-collapse: collapse }
+
+/* Responsive table adjustments */
+@media (min-width: 1920px) {
+    #bsTable { font-size: 12px; }
+    #bsTable thead th, #bsTable tbody td { padding: 10px 12px; }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+    #bsTable { font-size: 11px; }
+    #bsTable thead th, #bsTable tbody td { padding: 8px 10px; }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+    #bsTable { font-size: 11px; }
+    #bsTable thead th, #bsTable tbody td { padding: 6px 8px; }
+}
+
+@media (max-width: 1023px) {
+    #bsTable { font-size: 10px; }
+    #bsTable thead th, #bsTable tbody td { padding: 4px 6px; }
+}
+.dataTables_wrapper table#bsTable, #bsTable th, #bsTable td { box-sizing: border-box }
+/* identical paddings and typography */
+#bsTable thead th, #bsTable tbody td { padding: 8px 10px; line-height: 1.2; border: 1px solid #e0e0e0; vertical-align: middle; font-weight: 400 }
+#bsTable thead th { white-space: normal }
+#bsTable tbody td { white-space: nowrap }
+#bsTable thead th { background: #f5f5f5; border-bottom: 2px solid #999; font-weight: 600 }
+/* numbers and labels */
+#bsTable td:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums }
+#bsTable td:nth-child(2) { text-align: left; overflow: hidden; text-overflow: ellipsis; max-width: 240px }
+/* neutralize DataTables differences only for this table */
+table.dataTable#bsTable { border-collapse: collapse }
+table.dataTable#bsTable thead th, table.dataTable#bsTable tbody td { padding: 8px 10px }
+.dataTables_wrapper .dataTables_scrollHead, .dataTables_wrapper .dataTables_scrollBody { margin:0; padding:0; border:0 }
+.dataTables_wrapper .dataTables_scrollHead table#bsTable, .dataTables_wrapper .dataTables_scrollBody table#bsTable { margin:0; border:0 }
+/* keep your coloring without affecting padding */
+#bsTable .company-f2001 { background-color: rgba(173,216,230,0.3) }
+#bsTable .company-gl001 { background-color: rgba(144,238,144,0.3) }
+#bsTable .total-column { background-color: rgba(211,211,211,0.3); border-left: 2px solid #999; border-right: 2px solid #999 }
+
+/* header two-line wrapper */
+#bsTable .th-wrap { display: inline-flex; flex-direction: column; line-height: 1.1; white-space: normal }
+#bsTable thead th, #bsTable tbody td { font-size: 11px }
+/* account name indentation levels */
+#bsTable td.lvl-0 { padding-left: 10px }
+#bsTable td.lvl-1 { padding-left: 24px }
+#bsTable td.lvl-2 { padding-left: 36px }
+#bsTable td.lvl-3 { padding-left: 48px }
+/* emphasize by row class only, no inner <strong> in cells */
+#bsTable .parent-header-row,
+#bsTable .parent-total-row { font-weight: 700 }
+#bsTable .sub-total-row { font-weight: 600 }
+/* unify header and body boxes for this page only */
+#bs-report .dataTables_scrollHead table,
+#bs-report .dataTables_scrollBody table { table-layout: auto; border-collapse: collapse }
+
+#bs-report .dataTables_scrollHead table thead th,
+#bs-report .dataTables_scrollBody table tbody td {
+  box-sizing: border-box;
+  padding: 8px 10px !important;
+  line-height: 1.2 !important;
+  border: 1px solid #e0e0e0 !important;
+  vertical-align: middle !important;
+  font-weight: 400;
+}
+
+#bs-report .dataTables_scrollHead table thead th {
+  white-space: normal !important;
+}
+
+#bs-report .dataTables_scrollBody table tbody td {
+  white-space: nowrap !important;
+}
+
+/* keep header emphasis consistent */
+#bs-report .dataTables_scrollHead table thead th {
+  background: #f5f5f5;
+  border-bottom: 2px solid #999 !important;
+  font-weight: 600;
+}
+
+/* alignment utilities */
+#bs-report table#bsTable td:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums }
+#bs-report table#bsTable td:nth-child(2) { text-align: left; overflow: hidden; text-overflow: ellipsis; max-width: 240px }
+
+/* keep column coloring without affecting paddings */
+#bs-report #bsTable .company-f2001 { background-color: rgba(173,216,230,0.3) }
+#bs-report #bsTable .company-gl001 { background-color: rgba(144,238,144,0.3) }
+#bs-report #bsTable .total-column { background-color: rgba(211,211,211,0.3); border-left: 2px solid #999; border-right: 2px solid #999 }
+

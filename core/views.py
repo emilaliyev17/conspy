@@ -539,24 +539,29 @@ def pl_report(request):
         if fd.period in financial_data and fd.company.code in financial_data[fd.period]:
             financial_data[fd.period][fd.company.code][fd.account.code] = fd.amount
     
-    # Group accounts by parent_category and sub_category
+    # Group accounts by parent_category and sub_category from ChartOfAccounts
     grouped_data = {}
     
     for account in chart_accounts:
+        # Use parent_category and sub_category directly from ChartOfAccounts
         parent_category = account.parent_category or 'UNCATEGORIZED'
         sub_category = account.sub_category or 'UNCATEGORIZED'
         
+        # Create parent category if it doesn't exist
         if parent_category not in grouped_data:
             grouped_data[parent_category] = {}
         
+        # Create sub category if it doesn't exist
         if sub_category not in grouped_data[parent_category]:
             grouped_data[parent_category][sub_category] = []
         
+        # Add account to the appropriate group
         grouped_data[parent_category][sub_category].append(account)
         logger.info(f"Grouped account {account.account_code} under {parent_category} -> {sub_category}")
     
-    # Define P&L structure order
+    # Define P&L structure order - fixed order, filter out non-existent categories
     pl_structure = ['INCOME', 'COST OF FUNDS', 'OVERHEADS', 'TAXES']
+    pl_structure = [cat for cat in pl_structure if cat in grouped_data]
     
     # Calculate all totals first
     parent_totals = {}
