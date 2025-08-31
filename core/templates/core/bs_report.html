@@ -215,6 +215,28 @@
                 flex-direction: column;
             }
         }
+        
+        /* Column color styling */
+        .company-f2001 {
+            background-color: rgba(173, 216, 230, 0.3); /* Light blue */
+        }
+        
+        .company-gl001 {
+            background-color: rgba(144, 238, 144, 0.3); /* Light green */
+        }
+        
+        .total-column {
+            background-color: rgba(211, 211, 211, 0.3); /* Light gray */
+        }
+        
+        /* Column separators */
+        #bsTable th, #bsTable td {
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        #bsTable th:last-child, #bsTable td:last-child {
+            border-right: none;
+        }
     </style>
 </head>
 <body>
@@ -325,9 +347,9 @@
                         <th>Account Name</th>
                         {% for period in periods %}
                             {% for company in companies %}
-                                <th>{{ period|date:"M-y" }}<br>{{ company.code }}</th>
+                                <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">{{ period|date:"M-y" }}<br>{{ company.code }}</th>
                             {% endfor %}
-                            <th>{{ period|date:"M-y" }}<br>TOTAL</th>
+                            <th class="total-column">{{ period|date:"M-y" }}<br>TOTAL</th>
                         {% endfor %}
                     </tr>
                 </thead>
@@ -338,11 +360,11 @@
                             <td>{{ row.account_name }}</td>
                             {% for period in periods %}
                                 {% for company in companies %}
-                                    <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %}">
+                                    <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
                                         {{ row.periods|get_item:period|get_item:company.code|format_number }}
                                     </td>
                                 {% endfor %}
-                                <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %}">
+                                <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
                                     <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
                                 </td>
                             {% endfor %}
