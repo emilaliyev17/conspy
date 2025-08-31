@@ -520,13 +520,13 @@ def bs_report(request):
     
     # Get ASSET, LIABILITY, and EQUITY accounts ordered by sort_order
     accounts = ChartOfAccounts.objects.filter(
-        account_type__in=['ASSET', 'LIABILITY', 'EQUITY', 'Asset', 'Liability', 'Equity']
+        account_type__in=['ASSET', 'LIABILITY', 'EQUITY']
     ).order_by('sort_order')
     
     # Get unique periods from FinancialData
     try:
         periods_query = FinancialData.objects.filter(
-            account__chartofaccounts__account_type__in=['ASSET', 'LIABILITY', 'EQUITY']
+            account__type__in=['asset', 'liability', 'equity']
         )
         
         if from_date_start:
@@ -1002,11 +1002,33 @@ def upload_financial_data(request):
                         error_count += 1
                         continue
                     
-                    # Get or create account
+                    # First try to find the account type from ChartOfAccounts
+                    chart_account = ChartOfAccounts.objects.filter(account_code=account_code).first()
+
+                    if chart_account and chart_account.account_type:
+                        # Map ChartOfAccounts types to Account types
+                        type_mapping = {
+                            'ASSET': 'asset',
+                            'LIABILITY': 'liability', 
+                            'EQUITY': 'equity',
+                            'INCOME': 'revenue',
+                            'EXPENSE': 'expense'
+                        }
+                        account_type = type_mapping.get(chart_account.account_type.upper(), 'asset')
+                    else:
+                        # Default to asset if not found in ChartOfAccounts
+                        account_type = 'asset'
+
+                    # Get or create account with the correct type
                     account, created = Account.objects.get_or_create(
                         code=account_code,
-                        defaults={'name': account_name, 'type': 'asset'}  # Default type
+                        defaults={'name': account_name, 'type': account_type}
                     )
+
+                    # If account exists but type is wrong, update it
+                    if not created and account.type != account_type:
+                        account.type = account_type
+                        account.save()
                     
                     # Process each period column
                     for col_idx, period_header, period_date in valid_period_columns:
