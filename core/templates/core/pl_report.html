@@ -364,6 +364,24 @@
             margin-bottom: 8px !important; /* Bottom margin */
         }
         
+        /* Special styling for EXPENSE TOTAL row (last parent header) */
+        .parent-header-row:last-child {
+            background-color: #ffebee !important; /* Light red background */
+            border-top: 3px solid #f44336 !important; /* Red border */
+            border-bottom: 3px solid #f44336 !important; /* Red border */
+            font-weight: bold !important;
+            font-size: 16px !important;
+            color: #d32f2f !important; /* Dark red text */
+            position: relative !important;
+            z-index: 1000 !important;
+        }
+        
+        .parent-header-row:last-child td {
+            padding-top: 15px !important;
+            padding-bottom: 15px !important;
+            background-color: #ffebee !important;
+        }
+        
         /* Add spacing above and below parent headers */
         .parent-header-row td {
             padding-top: 12px !important; /* Extra top padding */
@@ -658,7 +676,7 @@
         $(document).ready(function() {
             $('#plTable').DataTable({
                 scrollX: true,
-                scrollY: "500px",
+                scrollY: false, // Remove height restriction to show all rows including EXPENSE TOTAL
                 paging: false,
                 searching: false,
                 ordering: false,  // DISABLE SORTING COMPLETELY
