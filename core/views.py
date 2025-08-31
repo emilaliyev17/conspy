@@ -220,23 +220,45 @@ def convert_month_year_to_date_range(month, year):
     except (ValueError, AttributeError):
         return None, None
 
+def convert_period_to_date_range(period):
+    """Convert period format (MM-YYYY) to date range (first day to last day of month)."""
+    if not period:
+        return None, None
+    
+    try:
+        from datetime import datetime, date
+        import calendar
+        
+        # Parse period format (MM-YYYY)
+        month_str, year_str = period.split('-')
+        month_int = int(month_str)
+        year_int = int(year_str)
+        
+        # Get first day of month
+        first_day = date(year_int, month_int, 1)
+        
+        # Get last day of month
+        last_day = date(year_int, month_int, calendar.monthrange(year_int, month_int)[1])
+        
+        return first_day, last_day
+    except (ValueError, AttributeError):
+        return None, None
+
 def pl_report(request):
     """P&L Report view with hierarchical grouping by parent_category and sub_category."""
     # Get filter parameters
-    from_month = request.GET.get('from_month', '')
-    from_year = request.GET.get('from_year', '')
-    to_month = request.GET.get('to_month', '')
-    to_year = request.GET.get('to_year', '')
+    from_period = request.GET.get('from_period', '')
+    to_period = request.GET.get('to_period', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
-    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
-    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
+    # Convert period inputs to date ranges
+    from_date_start, from_date_end = convert_period_to_date_range(from_period)
+    to_date_start, to_date_end = convert_period_to_date_range(to_period)
     
     # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
     
-    logger.info(f"P&L Report - Filters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
+    logger.info(f"P&L Report - Filters: from_period={from_period}, to_period={to_period}, data_type={data_type}")
     
     # Get all companies
     companies = list(Company.objects.all().order_by('name'))
@@ -273,10 +295,8 @@ def pl_report(request):
             'report_data': [],
             'companies': companies,
             'periods': [],
-            'from_month': from_month,
-            'from_year': from_year,
-            'to_month': to_month,
-            'to_year': to_year,
+            'from_period': from_period,
+            'to_period': to_period,
             'data_type': data_type,
             'report_type': 'pl',
             'year_range': year_range,
@@ -502,15 +522,13 @@ def pl_report(request):
 def bs_report(request):
     """Balance Sheet Report view."""
     # Get filter parameters
-    from_month = request.GET.get('from_month', '')
-    from_year = request.GET.get('from_year', '')
-    to_month = request.GET.get('to_month', '')
-    to_year = request.GET.get('to_year', '')
+    from_period = request.GET.get('from_period', '')
+    to_period = request.GET.get('to_period', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
-    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
-    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
+    # Convert period inputs to date ranges
+    from_date_start, from_date_end = convert_period_to_date_range(from_period)
+    to_date_start, to_date_end = convert_period_to_date_range(to_period)
     
     # Generate year range for dropdown (2023-2030)
     year_range = range(2023, 2031)
@@ -518,9 +536,15 @@ def bs_report(request):
     # Get all companies
     companies = Company.objects.all().order_by('name')
     
-    # Get ASSET, LIABILITY, and EQUITY accounts ordered by sort_order
+    # Include all Balance Sheet account types (standard and QuickBooks formats)
+    bs_types = [
+        'ASSET', 'LIABILITY', 'EQUITY',  # Standard
+        'Bank', 'Fixed Asset', 'Other Current Asset', 'Other Asset',  # QuickBooks Assets
+        'Other Current Liabilities', 'Other Current Liability',  # QuickBooks Liabilities
+        'Equity'  # Already correct
+    ]
     accounts = ChartOfAccounts.objects.filter(
-        account_type__in=['ASSET', 'LIABILITY', 'EQUITY']
+        account_type__in=bs_types
     ).order_by('sort_order')
     
     # Get unique periods from FinancialData
@@ -547,10 +571,8 @@ def bs_report(request):
             'report_data': [],
             'companies': companies,
             'periods': [],
-            'from_month': from_month,
-            'from_year': from_year,
-            'to_month': to_month,
-            'to_year': to_year,
+            'from_period': from_period,
+            'to_period': to_period,
             'data_type': data_type,
             'report_type': 'bs',
             'year_range': year_range
@@ -602,10 +624,8 @@ def bs_report(request):
         'report_data': report_data,
         'companies': companies,
         'periods': periods,
-        'from_month': from_month,
-        'from_year': from_year,
-        'to_month': to_month,
-        'to_year': to_year,
+        'from_period': from_period,
+        'to_period': to_period,
         'data_type': data_type,
         'report_type': 'bs',
         'year_range': year_range
@@ -616,15 +636,13 @@ def bs_report(request):
 def export_report_excel(request):
     """Export report data to Excel."""
     report_type = request.GET.get('type', 'pl')
-    from_month = request.GET.get('from_month', '')
-    from_year = request.GET.get('from_year', '')
-    to_month = request.GET.get('to_month', '')
-    to_year = request.GET.get('to_year', '')
+    from_period = request.GET.get('from_period', '')
+    to_period = request.GET.get('to_period', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    # Convert month/year inputs to date ranges
-    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
-    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
+    # Convert period inputs to date ranges
+    from_date_start, from_date_end = convert_period_to_date_range(from_period)
+    to_date_start, to_date_end = convert_period_to_date_range(to_period)
     
     # Get the same data as the report views
     companies = Company.objects.all().order_by('name')
@@ -1006,13 +1024,24 @@ def upload_financial_data(request):
                     chart_account = ChartOfAccounts.objects.filter(account_code=account_code).first()
 
                     if chart_account and chart_account.account_type:
-                        # Map ChartOfAccounts types to Account types
+                        # Map ChartOfAccounts types to Account types (handle both standard and QuickBooks)
                         type_mapping = {
+                            # Standard mappings
                             'ASSET': 'asset',
-                            'LIABILITY': 'liability', 
+                            'LIABILITY': 'liability',
                             'EQUITY': 'equity',
                             'INCOME': 'revenue',
-                            'EXPENSE': 'expense'
+                            'EXPENSE': 'expense',
+                            
+                            # QuickBooks-style mappings
+                            'BANK': 'asset',
+                            'FIXED ASSET': 'asset',
+                            'OTHER CURRENT ASSET': 'asset',
+                            'OTHER ASSET': 'asset',
+                            'OTHER CURRENT LIABILITIES': 'liability',
+                            'OTHER CURRENT LIABILITY': 'liability',
+                            'COST OF GOODS SOLD': 'expense',
+                            'COGS': 'expense',
                         }
                         account_type = type_mapping.get(chart_account.account_type.upper(), 'asset')
                     else:

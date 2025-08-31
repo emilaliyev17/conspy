@@ -6,11 +6,25 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         type_mapping = {
+            # Standard mappings
             'ASSET': 'asset',
             'LIABILITY': 'liability',
             'EQUITY': 'equity',
             'INCOME': 'revenue',
-            'EXPENSE': 'expense'
+            'EXPENSE': 'expense',
+            
+            # QuickBooks-style mappings for Balance Sheet
+            'BANK': 'asset',
+            'FIXED ASSET': 'asset',
+            'OTHER CURRENT ASSET': 'asset',
+            'OTHER ASSET': 'asset',
+            'OTHER CURRENT LIABILITIES': 'liability',
+            'OTHER CURRENT LIABILITY': 'liability',
+            
+            # QuickBooks-style mappings for P&L
+            'INCOME': 'revenue',
+            'COST OF GOODS SOLD': 'expense',
+            'COGS': 'expense',
         }
         
         updated_count = 0
