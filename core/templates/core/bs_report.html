@@ -6,486 +6,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Balance Sheet Report</title>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.2.2/css/fixedColumns.dataTables.min.css">
-    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            width: 100%;
-            max-width: 100%;
-            margin: 0;
-            background-color: white;
-            border-radius: 0;
-            box-shadow: none;
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-        }
-        .nav-menu {
-            background-color: #f8f9fa;
-            padding: 15px 20px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .nav-menu a {
-            color: #495057;
-            text-decoration: none;
-            padding: 8px 16px;
-            margin: 0 5px;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-        }
-        .nav-menu a:hover {
-            background-color: #e9ecef;
-        }
-        .nav-menu a.active {
-            background-color: #007bff;
-            color: white;
-        }
-        .filters {
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .filter-row {
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-        }
-        .filter-group label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #495057;
-        }
-        .filter-group input,
-        .filter-group select {
-            padding: 8px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        .month-select {
-            min-width: 65px;
-            max-width: 75px;
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-        
-        .year-select {
-            min-width: 65px;
-            max-width: 75px;
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-        .month-select {
-            min-width: 65px;
-            max-width: 75px;
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-        
-        .year-select {
-            min-width: 65px;
-            max-width: 75px;
-            padding: 6px 8px;
-            font-size: 13px;
-        }
-        .btn {
-            background-color: #007bff;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        .btn:hover {
-            background-color: #0056b3;
-        }
-        .btn-success {
-            background-color: #28a745;
-        }
-        .btn-success:hover {
-            background-color: #1e7e34;
-        }
-        .btn-secondary {
-            background-color: #6c757d;
-        }
-        .btn-secondary:hover {
-            background-color: #545b62;
-        }
-        .actions {
-            padding: 15px 20px;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .table-container {
-            padding: 5px;
-        }
-        
-        /* Responsive design for different screen sizes */
-        @media (min-width: 1920px) {
-            .table-container {
-                padding: 10px 20px;
-            }
-        }
-        
-        @media (min-width: 1440px) and (max-width: 1919px) {
-            .table-container {
-                padding: 8px 15px;
-            }
-        }
-        
-        @media (min-width: 1024px) and (max-width: 1439px) {
-            .table-container {
-                padding: 5px 10px;
-            }
-        }
-        
-        @media (max-width: 1023px) {
-            .table-container {
-                padding: 3px 5px;
-            }
-        }
+    
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/4.0.1/css/fixedHeader.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/5.0.1/css/fixedColumns.dataTables.min.css">
 
-        
-        .header-row {
-            background-color: #e3f2fd;
-            font-weight: bold;
-        }
-        .asset-row {
-            background-color: #e8f5e8;
-        }
-        .liability-row {
-            background-color: #fff3cd;
-        }
-        .equity-row {
-            background-color: #f3e5f5;
-        }
-        .total-row {
-            background-color: #e8f5e8;
-            font-weight: bold;
-            font-size: 16px;
-        }
-        .negative {
-            color: #dc3545;
-        }
-        .positive {
-            color: #000000;
-        }
-        .zero {
-            color: #6c757d;
-        }
-        @media print {
-            .nav-menu, .filters, .actions {
-                display: none;
-            }
-            .container {
-                box-shadow: none;
-            }
-        }
-        @media (max-width: 768px) {
-            .filter-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .actions {
-                flex-direction: column;
-            }
-        }
-        
-        /* Column color styling */
-        .company-f2001 {
-            background-color: rgba(173, 216, 230, 0.3); /* Light blue */
-        }
-        
-        .company-gl001 {
-            background-color: rgba(144, 238, 144, 0.3); /* Light green */
-        }
-        
-        .total-column {
-            background-color: rgba(211, 211, 211, 0.3); /* Light gray */
-        }
-        
-        /* Column separators */
-        #bsTable th, #bsTable td {
-            border-right: 1px solid #e0e0e0;
-        }
-        
-        #bsTable th:last-child, #bsTable td:last-child {
-            border-right: none;
-        }
-        
-        /* Hierarchical structure styling */
-        .parent-header-row {
-            background-color: #f8f9fa !important;
-            border-top: 2px solid #dee2e6 !important;
-            border-bottom: 1px solid #dee2e6 !important;
-        }
-        
-        .sub-header-row {
-            background-color: #f8f9fa !important; /* Light gray background */
-            font-weight: bold !important;
-            font-size: 12px !important;
-            border-bottom: 1px solid #dee2e6 !important;
-        }
-        
-        /* Smaller font size for table headers to prevent wrapping */
-        .dataTables_wrapper .dataTables_scrollHead th {
-            font-size: 11px !important;
-            line-height: 1.2 !important;
-            padding: 4px 6px !important;
-        }
-        
-        /* Prevent text wrapping in Account Name column and reduce font size */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            font-size: 11px !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 200px !important;
-        }
-        
-        /* Reduce font size for Account Code column */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1) {
-            font-size: 11px !important;
-        }
-        
-        /* Reduce font size for all data cells (numerical values) */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
-            font-size: 11px !important;
-            text-align: right !important;
-        }
-        
-        .account-row {
-            background-color: white !important;
-            font-size: 11px !important;
-            border-bottom: 1px solid #f0f0f0 !important;
-        }
-        
-        .sub-total-row {
-            background-color: #e8f4fd !important;
-            border-bottom: 1px solid #dee2e6 !important;
-        }
-        
-        .parent-total-row {
-            background-color: #d4edda !important;
-            border-bottom: 2px solid #28a745 !important;
-        }
-        
-        .check-row {
-            background-color: #f8d7da !important;
-            border-bottom: 2px solid #dc3545 !important;
-        }
-        
-        .account-row {
-            background-color: white !important;
-            border-bottom: 1px solid #f0f0f0 !important;
-        }
-        
-        /* Indentation for sub-categories and accounts */
-        .sub-header-row td:nth-child(2) {
-            padding-left: 20px !important;
-        }
-        
-        .account-row td:nth-child(2) {
-            padding-left: 40px !important;
-        }
-        
-        /* Hide account code for headers */
-        .parent-header-row td:nth-child(1),
-        .sub-header-row td:nth-child(1) {
-            background-color: transparent !important;
-            border: none !important;
-        }
-        
-        /* Ensure proper text alignment for headers */
-        .parent-header-row td,
-        .sub-header-row td {
-            text-align: left !important;
-            vertical-align: middle !important;
-        }
-        
-        /* Keep numerical data right-aligned even in headers */
-        .parent-header-row td:nth-child(n+3),
-        .sub-header-row td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        /* Fixed columns styling */
-        .DTFC_LeftWrapper {
-            background-color: white !important;
-            border-right: 2px solid #999 !important;
-        }
-        
-        .DTFC_LeftHeadWrapper {
-            background-color: #f5f5f5 !important;
-            border-right: 2px solid #999 !important;
-        }
-        
-        .DTFC_LeftBodyWrapper {
-            background-color: white !important;
-            border-right: 2px solid #999 !important;
-        }
-        
-        /* Ensure proper column widths for fixed columns */
-        .DTFC_LeftWrapper table,
-        .DTFC_LeftHeadWrapper table,
-        .DTFC_LeftBodyWrapper table {
-            width: 100% !important;
-        }
-        
-        /* Fix column alignment issues with fixed columns */
-        .DTFC_LeftBodyWrapper td:nth-child(1) {
-            width: 120px !important;
-            min-width: 120px !important;
-        }
-        
-        .DTFC_LeftBodyWrapper td:nth-child(2) {
-            width: 250px !important;
-            min-width: 250px !important;
-        }
-        
-        /* Table borders */
-        #bsTable {
-            border-collapse: collapse;
-            border: 1px solid #ddd;
-        }
-        
-        #bsTable th,
-        #bsTable td {
+    <style>
+        /* General Page Layout */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { background-color: white; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .nav-menu, .filters, .actions { padding: 15px 20px; border-bottom: 1px solid #dee2e6; }
+        .nav-menu a { color: #495057; text-decoration: none; padding: 8px 16px; margin-right: 10px; border-radius: 4px; }
+        .nav-menu a.active { background-color: #007bff; color: white; }
+        .filter-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
+        .filter-group label { font-weight: bold; margin-bottom: 5px; color: #495057; }
+        .btn { background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
+        .btn-success { background-color: #28a745; }
+        .btn-secondary { background-color: #6c757d; }
+        .table-wrapper { padding: 20px; }
+
+        /* Clean Table Styles */
+        #reportTable { width: 100%; border-collapse: collapse; }
+        #reportTable th, #reportTable td {
+            padding: 8px 10px;
             border: 1px solid #e0e0e0;
-            padding: 8px;
+            font-size: 11px;
+            line-height: 1.2;
+            white-space: nowrap;
         }
-        
-        /* Thicker borders for TOTAL columns */
-        .total-column {
-            border-left: 2px solid #999 !important;
-            border-right: 2px solid #999 !important;
-            background-color: #f8f8f8;
-        }
-        
-        /* Header styling */
-        #bsTable thead th {
-            border-bottom: 2px solid #999;
-            background-color: #f5f5f5;
-        }
-        
-        /* Section headers (ASSETS, LIABILITIES, etc) */
-        .parent-header {
-            background-color: #e8e8e8;
-            font-weight: bold;
-            border-top: 2px solid #999;
+        #reportTable thead th {
+            background: #f5f5f5;
+            font-weight: 600;
+            text-align: center;
+            vertical-align: middle;
             border-bottom: 2px solid #999;
         }
-        
-        /* ELIMINATE GAP BETWEEN HEADER AND FIRST DATA ROW */
-        .dataTables_wrapper .dataTables_scrollHead {
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody {
-            margin-top: 0 !important;
-            border-top: none !important;
-            padding-top: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollHead table {
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody table {
-            margin-top: 0 !important;
-            border-top: none !important;
-        }
-        
-        /* Force no gap between thead and tbody */
-        #bsTable thead {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        #bsTable tbody {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Remove any DataTables default spacing */
-        .dataTables_wrapper .dataTables_scrollHeadInner {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBodyInner {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* ELIMINATE GAP - Target first row specifically */
-        #bsTable tbody tr:first-child td {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody tr:first-child td {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
-        }
-        
-        /* Remove extra spacing from DataTables */
-        .dataTables_scrollBody {
-            margin-top: 0 !important;
-        }
-        
-        .dataTables_scrollHead {
-            margin-bottom: 0 !important;
-        }
-        
-        #bsTable tbody tr:first-child td {
-            padding-top: 8px !important;  /* Same as P&L */
-        }
-        
-        /* Remove any wrapper spacing */
-        .dataTables_wrapper .dataTables_scroll {
-            margin-top: 0 !important;
-        }
+        #reportTable td:nth-child(n+3) { text-align: right; }
+        .th-wrap { display: flex; flex-direction: column; align-items: center; }
+        .th-bottom { font-weight: normal; font-size: 10px; }
+
+        /* Row and Column Cosmetics */
+        .parent-header-row { background-color: #e8e8e8; font-weight: bold; }
+        .sub-header-row { background-color: #f8f9fa; font-weight: bold; }
+        .parent-total-row { background-color: #d4edda; font-weight: bold; }
+        .check-row { background-color: #f8d7da; font-weight: bold; }
+        .company-f2001 { background-color: rgba(173,216,230,0.3) !important; }
+        .company-gl001 { background-color: rgba(144,238,144,0.3) !important; }
+        .total-column { background-color: rgba(211,211,211,0.4) !important; border-left: 2px solid #bbb; border-right: 2px solid #bbb; }
+        .negative { color: #dc3545; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Balance Sheet Report</h1>
-        </div>
-        
-        <!-- Navigation Menu -->
+        <div class="header"><h1>Balance Sheet Report</h1></div>
         <div class="nav-menu">
             <a href="{% url 'core:home' %}">🏠 Home</a>
             <a href="{% url 'core:upload_chart_of_accounts' %}">📋 Chart of Accounts</a>
@@ -495,247 +70,140 @@
             <a href="/admin/">⚙️ Admin</a>
         </div>
         
-        <!-- Filters -->
         <div class="filters">
-            <form method="get" id="filterForm">
+            <form method="get">
                 <div class="filter-row">
                     <div class="filter-group">
-                        <label for="from_month">From Month:</label>
-                        <select id="from_month" name="from_month" class="month-select">
-                            <option value="">Select Month</option>
-                            <option value="01" {% if from_month == '01' %}selected{% endif %}>Jan</option>
-                            <option value="02" {% if from_month == '02' %}selected{% endif %}>Feb</option>
-                            <option value="03" {% if from_month == '03' %}selected{% endif %}>Mar</option>
-                            <option value="04" {% if from_month == '04' %}selected{% endif %}>Apr</option>
-                            <option value="05" {% if from_month == '05' %}selected{% endif %}>May</option>
-                            <option value="06" {% if from_month == '06' %}selected{% endif %}>Jun</option>
-                            <option value="07" {% if from_month == '07' %}selected{% endif %}>Jul</option>
-                            <option value="08" {% if from_month == '08' %}selected{% endif %}>Aug</option>
-                            <option value="09" {% if from_month == '09' %}selected{% endif %}>Sep</option>
-                            <option value="10" {% if from_month == '10' %}selected{% endif %}>Oct</option>
-                            <option value="11" {% if from_month == '11' %}selected{% endif %}>Nov</option>
-                            <option value="12" {% if from_month == '12' %}selected{% endif %}>Dec</option>
+                        <label>From:</label>
+                        <select name="from_month">
+                            <option value="">Month</option>
+                            <option value="1" {% if request.GET.from_month == '1' %}selected{% endif %}>January</option>
+                            <option value="2" {% if request.GET.from_month == '2' %}selected{% endif %}>February</option>
+                            <option value="3" {% if request.GET.from_month == '3' %}selected{% endif %}>March</option>
+                            <option value="4" {% if request.GET.from_month == '4' %}selected{% endif %}>April</option>
+                            <option value="5" {% if request.GET.from_month == '5' %}selected{% endif %}>May</option>
+                            <option value="6" {% if request.GET.from_month == '6' %}selected{% endif %}>June</option>
+                            <option value="7" {% if request.GET.from_month == '7' %}selected{% endif %}>July</option>
+                            <option value="8" {% if request.GET.from_month == '8' %}selected{% endif %}>August</option>
+                            <option value="9" {% if request.GET.from_month == '9' %}selected{% endif %}>September</option>
+                            <option value="10" {% if request.GET.from_month == '10' %}selected{% endif %}>October</option>
+                            <option value="11" {% if request.GET.from_month == '11' %}selected{% endif %}>November</option>
+                            <option value="12" {% if request.GET.from_month == '12' %}selected{% endif %}>December</option>
+                        </select>
+                        <select name="from_year">
+                            <option value="">Year</option>
+                            <option value="2024" {% if request.GET.from_year == '2024' %}selected{% endif %}>2024</option>
+                            <option value="2025" {% if request.GET.from_year == '2025' %}selected{% endif %}>2025</option>
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label for="from_year">From Year:</label>
-                        <select id="from_year" name="from_year" class="year-select">
-                            <option value="">Select Year</option>
-                            {% for year in year_range %}
-                                <option value="{{ year }}" {% if from_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
-                            {% endfor %}
+                        <label>To:</label>
+                        <select name="to_month">
+                            <option value="">Month</option>
+                            <option value="1" {% if request.GET.to_month == '1' %}selected{% endif %}>January</option>
+                            <option value="2" {% if request.GET.to_month == '2' %}selected{% endif %}>February</option>
+                            <option value="3" {% if request.GET.to_month == '3' %}selected{% endif %}>March</option>
+                            <option value="4" {% if request.GET.to_month == '4' %}selected{% endif %}>April</option>
+                            <option value="5" {% if request.GET.to_month == '5' %}selected{% endif %}>May</option>
+                            <option value="6" {% if request.GET.to_month == '6' %}selected{% endif %}>June</option>
+                            <option value="7" {% if request.GET.to_month == '7' %}selected{% endif %}>July</option>
+                            <option value="8" {% if request.GET.to_month == '8' %}selected{% endif %}>August</option>
+                            <option value="9" {% if request.GET.to_month == '9' %}selected{% endif %}>September</option>
+                            <option value="10" {% if request.GET.to_month == '10' %}selected{% endif %}>October</option>
+                            <option value="11" {% if request.GET.to_month == '11' %}selected{% endif %}>November</option>
+                            <option value="12" {% if request.GET.to_month == '12' %}selected{% endif %}>December</option>
+                        </select>
+                        <select name="to_year">
+                            <option value="">Year</option>
+                            <option value="2024" {% if request.GET.to_year == '2024' %}selected{% endif %}>2024</option>
+                            <option value="2025" {% if request.GET.to_year == '2025' %}selected{% endif %}>2025</option>
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label for="to_month">To Month:</label>
-                        <select id="to_month" name="to_month" class="month-select">
-                            <option value="">Select Month</option>
-                            <option value="01" {% if to_month == '01' %}selected{% endif %}>Jan</option>
-                            <option value="02" {% if to_month == '02' %}selected{% endif %}>Feb</option>
-                            <option value="03" {% if to_month == '03' %}selected{% endif %}>Mar</option>
-                            <option value="04" {% if to_month == '04' %}selected{% endif %}>Apr</option>
-                            <option value="05" {% if to_month == '05' %}selected{% endif %}>May</option>
-                            <option value="06" {% if to_month == '06' %}selected{% endif %}>Jun</option>
-                            <option value="07" {% if to_month == '07' %}selected{% endif %}>Jul</option>
-                            <option value="08" {% if to_month == '08' %}selected{% endif %}>Aug</option>
-                            <option value="09" {% if to_month == '09' %}selected{% endif %}>Sep</option>
-                            <option value="10" {% if to_month == '10' %}selected{% endif %}>Oct</option>
-                            <option value="11" {% if to_month == '11' %}selected{% endif %}>Nov</option>
-                            <option value="12" {% if to_month == '12' %}selected{% endif %}>Dec</option>
+                        <label>Data Type:</label>
+                        <select name="data_type" id="data_type">
+                            <option value="actual" {% if request.GET.data_type == 'actual' %}selected{% endif %}>Actual</option>
+                            <option value="budget" {% if request.GET.data_type == 'budget' %}selected{% endif %}>Budget</option>
                         </select>
                     </div>
-                    <div class="filter-group">
-                        <label for="to_year">To Year:</label>
-                        <select id="to_year" name="to_year" class="year-select">
-                            <option value="">Select Year</option>
-                            {% for year in year_range %}
-                                <option value="{{ year }}" {% if to_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="data_type">Data Type:</label>
-                        <select id="data_type" name="data_type">
-                            <option value="actual" {% if data_type == 'actual' %}selected{% endif %}>Actual</option>
-                            <option value="budget" {% if data_type == 'budget' %}selected{% endif %}>Budget</option>
-                            <option value="forecast" {% if data_type == 'forecast' %}selected{% endif %}>Forecast</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label>&nbsp;</label>
-                        <button type="submit" class="btn">🔍 Apply Filters</button>
-                    </div>
+                    <button type="submit" class="btn">🔍 Apply Filters</button>
                 </div>
             </form>
         </div>
         
-        <!-- Actions -->
         <div class="actions">
-            <a href="{% url 'core:export_report_excel' %}?type=bs&from_month={{ from_month }}&from_year={{ from_year }}&to_month={{ to_month }}&to_year={{ to_year }}&data_type={{ data_type }}" class="btn btn-success">
-                📥 Export to Excel
-            </a>
-            <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+             <a href="{% url 'core:export_report_excel' %}?type=bs&{{ request.GET.urlencode }}" class="btn btn-success">📥 Export to Excel</a>
+             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
         </div>
-        
-        <!-- Report Table -->
-        <div class="table-container">
+
+        <div class="table-wrapper">
             {% if report_data %}
-            <div id="bs-report">
-            <table id="bsTable" class="display">
-                <colgroup>
-                    <col style="width: 110px;">
-                    <col style="width: 240px;">
-                    {% for period in periods %}
-                        {% for company in companies %}
-                            <col style="width: 120px;">
-                        {% endfor %}
-                        <col style="width: 120px;">
-                    {% endfor %}
-                    {% for company in companies %}
-                        <col style="width: 120px;">
-                    {% endfor %}
-                    <col style="width: 120px;">
-                </colgroup>
+            <table id="reportTable" class="display">
                 <thead>
                     <tr>
-                        <th>Account Code</th>
-                        <th>Account Name</th>
+                        <th style="min-width: 150px;">Account Code</th>
+                        <th style="min-width: 300px;">Account Name</th>
                         {% for period in periods %}
                             {% for company in companies %}
-                                                                    <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}"><div class="th-wrap"><span class="th-top">{{ period|date:"M-y" }}</span><span class="th-bottom">{{ company.code }}</span></div></th>
+                                <th class="company-{{ company.code|lower }}"><div class="th-wrap"><span>{{ period|date:"M-y" }}</span><span class="th-bottom">{{ company.code }}</span></div></th>
                             {% endfor %}
-                                                                <th class="total-column"><div class="th-wrap"><span class="th-top">{{ period|date:"M-y" }}</span><span class="th-bottom">TOTAL</span></div></th>
+                            <th class="total-column"><div class="th-wrap"><span>{{ period|date:"M-y" }}</span><span class="th-bottom">TOTAL</span></div></th>
                         {% endfor %}
-                        {% for company in companies %}
-                                                            <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}"><div class="th-wrap"><span class="th-top">Grand Total</span><span class="th-bottom">{{ company.code }}</span></div></th>
-                        {% endfor %}
-                                                        <th class="total-column"><div class="th-wrap"><span class="th-top">Grand Total</span><span class="th-bottom">TOTAL</span></div></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in report_data %}
-                        <tr class="{% if row.type == 'parent_header' %}parent-header-row parent-header{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% else %}account-row{% endif %}">
-                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}{% else %}{{ row.account_code }}{% endif %}</td>
-                            <td class="label {% if row.type == 'parent_header' or row.type == 'parent_total' %}lvl-0{% elif row.type == 'sub_header' or row.type == 'sub_total' %}lvl-1{% else %}lvl-2{% endif %}">
-                                {% if row.type in 'parent_header,parent_total,check_row' %}<strong>{{ row.account_name }}</strong>{% else %}{{ row.account_name }}{% endif %}
-                            </td>
-                            {% for period in periods %}
-                                {% for company in companies %}
-                                    <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {% if row.type == 'sub_header' %}
-                                            <!-- Sub-category headers show no data -->
-                                        {% else %}
-                                            {{ row.periods|get_item:period|get_item:company.code|format_number }}
-                                        {% endif %}
-                                    </td>
-                                {% endfor %}
-                                <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                    {% if row.type == 'sub_header' %}
-                                        <!-- Sub-category headers show no data -->
-                                    {% else %}
-                                        {{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
+                    <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% endif %}">
+                        <td>{% if row.type == 'account' %}{{ row.account_code }}{% endif %}</td>
+                        <td style="padding-left: {{ row.level|default:0|add:1|multiply:15 }}px;">{{ row.account_name }}</td>
+                        {% for period in periods %}
                             {% for company in companies %}
-                                <td class="{% if row.grand_totals|get_item:company.code < 0 %}negative{% elif row.grand_totals|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                    {% if row.type == 'sub_header' %}
-                                        <!-- Sub-category headers show no data -->
-                                    {% else %}
-                                        {{ row.grand_totals|get_item:company.code|format_number }}
-                                    {% endif %}
-                                </td>
+                                {% with amount=row.periods|get_item:period|get_item:company.code %}
+                                <td class="company-{{ company.code|lower }} {% if amount < 0 %}negative{% endif %}">{{ amount|format_number }}</td>
+                                {% endwith %}
                             {% endfor %}
-                            <td class="{% if row.grand_totals|get_item:'TOTAL' < 0 %}negative{% elif row.grand_totals|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                {% if row.type == 'sub_header' %}
-                                    <!-- Sub-category headers show no data -->
-                                {% else %}
-                                    {{ row.grand_totals|get_item:'TOTAL'|format_number }}
-                                {% endif %}
-                            </td>
-                        </tr>
+                            {% with total=row.periods|get_item:period|get_item:'TOTAL' %}
+                            <td class="total-column {% if total < 0 %}negative{% endif %}">{{ total|format_number }}</td>
+                            {% endwith %}
+                        {% endfor %}
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            </div>
             {% else %}
-            <div style="text-align: center; padding: 40px; color: #6c757d;">
-                <h3>No data available</h3>
-                <p>Please upload financial data and ensure you have ASSET, LIABILITY, and EQUITY accounts configured.</p>
-            </div>
+            <div style="text-align: center; padding: 40px;"><p>No data available for the selected criteria.</p></div>
             {% endif %}
         </div>
     </div>
-    
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedcolumns/4.2.2/js/dataTables.fixedColumns.min.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/fixedheader/4.0.1/js/dataTables.fixedHeader.min.js"></script>
+    <script src="https://cdn.datatables.net/fixedcolumns/5.0.1/js/dataTables.fixedColumns.min.js"></script>
+
     <script>
-        // Auto-submit form when filters change
-        document.getElementById('data_type').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-        
-        // Initialize DataTable with responsive design
         $(document).ready(function() {
-            // Get screen dimensions
-            var screenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-            var screenHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
-            
-            // Calculate optimal table height based on screen size
-            var tableHeight = Math.max(400, screenHeight * 0.6);
-            
-            // Determine column widths based on screen size
-            var columnDefs = [
-                { targets: [0, 1], className: 'text-left' },
-                { targets: '_all', className: 'text-right' }
-            ];
-            
-            // Adjust column widths for different screen sizes
-            if (screenWidth >= 1920) {
-                // 4K and large screens
-                columnDefs.push({ targets: 0, width: '120px' }); // Account Code
-                columnDefs.push({ targets: 1, width: '300px' }); // Account Name
-            } else if (screenWidth >= 1440) {
-                // Full HD and larger
-                columnDefs.push({ targets: 0, width: '100px' });
-                columnDefs.push({ targets: 1, width: '250px' });
-            } else if (screenWidth >= 1024) {
-                // HD and larger
-                columnDefs.push({ targets: 0, width: '90px' });
-                columnDefs.push({ targets: 1, width: '200px' });
-            } else {
-                // Smaller screens
-                columnDefs.push({ targets: 0, width: '80px' });
-                columnDefs.push({ targets: 1, width: '180px' });
-            }
-            
-            var dt = $('#bsTable').DataTable({
+            $('#reportTable').DataTable({
+                // Vertical scrolling
+                scrollY: '70vh',
+                scrollCollapse: true,
+                
+                // Horizontal scrolling
                 scrollX: true,
-                scrollY: tableHeight + "px",
+
+                // Enable FixedHeader
+                fixedHeader: true,
+
+                // NEW: Enable FixedColumns for the first 2 columns
+                fixedColumns: {
+                    left: 2
+                },
+
+                // Disable unnecessary features
                 paging: false,
                 searching: false,
-                ordering: false,
                 info: false,
-                autoWidth: true,
-                columnDefs: columnDefs,
-                responsive: true
-            });
-            
-            // Adjust columns after initialization
-            dt.columns.adjust().draw(false);
-            
-            // Handle window resize
-            $(window).resize(function() {
-                var newScreenWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-                var newScreenHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
-                var newTableHeight = Math.max(400, newScreenHeight * 0.6);
-                
-                // Update table height
-                dt.scrollY(newTableHeight + "px");
-                
-                // Recalculate column widths
-                dt.columns.adjust().draw(false);
+                ordering: false
             });
         });
     </script>

@@ -29,3 +29,11 @@ def format_number(value):
             return "{:,.2f}".format(num)
     except (ValueError, TypeError):
         return str(value)
+
+@register.filter(name='multiply')
+def multiply(value, arg):
+    """Multiplies the value by the argument."""
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return ''
