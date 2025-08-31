@@ -883,6 +883,19 @@ def bs_report(request):
         if parent_category not in grouped_data:
             continue
             
+        # Calculate grand totals for parent category
+        parent_grand_totals = {}
+        parent_grand_total_overall = 0
+        
+        for company in companies:
+            company_total = 0
+            for period in periods:
+                company_total += parent_totals[parent_category][period][company.code]
+            parent_grand_totals[company.code] = company_total
+            parent_grand_total_overall += company_total
+        
+        parent_grand_totals['TOTAL'] = parent_grand_total_overall
+        
         # Add parent category header
         report_data.append({
             'type': 'parent_header',
@@ -893,11 +906,24 @@ def bs_report(request):
             'sub_category': '',
             'is_header': True,
             'periods': parent_totals[parent_category],
-            'grand_totals': {}
+            'grand_totals': parent_grand_totals
         })
         
         # Process sub categories
         for sub_category, sub_accounts in grouped_data[parent_category].items():
+            # Calculate grand totals for sub category
+            sub_grand_totals = {}
+            sub_grand_total_overall = 0
+            
+            for company in companies:
+                company_total = 0
+                for period in periods:
+                    company_total += sub_category_totals[f"{parent_category}_{sub_category}"][period][company.code]
+                sub_grand_totals[company.code] = company_total
+                sub_grand_total_overall += company_total
+            
+            sub_grand_totals['TOTAL'] = sub_grand_total_overall
+            
             # Add sub category header
             report_data.append({
                 'type': 'sub_header',
@@ -908,7 +934,7 @@ def bs_report(request):
                 'sub_category': sub_category,
                 'is_header': True,
                 'periods': sub_category_totals[f"{parent_category}_{sub_category}"],
-                'grand_totals': {}
+                'grand_totals': sub_grand_totals
             })
             
             # Add individual accounts
