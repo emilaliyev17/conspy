@@ -155,7 +155,7 @@
         }
         
         .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            left: 80px !important; /* Adjust based on first column width */
+            left: 60px !important; /* Reduced gap between columns */
         }
         
         .dataTables_wrapper .dataTables_scrollHead th:nth-child(1),
@@ -163,11 +163,61 @@
             position: sticky !important;
             left: 0 !important;
             background-color: white !important;
-            z-index: 11 !important;
+            z-index: 5 !important; /* Lower z-index to prevent overlap */
         }
         
         .dataTables_wrapper .dataTables_scrollHead th:nth-child(2) {
-            left: 80px !important; /* Adjust based on first column width */
+            left: 60px !important; /* Reduced gap between columns */
+        }
+        
+        /* Fix header overlap issue */
+        .dataTables_wrapper .dataTables_scrollHead {
+            z-index: 1 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody {
+            z-index: 0 !important;
+        }
+        
+        /* Reduce gap between header and first data row */
+        .dataTables_wrapper .dataTables_scrollHead {
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody {
+            margin-top: 0 !important;
+            border-top: none !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Remove any spacing between header and body */
+        .dataTables_wrapper .dataTables_scrollHeadInner {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        /* Force minimal spacing */
+        .dataTables_wrapper .dataTables_scrollHead table {
+            margin-bottom: 0 !important;
+            border-bottom: none !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody table {
+            margin-top: 0 !important;
+            border-top: none !important;
+        }
+        
+        /* Remove any gaps from table cells */
+        .dataTables_wrapper .dataTables_scrollHead th {
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody td:first-child {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
         }
         
         /* Fix vertical alignment - force consistent height */
@@ -296,6 +346,13 @@
             font-size: 11px !important;
             text-align: right !important;
         }
+        
+        /* Ensure first row has same font size as others */
+        .dataTables_wrapper .dataTables_scrollBody tr:first-child td:nth-child(n+3) {
+            font-size: 11px !important;
+        }
+        
+
         
         .header-row {
             background-color: #e3f2fd;

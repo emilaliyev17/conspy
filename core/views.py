@@ -406,7 +406,11 @@ def pl_report(request):
         grand_totals['OVERALL'] = grand_total_overall
         row_data['grand_totals'] = grand_totals
         
-        report_data.append(row_data)
+        # Only add rows where Grand Total is not zero
+        if grand_total_overall != 0:
+            report_data.append(row_data)
+        else:
+            logger.info(f"Skipping account {account.account_code} - {account.account_name} (Grand Total = 0)")
     
     logger.info(f"Generated report with {len(report_data)} account rows")
     
