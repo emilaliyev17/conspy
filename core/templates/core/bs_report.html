@@ -382,6 +382,10 @@
                             {% endfor %}
                             <th class="total-column">{{ period|date:"M-y" }}<br>TOTAL</th>
                         {% endfor %}
+                        {% for company in companies %}
+                            <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">Grand Total<br>{{ company.code }}</th>
+                        {% endfor %}
+                        <th class="total-column">Grand Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -417,6 +421,18 @@
                                     <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
                                 </td>
                             {% endfor %}
+                            {% for company in companies %}
+                                <td class="{% if row.grand_totals|get_item:company.code < 0 %}negative{% elif row.grand_totals|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
+                                    {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'check_row' %}
+                                        <strong>{{ row.grand_totals|get_item:company.code|format_number }}</strong>
+                                    {% else %}
+                                        {{ row.grand_totals|get_item:company.code|format_number }}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="{% if row.grand_totals|get_item:'TOTAL' < 0 %}negative{% elif row.grand_totals|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
+                                <strong>{{ row.grand_totals|get_item:'TOTAL'|format_number }}</strong>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

@@ -6,6 +6,8 @@ register = template.Library()
 @register.filter
 def get_item(dictionary, key):
     """Get item from dictionary by key."""
+    if dictionary is None or not isinstance(dictionary, dict):
+        return 0
     return dictionary.get(key, 0)
 
 @register.filter
