@@ -106,6 +106,42 @@
         .total-column {
             background-color: rgba(211, 211, 211, 0.3); /* Light gray */
         }
+        
+        /* Table alignment fixes */
+        #plTable th {
+            vertical-align: middle !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+            padding: 8px 4px !important;
+            height: 60px !important;
+        }
+        
+        #plTable td {
+            vertical-align: middle !important;
+            text-align: right !important;
+            line-height: 1.2 !important;
+            padding: 8px 4px !important;
+            height: 40px !important;
+        }
+        
+        /* Keep Account Code and Account Name left-aligned */
+        #plTable td:nth-child(1),
+        #plTable td:nth-child(2) {
+            text-align: left !important;
+        }
+        
+        /* Ensure consistent height for header and data cells */
+        #plTable thead th,
+        #plTable tbody td {
+            box-sizing: border-box !important;
+        }
+        
+        /* Fix for two-line headers */
+        #plTable th br {
+            display: block !important;
+            content: "" !important;
+            margin: 2px 0 !important;
+        }
         .btn {
             background-color: #007bff;
             color: white;
