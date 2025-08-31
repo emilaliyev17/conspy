@@ -840,30 +840,41 @@ def upload_financial_data(request):
     
     if request.method == 'POST':
         if 'file' not in request.FILES:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Please select a file to upload.'})
             messages.error(request, 'Please select a file to upload.')
             return render(request, 'core/upload_financial_data.html', {'companies': companies})
         
         uploaded_file = request.FILES['file']
         company_id = request.POST.get('company')
         data_type = request.POST.get('data_type')
+        confirm_overwrite = request.POST.get('confirm_overwrite') == 'true'
         
         # Validate form data
         if not company_id:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Please select a company.'})
             messages.error(request, 'Please select a company.')
             return render(request, 'core/upload_financial_data.html', {'companies': companies})
         
         if not data_type:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Please select a data type.'})
             messages.error(request, 'Please select a data type.')
             return render(request, 'core/upload_financial_data.html', {'companies': companies})
         
         try:
             company = Company.objects.get(id=company_id)
         except Company.DoesNotExist:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Selected company does not exist.'})
             messages.error(request, 'Selected company does not exist.')
             return render(request, 'core/upload_financial_data.html', {'companies': companies})
         
         # Check file extension
         if not uploaded_file.name.endswith(('.csv', '.xlsx', '.xls')):
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Please upload a CSV or Excel file.'})
             messages.error(request, 'Please upload a CSV or Excel file.')
             return render(request, 'core/upload_financial_data.html', {'companies': companies})
         
@@ -913,7 +924,19 @@ def upload_financial_data(request):
                 ).exists():
                     existing_periods.append(period_header)
             
-            # If there are existing periods, create backup and show warning
+            # If there are existing periods and user hasn't confirmed overwrite
+            if existing_periods and not confirm_overwrite:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    message = f"Data already exists for periods: {', '.join(existing_periods)}. Do you want to overwrite?"
+                    return JsonResponse({
+                        'status': 'confirmation_needed',
+                        'message': message
+                    })
+                else:
+                    # For non-AJAX requests, show warning but proceed
+                    messages.warning(request, f"Data already exists for periods: {', '.join(existing_periods)}. Existing data will be overwritten.")
+            
+            # If there are existing periods, create backup
             backup_created = False
             if existing_periods:
                 # Create backup of existing data
@@ -1039,22 +1062,33 @@ def upload_financial_data(request):
             if success_count > 0 or updated_count > 0:
                 period_range = f"from {earliest_period.strftime('%b %Y')} to {latest_period.strftime('%b %Y')}"
                 if updated_count > 0:
-                    success_msg = f'Successfully uploaded {success_count} new records and updated {updated_count} existing records for {len(valid_period_columns)} periods ({period_range}).'
+                    success_msg = f'Successfully uploaded {success_count} accounts for {len(valid_period_columns)} periods ({period_range}). Updated {updated_count} existing records.'
                     if backup_created:
                         success_msg += ' Previous data backed up and can be restored from Admin > Data Backups.'
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'status': 'success', 'message': success_msg})
                     messages.success(request, success_msg)
                 else:
-                    messages.success(request, f'Successfully uploaded {success_count} records for {len(valid_period_columns)} periods ({period_range}).')
+                    success_msg = f'Successfully uploaded {success_count} accounts for {len(valid_period_columns)} periods ({period_range}).'
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({'status': 'success', 'message': success_msg})
+                    messages.success(request, success_msg)
             
             if error_count > 0:
-                messages.warning(request, f'Failed to import {error_count} records. Check the errors below.')
+                error_msg = f'Failed to import {error_count} records. Check the errors below.'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'status': 'error', 'message': error_msg})
+                messages.warning(request, error_msg)
                 for error in errors[:10]:  # Show first 10 errors
                     messages.error(request, error)
                 if len(errors) > 10:
                     messages.error(request, f'... and {len(errors) - 10} more errors.')
             
         except Exception as e:
-            messages.error(request, f'Error processing file: {str(e)}')
+            error_msg = f'Error processing file: {str(e)}'
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': error_msg})
+            messages.error(request, error_msg)
     
     return render(request, 'core/upload_financial_data.html', {'companies': companies})
 
