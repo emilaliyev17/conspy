@@ -359,6 +359,18 @@ def upload_financial_data(request):
                     messages.warning(request, f'Data already exists for periods: {", ".join(existing_periods)}. Please confirm overwrite.')
                     return render(request, 'core/upload_financial_data.html', {'companies': companies})
             
+            # Collect account codes from the uploaded file
+            uploaded_account_codes = set()
+            for index, row in df.iterrows():
+                account_code_raw = row.iloc[0]
+                if pd.notna(account_code_raw):
+                    if isinstance(account_code_raw, float):
+                        account_code = str(int(account_code_raw))
+                    else:
+                        account_code = str(account_code_raw).strip()
+                    if account_code:
+                        uploaded_account_codes.add(account_code)
+            
             # Create backup before overwriting if there's existing data
             if existing_periods:
                 backup_data = []
@@ -367,7 +379,8 @@ def upload_financial_data(request):
                         existing_records = FinancialData.objects.filter(
                             company=company,
                             period=period_date,
-                            data_type=data_type
+                            data_type=data_type,
+                            account_code__in=uploaded_account_codes  # Backup только тех записей, которые будут удалены
                         )
                         for record in existing_records:
                             backup_data.append({
@@ -392,13 +405,14 @@ def upload_financial_data(request):
                     else:
                         messages.warning(request, backup_msg)
                 
-                # Delete existing data
+                # Delete ONLY data for account codes that are in the uploaded file
                 for col, period_date in period_columns:
                     if col in existing_periods:
                         FinancialData.objects.filter(
                             company=company,
                             period=period_date,
-                            data_type=data_type
+                            data_type=data_type,
+                            account_code__in=uploaded_account_codes  # ВАЖНО: удаляем только эти коды
                         ).delete()
             
             success_count = 0
