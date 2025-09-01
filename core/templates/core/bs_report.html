@@ -24,7 +24,7 @@
             background-color: white;
             border-radius: 0;
             box-shadow: none;
-            overflow: hidden;
+            overflow: auto;
         }
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -419,7 +419,7 @@
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader
                         },
-                        domLayout: 'autoHeight',
+                        domLayout: 'normal',  // Enable internal scrolling like P&L
                         rowSelection: {
                             enableClickSelection: false
                         },
