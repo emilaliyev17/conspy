@@ -1066,13 +1066,21 @@ def pl_report_data(request):
                 'field': f'{p.strftime("%b-%y")}_{c.code}',
                 'headerName': f'{p.strftime("%b-%y")} {c.code}',
                 'width': 120,
-                'type': 'numberColumnWithCommas'
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#E6F3FF' if str(c.code).upper().startswith('F2') else '#E8F5E9'
+                }
             })
         column_defs.append({
             'field': f'{p.strftime("%b-%y")}_TOTAL',
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
             'width': 120,
-            'type': 'numberColumnWithCommas'
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#FFF9E6'
+            }
         })
     for c in companies:
         column_defs.append({
@@ -1445,29 +1453,23 @@ def bs_report_data(request):
                 'field': f'{period.strftime("%b-%y")}_{company.code}',
                 'headerName': f'{period.strftime("%b-%y")} {company.code}',
                 'width': 120,
-                'type': 'numberColumnWithCommas'
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#E6F3FF' if str(company.code).upper().startswith('F2') else '#E8F5E9'
+                }
             })
         column_defs.append({
             'field': f'{period.strftime("%b-%y")}_TOTAL',
             'headerName': f'{period.strftime("%b-%y")} TOTAL',
             'width': 120,
-            'type': 'numberColumnWithCommas'
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#FFF9E6'
+            }
         })
     
-    # Add grand total columns
-    for company in companies:
-        column_defs.append({
-            'field': f'grand_total_{company.code}',
-            'headerName': f'Grand Total {company.code}',
-            'width': 120,
-            'type': 'numberColumnWithCommas'
-        })
-    column_defs.append({
-        'field': 'grand_total_TOTAL',
-        'headerName': 'Grand Total',
-        'width': 120,
-        'type': 'numberColumnWithCommas'
-    })
     
     # Prepare row data for AG Grid
     row_data = []
@@ -1488,15 +1490,6 @@ def bs_report_data(request):
             field_name = f'{period.strftime("%b-%y")}_TOTAL'
             value = row['periods'].get(period, {}).get('TOTAL', 0)
             grid_row[field_name] = float(value or 0)
-        
-        # Add grand total data
-        for company in companies:
-            field_name = f'grand_total_{company.code}'
-            value = row['grand_totals'].get(company.code, 0)
-            grid_row[field_name] = float(value or 0)
-        
-        value = row['grand_totals'].get('TOTAL', 0)
-        grid_row['grand_total_TOTAL'] = float(value or 0)
         
         # Apply row styling based on type
         if row['type'] == 'parent_header':
