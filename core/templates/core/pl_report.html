@@ -442,12 +442,14 @@
                 to_year: document.getElementById('to_year').value,
                 data_type: document.getElementById('data_type').value
             };
+            console.log('Saving filters:', filters);  // ДОБАВЬ ЭТУ СТРОКУ
             localStorage.setItem('pl_filters', JSON.stringify(filters));
         }
 
         // Функция для загрузки фильтров
         function loadSavedFilters() {
             const saved = localStorage.getItem('pl_filters');
+            console.log('Loading saved filters:', saved);  // ДОБАВЬ ЭТУ СТРОКУ
             if (saved) {
                 const filters = JSON.parse(saved);
                 if (filters.from_month) document.getElementById('from_month').value = filters.from_month;
