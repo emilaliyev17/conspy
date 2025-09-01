@@ -14,7 +14,7 @@ django.setup()
 
 from django.test import RequestFactory
 from core.views import download_template, upload_chart_of_accounts, download_financial_data_template, upload_financial_data
-from core.models import ChartOfAccounts, Company, Account, FinancialData
+from core.models import ChartOfAccounts, Company, FinancialData
 
 def test_download_template():
     """Test the Chart of Accounts template download functionality."""
@@ -117,16 +117,16 @@ def test_financial_data_model_creation():
             defaults={'name': 'Test Company for Financial Data'}
         )
         
-        account, _ = Account.objects.get_or_create(
-            code='TEST_ACC',
-            defaults={'name': 'Test Account for Financial Data', 'type': 'asset'}
+        chart_account, _ = ChartOfAccounts.objects.get_or_create(
+            account_code='TEST_ACC',
+            defaults={'account_name': 'Test Account for Financial Data', 'account_type': 'ASSET'}
         )
         
         # Create a test financial data record
         from datetime import date
         financial_data = FinancialData.objects.create(
             company=company,
-            account=account,
+            account_code=chart_account.account_code,
             period=date(2024, 1, 1),
             amount=1000.00,
             data_type='actual'
@@ -135,7 +135,8 @@ def test_financial_data_model_creation():
         
         # Clean up
         financial_data.delete()
-        print("✓ Test Financial Data deleted successfully")
+        chart_account.delete()
+        print("✓ Test Financial Data and Chart of Accounts deleted successfully")
         return True
     except Exception as e:
         print(f"✗ FinancialData model creation failed: {e}")

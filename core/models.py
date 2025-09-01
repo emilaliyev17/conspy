@@ -12,22 +12,6 @@ class Company(models.Model):
     class Meta:
         verbose_name_plural = "Companies"
 
-class Account(models.Model):
-    ACCOUNT_TYPES = [
-        ('asset', 'Asset'),
-        ('liability', 'Liability'),
-        ('equity', 'Equity'),
-        ('revenue', 'Revenue'),
-        ('expense', 'Expense'),
-    ]
-    
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=200)
-    type = models.CharField(max_length=20, choices=ACCOUNT_TYPES)
-    
-    def __str__(self):
-        return f"{self.code} - {self.name}"
-
 class FinancialData(models.Model):
     DATA_TYPES = [
         ('actual', 'Actual'),
@@ -36,17 +20,17 @@ class FinancialData(models.Model):
     ]
     
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='financial_data')
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='financial_data')
+    account_code = models.CharField(max_length=50, null=True, blank=True)  # Changed from ForeignKey to CharField
     period = models.DateField()
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     data_type = models.CharField(max_length=20, choices=DATA_TYPES)
     
     def __str__(self):
-        return f"{self.company.code} - {self.account.code} - {self.period} - {self.amount}"
+        return f"{self.company.code} - {self.account_code} - {self.period} - {self.amount}"
     
     class Meta:
         verbose_name_plural = "Financial Data"
-        unique_together = ['company', 'account', 'period', 'data_type']
+        unique_together = ['company', 'account_code', 'period', 'data_type']
 
 class ChartOfAccounts(models.Model):
     ACCOUNT_TYPES = [
@@ -91,3 +75,5 @@ class DataBackup(models.Model):
     class Meta:
         verbose_name_plural = "Data Backups"
         ordering = ['-backup_date']
+
+

@@ -6,6 +6,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profit & Loss Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css">
     <link rel="stylesheet" href="{% static 'css/reports.css' %}">
     <style>
         body {
@@ -244,140 +247,9 @@
             padding: 0 2mm;
             width: 100%;
         }
-        /* Smaller font size for table headers to prevent wrapping */
-        .dataTables_wrapper .dataTables_scrollHead th {
-            font-size: 11px !important;
-            line-height: 1.2 !important;
-            padding: 4px 6px !important;
-        }
+
         
-        /* Prevent text wrapping in Account Name column and reduce font size */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            font-size: 11px !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            max-width: 150px !important;
-            width: 150px !important;
-        }
-        
-        /* Reduce font size for Account Code column */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1) {
-            font-size: 11px !important;
-        }
-        
-        /* Reduce font size for all data cells (numerical values) */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
-            font-size: 11px !important;
-            text-align: right !important;
-        }
-        
-        /* Make DataTables wrapper stretch to full width */
-        .dataTables_wrapper {
-            width: 100% !important;
-        }
-        
-        /* Ensure first row has same font size as others */
-        .dataTables_wrapper .dataTables_scrollBody tr:first-child td:nth-child(n+3) {
-            font-size: 11px !important;
-        }
-        
-        /* Hierarchical grouping styles */
-        .parent-header-row {
-            background-color: #e8f5e8 !important; /* Light green background */
-            font-weight: bold !important;
-            font-size: 14px !important;
-            text-transform: uppercase !important;
-            border-top: 2px solid #28a745 !important; /* Top border line */
-            border-bottom: 2px solid #28a745 !important; /* Bottom border line */
-            margin-top: 8px !important; /* Top margin */
-            margin-bottom: 8px !important; /* Bottom margin */
-        }
-        
-        /* Special styling for EXPENSE TOTAL row (last parent header) */
-        .parent-header-row:last-child {
-            background-color: #ffebee !important; /* Light red background */
-            border-top: 3px solid #f44336 !important; /* Red border */
-            border-bottom: 3px solid #f44336 !important; /* Red border */
-            font-weight: bold !important;
-            font-size: 16px !important;
-            color: #d32f2f !important; /* Dark red text */
-        }
-        
-        .parent-header-row:last-child td {
-            padding-top: 15px !important;
-            padding-bottom: 15px !important;
-            background-color: #ffebee !important;
-        }
-        
-        /* Add spacing above and below parent headers */
-        .parent-header-row td {
-            padding-top: 12px !important; /* Extra top padding */
-            padding-bottom: 12px !important; /* Extra bottom padding */
-        }
-        
-        .sub-header-row {
-            background-color: #f8f9fa !important; /* Light gray background */
-            font-weight: bold !important;
-            font-size: 12px !important;
-        }
-        
-        .account-row {
-            background-color: white !important;
-            font-size: 11px !important;
-        }
-        
-        /* Indentation for sub-categories and accounts */
-        .sub-header-row td:nth-child(2) {
-            padding-left: 20px !important;
-        }
-        
-        .account-row td:nth-child(2) {
-            padding-left: 40px !important;
-        }
-        
-        /* Hide account code for headers */
-        .parent-header-row td:nth-child(1),
-        .sub-header-row td:nth-child(1) {
-            background-color: transparent !important;
-            border: none !important;
-        }
-        
-        /* Ensure proper text alignment for headers */
-        .parent-header-row td,
-        .sub-header-row td {
-            text-align: left !important;
-            vertical-align: middle !important;
-        }
-        
-        /* Keep numerical data right-aligned even in headers */
-        .parent-header-row td:nth-child(n+3),
-        .sub-header-row td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        .header-row {
-            background-color: #e3f2fd;
-            font-weight: bold;
-        }
-        .subtotal-row {
-            background-color: #f3e5f5;
-            font-weight: bold;
-        }
-        .total-row {
-            background-color: #e8f5e8;
-            font-weight: bold;
-            font-size: 16px;
-        }
-        .negative {
-            color: #dc3545;
-        }
-        .positive {
-            color: #000000;
-        }
-        .zero {
-            color: #6c757d;
-        }
+
         @media print {
             .nav-menu, .filters, .actions {
                 display: none;
@@ -495,138 +367,186 @@
             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
         </div>
         
-        <!-- Report Table -->
+        <!-- AG Grid Container -->
         <div class="table-container">
-            {% if report_data %}
-            <table id="financial-report-table" class="display">
-                <thead>
-                    <tr>
-                        <th>A/C</th>
-                        <th>Account Name</th>
-                        {% for period in periods %}
-                            {% for company in companies %}
-                                <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">{{ period|date:"M-y" }}<br>{{ company.code }}</th>
-                            {% endfor %}
-                            <th class="total-column">{{ period|date:"M-y" }}<br>TOTAL</th>
-                        {% endfor %}
-                        {% for company in companies %}
-                            <th class="{% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">Grand Total<br>{{ company.code }}</th>
-                        {% endfor %}
-                        <th class="total-column">Grand Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in report_data %}
-                        <tr class="{% if row.type == 'parent_header' %}parent-header-row parent-header{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'sub_total' %}sub-total-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'calculated_total' %}calculated-total-row calculated-total{% else %}account-row{% endif %}">
-                            <td>{% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}{% else %}{{ row.account_code }}{% endif %}</td>
-                            <td>
-                                {% if row.type == 'parent_header' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'sub_header' %}
-                                    {{ row.account_name }}
-                                {% elif row.type == 'sub_total' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'parent_total' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% elif row.type == 'calculated_total' %}
-                                    <strong>{{ row.account_name }}</strong>
-                                {% else %}
-                                    {{ row.account_name }}
-                                {% endif %}
-                            </td>
-                            {% for period in periods %}
-                                {% for company in companies %}
-                                    <td class="{% if row.periods|get_item:period|get_item:company.code < 0 %}negative{% elif row.periods|get_item:period|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                        {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}
-                                            <strong>{{ row.periods|get_item:period|get_item:company.code|format_number }}</strong>
-                                        {% else %}
-                                            {{ row.periods|get_item:period|get_item:company.code|format_number }}
-                                        {% endif %}
-                                    </td>
-                                {% endfor %}
-                                <td class="{% if row.periods|get_item:period|get_item:'TOTAL' < 0 %}negative{% elif row.periods|get_item:period|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                    <strong>{{ row.periods|get_item:period|get_item:'TOTAL'|format_number }}</strong>
-                                </td>
-                            {% endfor %}
-                            {% for company in companies %}
-                                <td class="{% if row.grand_totals|get_item:company.code < 0 %}negative{% elif row.grand_totals|get_item:company.code > 0 %}positive{% else %}zero{% endif %} {% if company.code == 'F2001' %}company-f2001{% elif company.code == 'GL001' %}company-gl001{% endif %}">
-                                    {% if row.type == 'parent_header' or row.type == 'sub_header' or row.type == 'sub_total' or row.type == 'parent_total' or row.type == 'calculated_total' %}
-                                        <strong>{{ row.grand_totals|get_item:company.code|format_number }}</strong>
-                                    {% else %}
-                                        {{ row.grand_totals|get_item:company.code|format_number }}
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                            <td class="{% if row.grand_totals|get_item:'TOTAL' < 0 %}negative{% elif row.grand_totals|get_item:'TOTAL' > 0 %}positive{% else %}zero{% endif %} total-column">
-                                <strong>{{ row.grand_totals|get_item:'TOTAL'|format_number }}</strong>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div style="text-align: center; padding: 40px; color: #6c757d;">
-                <h3>No data available</h3>
-                <p>Please upload financial data and ensure you have INCOME and EXPENSE accounts configured.</p>
-                
-                {% if debug_info %}
-                <div style="text-align: left; margin-top: 20px; padding: 20px; background-color: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                    <h4>Debug Information:</h4>
-                    <ul>
-                        <li><strong>Total FinancialData records:</strong> {{ debug_info.total_financial_records }}</li>
-                        <li><strong>Records with data_type '{{ data_type }}':</strong> {{ debug_info.data_type_records }}</li>
-                        <li><strong>INCOME/EXPENSE accounts found:</strong> {{ debug_info.accounts_found }}</li>
-                        <li><strong>Companies found:</strong> {{ debug_info.companies_found }}</li>
-                        <li><strong>Periods found:</strong> {{ debug_info.periods_found }}</li>
-                    </ul>
-                    
-                    <h4>Troubleshooting:</h4>
-                    <ul>
-                        {% if debug_info.total_financial_records == 0 %}
-                            <li>❌ No financial data has been uploaded yet. Please upload data first.</li>
-                        {% elif debug_info.data_type_records == 0 %}
-                            <li>❌ No data found for data type '{{ data_type }}'. Try changing the data type filter.</li>
-                        {% else %}
-                            <li>✅ Financial data exists for this data type.</li>
-                        {% endif %}
-                        
-                        {% if debug_info.accounts_found == 0 %}
-                            <li>❌ No INCOME or EXPENSE accounts found in Chart of Accounts. Please upload Chart of Accounts first.</li>
-                        {% else %}
-                            <li>✅ INCOME/EXPENSE accounts are configured.</li>
-                        {% endif %}
-                        
-                        {% if debug_info.periods_found == 0 %}
-                            <li>❌ No periods found. This could be due to date filters being too restrictive.</li>
-                        {% else %}
-                            <li>✅ Periods are available for reporting.</li>
-                        {% endif %}
-                    </ul>
-                </div>
-                {% endif %}
+            <div id="plGrid" class="ag-theme-alpine" style="height: 800px; width: 100%;"></div>
+            <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
+                <h3>Loading data...</h3>
+                <p>Please wait while we load your P&L report.</p>
             </div>
-            {% endif %}
         </div>
     </div>
     
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
+        // --- Custom Header for the "+" Toggler Button ---
+        class TogglerHeader {
+            init(params) {
+                this.eGui = document.createElement('div');
+                this.eGui.innerHTML = `
+                    <span style="cursor: pointer; font-weight: bold;">+</span>
+                `;
+                this.params = params;
+                this.eGui.addEventListener('click', this.toggleColumn.bind(this));
+            }
+            getGui() {
+                return this.eGui;
+            }
+            toggleColumn() {
+                const api = this.params.api;
+                // Hide this toggler column
+                api.setColumnsVisible(['toggler'], false);
+                // Show the real A/C column
+                api.setColumnsVisible(['account_code'], true);
+            }
+            destroy() {}
+        }
+
+        // --- Custom Header for the "A/C" column with a "-" Button ---
+        class HideableHeader {
+            init(params) {
+                this.eGui = document.createElement('div');
+                this.eGui.innerHTML = `
+                    <span>A/C</span>
+                    <span style="cursor: pointer; font-weight: bold; float: right;">-</span>
+                `;
+                this.params = params;
+                this.eGui.addEventListener('click', this.toggleColumn.bind(this));
+            }
+            getGui() {
+                return this.eGui;
+            }
+            toggleColumn() {
+                const api = this.params.api;
+                // Hide this A/C column
+                api.setColumnsVisible(['account_code'], false);
+                // Show the toggler column
+                api.setColumnsVisible(['toggler'], true);
+            }
+            destroy() {}
+        }
+
         // Auto-submit form when filters change
         document.getElementById('data_type').addEventListener('change', function() {
             document.getElementById('filterForm').submit();
         });
         
-        // Simple alignment for native table
-        $(document).ready(function() {
-            // Force right alignment for all data cells (except first two columns)
-            $('#financial-report-table tbody tr').each(function() {
-                $(this).find('td:nth-child(n+3)').attr('style', 'text-align: right !important');
-            });
+        // AG Grid initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing AG Grid...');
             
-            // Force left alignment for Account Code and Account Name
-            $('#financial-report-table tbody tr').each(function() {
-                $(this).find('td:nth-child(1), td:nth-child(2)').attr('style', 'text-align: left !important');
-            });
+            const gridDiv = document.querySelector('#plGrid');
+            const loadingDiv = document.querySelector('#loadingMessage');
+            
+            if (!gridDiv) {
+                console.error('Grid div not found!');
+                return;
+            }
+            
+            // Check if AG Grid is loaded
+            if (typeof agGrid === 'undefined') {
+                console.error('AG Grid library not loaded!');
+                if (loadingDiv) {
+                    loadingDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>AG Grid Library Error</h3><p>AG Grid library failed to load. Please refresh the page.</p></div>';
+                }
+                return;
+            }
+            console.log('AG Grid library loaded successfully');
+            
+            // Get current URL parameters for the data request
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataUrl = '/reports/pl/data/?' + urlParams.toString();
+            console.log('Fetching data from:', dataUrl);
+            
+            // Fetch data from the JSON endpoint
+            fetch(dataUrl)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Data received:', data);
+                    console.log('Column definitions:', data.columnDefs);
+                    console.log('Row data count:', data.rowData.length);
+                    
+                    // Hide loading message
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                    
+                    // Initialize AG Grid
+                    const gridOptions = {
+                        columnDefs: data.columnDefs,
+                        rowData: data.rowData,
+                        defaultColDef: {
+                            sortable: true,
+                            filter: true,
+                            resizable: true,
+                            wrapHeaderText: true,
+                            autoHeaderHeight: true
+                        },
+                        columnTypes: {
+                            numberColumnWithCommas: {
+                                // This function formats the number
+                                valueFormatter: params => {
+                                    // Check if the value is a number
+                                    if (typeof params.value === 'number') {
+                                        // Format with thousand separators and 2 decimal places
+                                        return new Intl.NumberFormat('en-US', {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0
+                                        }).format(params.value);
+                                    }
+                                    // Return as is if it's not a number (e.g., for empty cells)
+                                    return params.value;
+                                },
+                                // Align numbers to the right for better readability
+                                cellStyle: { 'textAlign': 'right' }
+                            }
+                        },
+                        // Register the new custom components
+                        components: {
+                            togglerHeader: TogglerHeader,
+                            hideableHeader: HideableHeader
+                        },
+                        domLayout: 'autoHeight',
+                        rowSelection: {
+                            enableClickSelection: false
+                        },
+                        suppressCellFocus: true,
+                        suppressRowHoverHighlight: true,
+                        getRowClass: function(params) {
+                            if (params.data.rowType === 'parent_header') return 'parent-header-row';
+                            if (params.data.rowType === 'sub_header') return 'sub-header-row';
+                            if (params.data.rowType === 'sub_total') return 'sub-total-row';
+                            if (params.data.rowType === 'parent_total') return 'parent-total-row';
+                            if (params.data.rowType === 'calculated_total') return 'calculated-total-row';
+                            return '';
+                        }
+                    };
+                    
+                    console.log('Creating AG Grid with options:', gridOptions);
+                    // Try different initialization methods
+                    let grid;
+                    if (typeof agGrid.createGrid === 'function') {
+                        grid = agGrid.createGrid(gridDiv, gridOptions);
+                    } else if (typeof agGrid.Grid === 'function') {
+                        grid = new agGrid.Grid(gridDiv, gridOptions);
+                    } else {
+                        throw new Error('AG Grid initialization method not found');
+                    }
+                    console.log('AG Grid created successfully!');
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    if (loadingDiv) {
+                        loadingDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
+                    } else {
+                        gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
+                    }
+                });
         });
     </script>
 </body>

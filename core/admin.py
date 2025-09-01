@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, Account, FinancialData, ChartOfAccounts, DataBackup
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup
 import json
 from datetime import datetime
 
@@ -15,20 +15,15 @@ class CompanyAdmin(admin.ModelAdmin):
     search_fields = ['code', 'name']
     ordering = ['code']
 
-@admin.register(Account)
-class AccountAdmin(admin.ModelAdmin):
-    list_display = ['code', 'name', 'type']
-    list_filter = ['type']
-    search_fields = ['code', 'name']
-    ordering = ['code']
+
 
 @admin.register(FinancialData)
 class FinancialDataAdmin(admin.ModelAdmin):
-    list_display = ['company', 'account', 'period', 'amount', 'data_type']
-    list_filter = ['company', 'account', 'data_type', 'period']
-    search_fields = ['company__name', 'company__code', 'account__name', 'account__code']
+    list_display = ['company', 'account_code', 'period', 'amount', 'data_type']
+    list_filter = ['company', 'data_type', 'period']
+    search_fields = ['company__name', 'company__code', 'account_code']
     date_hierarchy = 'period'
-    ordering = ['-period', 'company', 'account']
+    ordering = ['-period', 'company', 'account_code']
 
 @admin.register(ChartOfAccounts)
 class ChartOfAccountsAdmin(admin.ModelAdmin):
@@ -100,7 +95,7 @@ class DataBackupAdmin(admin.ModelAdmin):
                 for record in current_data:
                     current_backup_data.append({
                         'company_id': record.company.id,
-                        'account_id': record.account.id,
+                        'account_code': record.account_code,
                         'period': record.period.strftime('%Y-%m-%d'),
                         'amount': str(record.amount),
                         'data_type': record.data_type
@@ -124,12 +119,12 @@ class DataBackupAdmin(admin.ModelAdmin):
             for record_data in backup.backup_data:
                 try:
                     # Get account
-                    account = Account.objects.get(id=record_data['account_id'])
+                    chart_of_account = ChartOfAccounts.objects.get(account_code=record_data['account_code'])
                     
                     # Create financial data record
                     FinancialData.objects.create(
                         company=backup.company,
-                        account=account,
+                        account_code=chart_of_account.account_code,
                         period=datetime.strptime(record_data['period'], '%Y-%m-%d').date(),
                         amount=record_data['amount'],
                         data_type=backup.data_type

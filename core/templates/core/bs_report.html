@@ -6,76 +6,145 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Balance Sheet Report</title>
-    
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/4.0.1/css/fixedHeader.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/5.0.1/css/fixedColumns.dataTables.min.css">
-
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css">
+    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
     <style>
-        /* General Page Layout */
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
-        .container { background-color: white; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
-        .header h1 { margin: 0; font-size: 28px; }
-        .nav-menu, .filters, .actions { padding: 15px 20px; border-bottom: 1px solid #dee2e6; }
-        .nav-menu a { color: #495057; text-decoration: none; padding: 8px 16px; margin-right: 10px; border-radius: 4px; }
-        .nav-menu a.active { background-color: #007bff; color: white; }
-        .filter-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
-        .filter-group label { font-weight: bold; margin-bottom: 5px; color: #495057; }
-        .btn { background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
-        .btn-success { background-color: #28a745; }
-        .btn-secondary { background-color: #6c757d; }
-        .table-wrapper { padding: 20px; }
-
-        /* Clean Table Styles */
-        #reportTable { width: 100%; border-collapse: collapse; }
-        #reportTable th, #reportTable td {
-            padding: 8px 10px;
-            border: 1px solid #e0e0e0;
-            font-size: 11px;
-            line-height: 1.2;
-            white-space: nowrap;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0 2mm 0 8mm;
+            background-color: #f5f5f5;
         }
-        #reportTable thead th {
-            background: #f5f5f5;
-            font-weight: 600;
+        .container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            background-color: white;
+            border-radius: 0;
+            box-shadow: none;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
             text-align: center;
-            vertical-align: middle;
-            border-bottom: 2px solid #999;
+            width: 100%;
         }
-        #reportTable td:nth-child(n+3) { text-align: right; }
-        .th-wrap { display: flex; flex-direction: column; align-items: center; }
-        .th-wrap span:first-child { font-size: 11px; } /* Month - увеличен на 2 пункта */
-        .th-bottom { font-weight: bold; font-size: 11px; }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .nav-menu {
+            background-color: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            width: 100%;
+        }
+        .nav-menu a {
+            color: #495057;
+            text-decoration: none;
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav-menu a:hover {
+            background-color: #e9ecef;
+        }
+        .nav-menu a.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .filters {
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            width: 100%;
+        }
+        .filter-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .filter-group label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .filter-group input,
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
         
-        /* Черная разделительная линия между Account Code и Account Name */
-        #reportTable th:first-child,
-        #reportTable td:first-child {
-            border-right: 2px solid black !important;
+        .month-select {
+            min-width: 65px;
+            max-width: 75px;
+            padding: 6px 8px;
+            font-size: 13px;
         }
-
-        /* Устанавливаем размер шрифта для заголовков Account Code и Account Name */
-        #reportTable thead th:first-child,
-        #reportTable thead th:nth-child(2) {
-            font-size: 11px !important;
-            text-align: center !important;
-            vertical-align: middle !important;
+        
+        .year-select {
+            min-width: 65px;
+            max-width: 75px;
+            padding: 6px 8px;
+            font-size: 13px;
         }
-
-        /* Row and Column Cosmetics */
-        .parent-header-row { background-color: #e8e8e8; font-weight: bold; }
-        .sub-header-row { background-color: #f8f9fa; font-weight: bold; }
-        .parent-total-row { background-color: #d4edda; font-weight: bold; }
-        .check-row { background-color: #f8d7da; font-weight: bold; }
-        .company-f2001 { background-color: rgba(173,216,230,0.3) !important; }
-        .company-gl001 { background-color: rgba(144,238,144,0.3) !important; }
-        .total-column { background-color: rgba(211,211,211,0.4) !important; border-left: 2px solid #bbb; border-right: 2px solid #bbb; }
-        .negative { color: #dc3545; }
+        
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #1e7e34;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+        .actions {
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .table-container {
+            padding: 20px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>Balance Sheet Report</h1></div>
+        <div class="header">
+            <h1>Balance Sheet Report</h1>
+        </div>
+        
         <div class="nav-menu">
             <a href="{% url 'core:home' %}">🏠 Home</a>
             <a href="{% url 'core:upload_chart_of_accounts' %}">📋 Chart of Accounts</a>
@@ -86,54 +155,66 @@
         </div>
         
         <div class="filters">
-            <form method="get">
+            <form method="get" id="filterForm">
                 <div class="filter-row">
                     <div class="filter-group">
-                        <label>From:</label>
-                        <select name="from_month">
-                            <option value="">Month</option>
-                            <option value="1" {% if request.GET.from_month == '1' %}selected{% endif %}>January</option>
-                            <option value="2" {% if request.GET.from_month == '2' %}selected{% endif %}>February</option>
-                            <option value="3" {% if request.GET.from_month == '3' %}selected{% endif %}>March</option>
-                            <option value="4" {% if request.GET.from_month == '4' %}selected{% endif %}>April</option>
-                            <option value="5" {% if request.GET.from_month == '5' %}selected{% endif %}>May</option>
-                            <option value="6" {% if request.GET.from_month == '6' %}selected{% endif %}>June</option>
-                            <option value="7" {% if request.GET.from_month == '7' %}selected{% endif %}>July</option>
-                            <option value="8" {% if request.GET.from_month == '8' %}selected{% endif %}>August</option>
-                            <option value="9" {% if request.GET.from_month == '9' %}selected{% endif %}>September</option>
-                            <option value="10" {% if request.GET.from_month == '10' %}selected{% endif %}>October</option>
-                            <option value="11" {% if request.GET.from_month == '11' %}selected{% endif %}>November</option>
-                            <option value="12" {% if request.GET.from_month == '12' %}selected{% endif %}>December</option>
-                        </select>
-                        <select name="from_year">
-                            <option value="">Year</option>
-                            <option value="2024" {% if request.GET.from_year == '2024' %}selected{% endif %}>2024</option>
-                            <option value="2025" {% if request.GET.from_year == '2025' %}selected{% endif %}>2025</option>
+                        <label>From Month:</label>
+                        <select name="from_month" class="month-select">
+                            <option value="">All</option>
+                            <option value="01" {% if request.GET.from_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if request.GET.from_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if request.GET.from_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if request.GET.from_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if request.GET.from_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if request.GET.from_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if request.GET.from_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if request.GET.from_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if request.GET.from_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if request.GET.from_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if request.GET.from_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if request.GET.from_month == '12' %}selected{% endif %}>Dec</option>
                         </select>
                     </div>
+                    
                     <div class="filter-group">
-                        <label>To:</label>
-                        <select name="to_month">
-                            <option value="">Month</option>
-                            <option value="1" {% if request.GET.to_month == '1' %}selected{% endif %}>January</option>
-                            <option value="2" {% if request.GET.to_month == '2' %}selected{% endif %}>February</option>
-                            <option value="3" {% if request.GET.to_month == '3' %}selected{% endif %}>March</option>
-                            <option value="4" {% if request.GET.to_month == '4' %}selected{% endif %}>April</option>
-                            <option value="5" {% if request.GET.to_month == '5' %}selected{% endif %}>May</option>
-                            <option value="6" {% if request.GET.to_month == '6' %}selected{% endif %}>June</option>
-                            <option value="7" {% if request.GET.to_month == '7' %}selected{% endif %}>July</option>
-                            <option value="8" {% if request.GET.to_month == '8' %}selected{% endif %}>August</option>
-                            <option value="9" {% if request.GET.to_month == '9' %}selected{% endif %}>September</option>
-                            <option value="10" {% if request.GET.to_month == '10' %}selected{% endif %}>October</option>
-                            <option value="11" {% if request.GET.to_month == '11' %}selected{% endif %}>November</option>
-                            <option value="12" {% if request.GET.to_month == '12' %}selected{% endif %}>December</option>
-                        </select>
-                        <select name="to_year">
-                            <option value="">Year</option>
-                            <option value="2024" {% if request.GET.to_year == '2024' %}selected{% endif %}>2024</option>
-                            <option value="2025" {% if request.GET.to_year == '2025' %}selected{% endif %}>2025</option>
+                        <label>From Year:</label>
+                        <select name="from_year" class="year-select">
+                            <option value="">All</option>
+                            {% for year in year_range %}
+                                <option value="{{ year }}" {% if request.GET.from_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
                         </select>
                     </div>
+                    
+                    <div class="filter-group">
+                        <label>To Month:</label>
+                        <select name="to_month" class="month-select">
+                            <option value="">All</option>
+                            <option value="01" {% if request.GET.to_month == '01' %}selected{% endif %}>Jan</option>
+                            <option value="02" {% if request.GET.to_month == '02' %}selected{% endif %}>Feb</option>
+                            <option value="03" {% if request.GET.to_month == '03' %}selected{% endif %}>Mar</option>
+                            <option value="04" {% if request.GET.to_month == '04' %}selected{% endif %}>Apr</option>
+                            <option value="05" {% if request.GET.to_month == '05' %}selected{% endif %}>May</option>
+                            <option value="06" {% if request.GET.to_month == '06' %}selected{% endif %}>Jun</option>
+                            <option value="07" {% if request.GET.to_month == '07' %}selected{% endif %}>Jul</option>
+                            <option value="08" {% if request.GET.to_month == '08' %}selected{% endif %}>Aug</option>
+                            <option value="09" {% if request.GET.to_month == '09' %}selected{% endif %}>Sep</option>
+                            <option value="10" {% if request.GET.to_month == '10' %}selected{% endif %}>Oct</option>
+                            <option value="11" {% if request.GET.to_month == '11' %}selected{% endif %}>Nov</option>
+                            <option value="12" {% if request.GET.to_month == '12' %}selected{% endif %}>Dec</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>To Year:</label>
+                        <select name="to_year" class="year-select">
+                            <option value="">All</option>
+                            {% for year in year_range %}
+                                <option value="{{ year }}" {% if request.GET.to_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
                     <div class="filter-group">
                         <label>Data Type:</label>
                         <select name="data_type" id="data_type">
@@ -141,116 +222,200 @@
                             <option value="budget" {% if request.GET.data_type == 'budget' %}selected{% endif %}>Budget</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn">🔍 Apply Filters</button>
+                    
+                    <div class="filter-group">
+                        <button type="submit" class="btn">Apply Filters</button>
+                    </div>
                 </div>
             </form>
         </div>
         
         <div class="actions">
-             <a href="{% url 'core:export_report_excel' %}?type=bs&{{ request.GET.urlencode }}" class="btn btn-success">📥 Export to Excel</a>
-             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+            <a href="{% url 'core:export_report_excel' %}?type=bs&from_month={{ request.GET.from_month }}&from_year={{ request.GET.from_year }}&to_month={{ request.GET.to_month }}&to_year={{ request.GET.to_year }}&data_type={{ request.GET.data_type }}" class="btn btn-success">Export to Excel</a>
+            <button onclick="window.print()" class="btn btn-secondary">Print Report</button>
         </div>
-
-        <div class="table-wrapper">
-            {% if report_data %}
-            <table id="reportTable" class="display">
-                <thead>
-                    <tr>
-                        <th style="min-width: 20px; max-width: 20px;">A/C</th>
-                        <th style="min-width: 300px;">Account Name</th>
-                        {% for period in periods %}
-                            {% for company in companies %}
-                                <th class="company-{{ company.code|lower }}"><div class="th-wrap"><span>{{ period|date:"M-y" }}</span><span class="th-bottom">{{ company.code }}</span></div></th>
-                            {% endfor %}
-                            <th class="total-column"><div class="th-wrap"><span>{{ period|date:"M-y" }}</span><span class="th-bottom">TOTAL</span></div></th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in report_data %}
-                    <tr class="{% if row.type == 'parent_header' %}parent-header-row{% elif row.type == 'sub_header' %}sub-header-row{% elif row.type == 'parent_total' %}parent-total-row{% elif row.type == 'check_row' %}check-row{% endif %}">
-                        <td>{% if row.type == 'account' %}{{ row.account_code }}{% endif %}</td>
-                        <td style="padding-left: {{ row.level|default:0|add:1|multiply:15 }}px;">{{ row.account_name }}</td>
-                        {% for period in periods %}
-                            {% for company in companies %}
-                                {% with amount=row.periods|get_item:period|get_item:company.code %}
-                                <td class="company-{{ company.code|lower }} {% if amount < 0 %}negative{% endif %}">{{ amount|format_number }}</td>
-                                {% endwith %}
-                            {% endfor %}
-                            {% with total=row.periods|get_item:period|get_item:'TOTAL' %}
-                            <td class="total-column {% if total < 0 %}negative{% endif %}">{{ total|format_number }}</td>
-                            {% endwith %}
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div style="text-align: center; padding: 40px;"><p>No data available for the selected criteria.</p></div>
-            {% endif %}
+        
+        <!-- AG Grid Container -->
+        <div class="table-container">
+            <div id="bsGrid" class="ag-theme-alpine" style="height: 800px; width: 100%;"></div>
+            <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
+                <h3>Loading data...</h3>
+                <p>Please wait while we load your Balance Sheet report.</p>
+            </div>
         </div>
     </div>
-
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedheader/4.0.1/js/dataTables.fixedHeader.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedcolumns/5.0.1/js/dataTables.fixedColumns.min.js"></script>
-
+    
     <script>
-        $(document).ready(function() {
-            var table = $('#reportTable').DataTable({
-                // Vertical scrolling
-                scrollY: '70vh',
-                scrollCollapse: true,
-                
-                // Horizontal scrolling
-                scrollX: true,
+        // --- Custom Header for the "+" Toggler Button ---
+        class TogglerHeader {
+            init(params) {
+                this.eGui = document.createElement('div');
+                this.eGui.innerHTML = `
+                    <span style="cursor: pointer; font-weight: bold;">+</span>
+                `;
+                this.params = params;
+                this.eGui.addEventListener('click', this.toggleColumn.bind(this));
+            }
+            getGui() {
+                return this.eGui;
+            }
+            toggleColumn() {
+                const api = this.params.api;
+                // Hide this toggler column
+                api.setColumnsVisible(['toggler'], false);
+                // Show the real A/C column
+                api.setColumnsVisible(['account_code'], true);
+            }
+            destroy() {}
+        }
 
-                // Enable FixedHeader
-                fixedHeader: true,
+        // --- Custom Header for the "A/C" column with a "-" Button ---
+        class HideableHeader {
+            init(params) {
+                this.eGui = document.createElement('div');
+                this.eGui.innerHTML = `
+                    <span>A/C</span>
+                    <span style="cursor: pointer; font-weight: bold; float: right;">-</span>
+                `;
+                this.params = params;
+                this.eGui.addEventListener('click', this.toggleColumn.bind(this));
+            }
+            getGui() {
+                return this.eGui;
+            }
+            toggleColumn() {
+                const api = this.params.api;
+                // Hide this A/C column
+                api.setColumnsVisible(['account_code'], false);
+                // Show the toggler column
+                api.setColumnsVisible(['toggler'], true);
+            }
+            destroy() {}
+        }
 
-                // Enable FixedColumns for the first 2 columns
-                fixedColumns: {
-                    left: 2
-                },
-
-
-
-                // Disable unnecessary features
-                paging: false,
-                searching: false,
-                info: false,
-                ordering: false
-            });
+        // Auto-submit form when filters change
+        document.getElementById('data_type').addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+        
+        // AG Grid initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing AG Grid...');
             
-            // Force font size for headers using JavaScript
-            function forceFontSize() {
-                // Try multiple selectors
-                $('th:first-child, th:nth-child(2)').each(function() {
-                    $(this).css('font-size', '11px');
-                    $(this).css('text-align', 'center');
-                    $(this).css('vertical-align', 'middle');
-                    $(this).attr('style', $(this).attr('style') + '; font-size: 11px !important; text-align: center !important; vertical-align: middle !important;');
-                });
-                
-                // Try DataTables specific selectors
-                $('.dataTables_scrollHead th:first-child, .dataTables_scrollHead th:nth-child(2)').each(function() {
-                    $(this).css('font-size', '11px');
-                    $(this).css('text-align', 'center');
-                    $(this).css('vertical-align', 'middle');
-                    $(this).attr('style', $(this).attr('style') + '; font-size: 11px !important; text-align: center !important; vertical-align: middle !important;');
-                });
+            const gridDiv = document.querySelector('#bsGrid');
+            const loadingDiv = document.querySelector('#loadingMessage');
+            
+            if (!gridDiv) {
+                console.error('Grid div not found!');
+                return;
             }
             
-
+            // Check if AG Grid is loaded
+            if (typeof agGrid === 'undefined') {
+                console.error('AG Grid library not loaded!');
+                if (loadingDiv) {
+                    loadingDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>AG Grid Library Error</h3><p>AG Grid library failed to load. Please refresh the page.</p></div>';
+                }
+                return;
+            }
+            console.log('AG Grid library loaded successfully');
+            console.log('Grid div found:', gridDiv);
             
-            // Try multiple times
-            setTimeout(forceFontSize, 100);
-            setTimeout(forceFontSize, 500);
-            setTimeout(forceFontSize, 1000);
-            setTimeout(forceFontSize, 2000);
+            // Get current URL parameters for the data request
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataUrl = '/reports/bs/data/?' + urlParams.toString();
+            console.log('Fetching data from:', dataUrl);
             
-
+            // Fetch data from the JSON endpoint
+            fetch(dataUrl)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Data received:', data);
+                    console.log('Column definitions:', data.columnDefs);
+                    console.log('Row data count:', data.rowData.length);
+                    
+                    // Hide loading message
+                    if (loadingDiv) {
+                        loadingDiv.style.display = 'none';
+                    }
+                    
+                    // Initialize AG Grid
+                    const gridOptions = {
+                        columnDefs: data.columnDefs,
+                        rowData: data.rowData,
+                        defaultColDef: {
+                            sortable: true,
+                            filter: true,
+                            resizable: true,
+                            wrapHeaderText: true,
+                            autoHeaderHeight: true
+                        },
+                        columnTypes: {
+                            numberColumnWithCommas: {
+                                // This function formats the number
+                                valueFormatter: params => {
+                                    // Check if the value is a number
+                                    if (typeof params.value === 'number') {
+                                        // Format with thousand separators and 2 decimal places
+                                        return new Intl.NumberFormat('en-US', {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0
+                                        }).format(params.value);
+                                    }
+                                    // Return as is if it's not a number (e.g., for empty cells)
+                                    return params.value;
+                                },
+                                // Align numbers to the right for better readability
+                                cellStyle: { 'textAlign': 'right' }
+                            }
+                        },
+                        // Register the new custom components
+                        components: {
+                            togglerHeader: TogglerHeader,
+                            hideableHeader: HideableHeader
+                        },
+                        domLayout: 'autoHeight',
+                        rowSelection: {
+                            enableClickSelection: false
+                        },
+                        suppressCellFocus: true,
+                        suppressRowHoverHighlight: true,
+                        getRowClass: function(params) {
+                            if (params.data.rowType === 'parent_header') return 'parent-header-row';
+                            if (params.data.rowType === 'sub_header') return 'sub-header-row';
+                            if (params.data.rowType === 'sub_total') return 'sub-total-row';
+                            if (params.data.rowType === 'parent_total') return 'parent-total-row';
+                            if (params.data.rowType === 'check_row') return 'check-row';
+                            return '';
+                        }
+                    };
+                    
+                    console.log('Creating AG Grid with options:', gridOptions);
+                    // Try different initialization methods
+                    let grid;
+                    if (typeof agGrid.createGrid === 'function') {
+                        grid = agGrid.createGrid(gridDiv, gridOptions);
+                    } else if (typeof agGrid.Grid === 'function') {
+                        grid = new agGrid.Grid(gridDiv, gridOptions);
+                    } else {
+                        throw new Error('AG Grid initialization method not found');
+                    }
+                    console.log('AG Grid created successfully!');
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    if (loadingDiv) {
+                        loadingDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
+                    } else {
+                        gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
+                    }
+                });
         });
     </script>
 </body>

@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from core.models import Account, ChartOfAccounts
+from core.models import ChartOfAccounts
 
 class Command(BaseCommand):
     help = 'Fix account types based on ChartOfAccounts'
@@ -7,43 +7,39 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         type_mapping = {
             # Standard mappings
-            'ASSET': 'asset',
-            'LIABILITY': 'liability',
-            'EQUITY': 'equity',
-            'INCOME': 'revenue',
-            'EXPENSE': 'expense',
+            'ASSET': 'ASSET',
+            'LIABILITY': 'LIABILITY',
+            'EQUITY': 'EQUITY',
+            'INCOME': 'INCOME',
+            'EXPENSE': 'EXPENSE',
             
             # QuickBooks-style mappings for Balance Sheet
-            'BANK': 'asset',
-            'FIXED ASSET': 'asset',
-            'OTHER CURRENT ASSET': 'asset',
-            'OTHER ASSET': 'asset',
-            'OTHER CURRENT LIABILITIES': 'liability',
-            'OTHER CURRENT LIABILITY': 'liability',
+            'BANK': 'ASSET',
+            'FIXED ASSET': 'ASSET',
+            'OTHER CURRENT ASSET': 'ASSET',
+            'OTHER ASSET': 'ASSET',
+            'OTHER CURRENT LIABILITIES': 'LIABILITY',
+            'OTHER CURRENT LIABILITY': 'LIABILITY',
             
             # QuickBooks-style mappings for P&L
-            'INCOME': 'revenue',
-            'COST OF GOODS SOLD': 'expense',
-            'COGS': 'expense',
+            'COST OF GOODS SOLD': 'EXPENSE',
+            'COGS': 'EXPENSE',
         }
         
         updated_count = 0
-        for account in Account.objects.all():
-            chart_account = ChartOfAccounts.objects.filter(
-                account_code=account.code
-            ).first()
-            
-            if chart_account and chart_account.account_type:
+        for chart_account in ChartOfAccounts.objects.all():
+            if chart_account.account_type:
+                original_type = chart_account.account_type
                 new_type = type_mapping.get(
-                    chart_account.account_type.upper(), 
-                    account.type
+                    original_type.upper(), 
+                    original_type
                 )
-                if account.type != new_type:
-                    account.type = new_type
-                    account.save()
+                if original_type != new_type:
+                    chart_account.account_type = new_type
+                    chart_account.save()
                     updated_count += 1
                     self.stdout.write(
-                        f"Updated {account.code}: {account.type} -> {new_type}"
+                        f"Updated {chart_account.account_code}: {original_type} -> {new_type}"
                     )
         
         self.stdout.write(
