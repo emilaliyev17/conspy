@@ -5,6 +5,7 @@ from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
 from .models import Company, FinancialData, ChartOfAccounts, DataBackup
+from .report_utils import generate_report_data
 import pandas as pd
 import csv
 from datetime import datetime, date
@@ -1117,7 +1118,6 @@ def pl_report_data_old(request):
 
 def pl_report_data(request):
     """P&L Report data using ChartOfAccounts structure from DB."""
-    from core.report_utils import generate_report_data
     from datetime import date
     from django.http import JsonResponse
     import logging
@@ -1594,7 +1594,6 @@ def bs_report_data_old(request):
 
 def bs_report_data(request):
     """Balance Sheet Report data using ChartOfAccounts structure from DB."""
-    from core.report_utils import generate_report_data
     from datetime import date
     from django.http import JsonResponse
     import logging
