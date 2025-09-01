@@ -5,7 +5,6 @@ from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
 from .models import Company, FinancialData, ChartOfAccounts, DataBackup
-from .report_utils import generate_report_data
 import pandas as pd
 import csv
 from datetime import datetime, date
@@ -556,7 +555,7 @@ def download_template(request):
     
     return response
 
-def pl_report_data_old(request):
+def pl_report_data(request):
     """P&L Report data in JSON format for AG Grid, с нормализацией месяцев и фильтром по диапазону."""
     logger.info("--- P&L Report Data Generation Started ---")
     from_month = request.GET.get('from_month', '')
@@ -1116,98 +1115,7 @@ def pl_report_data_old(request):
         'debug_info': debug_info
     })
 
-def pl_report_data(request):
-    """P&L Report data using ChartOfAccounts structure from DB."""
-    from datetime import date
-    from django.http import JsonResponse
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    logger.info("--- P&L Report using DB structure ---")
-    
-    # Получаем параметры
-    from_month = request.GET.get('from_month', '')
-    from_year = request.GET.get('from_year', '')
-    to_month = request.GET.get('to_month', '')
-    to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
-    
-    # Преобразуем в даты
-    from_date_start, _ = convert_month_year_to_date_range(from_month, from_year)
-    _, to_date_end = convert_month_year_to_date_range(to_month, to_year)
-    
-    # Генерируем список периодов
-    periods = []
-    if from_date_start and to_date_end:
-        current = date(from_date_start.year, from_date_start.month, 1)
-        end = date(to_date_end.year, to_date_end.month, 1)
-        while current <= end:
-            periods.append(current)
-            if current.month == 12:
-                current = date(current.year + 1, 1, 1)
-            else:
-                current = date(current.year, current.month + 1, 1)
-    
-    if not periods:
-        return JsonResponse({'columnDefs': [], 'rowData': []})
-    
-    # Получаем компании
-    companies = list(Company.objects.all().order_by('name'))
-    
-    # Генерируем данные для основной компании (F2Fin)
-    main_company = Company.objects.filter(code='F2Fin').first()
-    if not main_company:
-        main_company = companies[0] if companies else None
-    
-    if not main_company:
-        return JsonResponse({'columnDefs': [], 'rowData': []})
-    
-    # Получаем данные отчета
-    report_data = generate_report_data(main_company, periods, 'PL')
-    
-    # Формируем колонки для AG Grid
-    column_defs = [
-        {'field': 'account_code', 'headerName': 'A/C', 'pinned': 'left', 'width': 90},
-        {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
-    ]
-    
-    for period in periods:
-        column_defs.append({
-            'field': f'{period.strftime("%b-%y")}',
-            'headerName': f'{period.strftime("%b-%y")}',
-            'width': 120,
-            'type': 'numberColumnWithCommas'
-        })
-    
-    # Формируем строки данных
-    row_data = []
-    for row in report_data:
-        grid_row = {
-            'account_code': row.get('code', ''),
-            'account_name': row['name'],
-            'rowType': row['type']
-        }
-        
-        # Добавляем данные по периодам
-        for period in periods:
-            field = period.strftime("%b-%y")
-            value = row.get('periods', {}).get(period, 0)
-            grid_row[field] = value
-        
-        # Стили для разных типов строк
-        if row['type'] == 'header':
-            grid_row['cellStyle'] = {'backgroundColor': '#e8f5e8', 'fontWeight': 'bold'}
-        elif row['type'] == 'subtotal':
-            grid_row['cellStyle'] = {'backgroundColor': '#fff8dc', 'fontWeight': 'bold'}
-        
-        row_data.append(grid_row)
-    
-    return JsonResponse({
-        'columnDefs': column_defs,
-        'rowData': row_data
-    })
-
-def bs_report_data_old(request):
+def bs_report_data(request):
     """Balance Sheet Report data in JSON format for AG Grid."""
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
@@ -1584,97 +1492,6 @@ def bs_report_data_old(request):
             grid_row['cellStyle'] = {'backgroundColor': '#f0fff0', 'fontWeight': 'bold'}
         elif row['type'] == 'check_row':
             grid_row['cellStyle'] = {'backgroundColor': '#ffe6e6', 'fontWeight': 'bold'}
-        
-        row_data.append(grid_row)
-    
-    return JsonResponse({
-        'columnDefs': column_defs,
-        'rowData': row_data
-    })
-
-def bs_report_data(request):
-    """Balance Sheet Report data using ChartOfAccounts structure from DB."""
-    from datetime import date
-    from django.http import JsonResponse
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    logger.info("--- Balance Sheet Report using DB structure ---")
-    
-    # Получаем параметры
-    from_month = request.GET.get('from_month', '')
-    from_year = request.GET.get('from_year', '')
-    to_month = request.GET.get('to_month', '')
-    to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
-    
-    # Преобразуем в даты
-    from_date_start, _ = convert_month_year_to_date_range(from_month, from_year)
-    _, to_date_end = convert_month_year_to_date_range(to_month, to_year)
-    
-    # Генерируем список периодов
-    periods = []
-    if from_date_start and to_date_end:
-        current = date(from_date_start.year, from_date_start.month, 1)
-        end = date(to_date_end.year, to_date_end.month, 1)
-        while current <= end:
-            periods.append(current)
-            if current.month == 12:
-                current = date(current.year + 1, 1, 1)
-            else:
-                current = date(current.year, current.month + 1, 1)
-    
-    if not periods:
-        return JsonResponse({'columnDefs': [], 'rowData': []})
-    
-    # Получаем компании
-    companies = list(Company.objects.all().order_by('name'))
-    
-    # Генерируем данные для основной компании (F2Fin)
-    main_company = Company.objects.filter(code='F2Fin').first()
-    if not main_company:
-        main_company = companies[0] if companies else None
-    
-    if not main_company:
-        return JsonResponse({'columnDefs': [], 'rowData': []})
-    
-    # Получаем данные отчета
-    report_data = generate_report_data(main_company, periods, 'BS')
-    
-    # Формируем колонки для AG Grid
-    column_defs = [
-        {'field': 'account_code', 'headerName': 'A/C', 'pinned': 'left', 'width': 90},
-        {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
-    ]
-    
-    for period in periods:
-        column_defs.append({
-            'field': f'{period.strftime("%b-%y")}',
-            'headerName': f'{period.strftime("%b-%y")}',
-            'width': 120,
-            'type': 'numberColumnWithCommas'
-        })
-    
-    # Формируем строки данных
-    row_data = []
-    for row in report_data:
-        grid_row = {
-            'account_code': row.get('code', ''),
-            'account_name': row['name'],
-            'rowType': row['type']
-        }
-        
-        # Добавляем данные по периодам
-        for period in periods:
-            field = period.strftime("%b-%y")
-            value = row.get('periods', {}).get(period, 0)
-            grid_row[field] = value
-        
-        # Стили для разных типов строк
-        if row['type'] == 'header':
-            grid_row['cellStyle'] = {'backgroundColor': '#e8f5e8', 'fontWeight': 'bold'}
-        elif row['type'] == 'subtotal':
-            grid_row['cellStyle'] = {'backgroundColor': '#fff8dc', 'fontWeight': 'bold'}
         
         row_data.append(grid_row)
     

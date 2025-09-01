@@ -138,12 +138,6 @@
             width: 100%;
         }
         
-        /* ТАКЖЕ добавь стиль для контейнера AG Grid (если его нет) */
-        #bsGrid {
-            height: 600px; /* Фиксированная высота для включения скролла */
-            width: 100%;
-        }
-        
         /* AG Grid scrolling improvements */
         #bsGrid {
             border: 1px solid #ddd;
@@ -276,7 +270,7 @@
         
         <!-- AG Grid Container -->
         <div class="table-container">
-            <div id="bsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+            <div id="bsGrid" class="ag-theme-alpine" style="height: 80vh; width: 100%;"></div>
             <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>Loading data...</h3>
                 <p>Please wait while we load your Balance Sheet report.</p>
@@ -395,6 +389,12 @@
                             wrapHeaderText: true,
                             autoHeaderHeight: true
                         },
+                        // Enable sticky headers
+                        suppressColumnVirtualisation: false,
+                        suppressRowVirtualisation: false,
+                        // Ensure headers stay visible during scrolling
+                        suppressHorizontalScroll: false,
+                        suppressVerticalScroll: false,
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number
@@ -419,7 +419,7 @@
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader
                         },
-                        domLayout: 'normal',  // Это включит скролл при фиксированной высоте
+                        domLayout: 'autoHeight',
                         rowSelection: {
                             enableClickSelection: false
                         },

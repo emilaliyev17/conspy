@@ -433,36 +433,13 @@
             destroy() {}
         }
 
-        // Функции для сохранения и восстановления фильтров
-        function saveCurrentFilters() {
-            const filters = {
-                from_month: document.getElementById('from_month').value,
-                from_year: document.getElementById('from_year').value,
-                to_month: document.getElementById('to_month').value,
-                to_year: document.getElementById('to_year').value,
-                data_type: document.getElementById('data_type').value
-            };
-            localStorage.setItem('pl_filters', JSON.stringify(filters));
-            console.log('Filters saved:', filters);
-        }
-
-        function restoreFilters() {
-            const saved = localStorage.getItem('pl_filters');
-            if (saved) {
-                const filters = JSON.parse(saved);
-                document.getElementById('from_month').value = filters.from_month || 'Jan';
-                document.getElementById('from_year').value = filters.from_year || '2024';
-                document.getElementById('to_month').value = filters.to_month || 'Jul';
-                document.getElementById('to_year').value = filters.to_year || '2025';
-                document.getElementById('data_type').value = filters.data_type || 'Actual';
-                console.log('Filters restored:', filters);
-                return true;
-            }
-            return false;
-        }
-
-        // Функция для загрузки данных отчета
-        function loadReportData() {
+        // Auto-submit form when filters change
+        document.getElementById('data_type').addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+        
+        // AG Grid initialization
+        document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing AG Grid...');
             
             const gridDiv = document.querySelector('#plGrid');
@@ -482,8 +459,6 @@
                 return;
             }
             console.log('AG Grid library loaded successfully');
-            
-            saveCurrentFilters();  // Сохраняем фильтры при каждой загрузке
             
             // Get current URL parameters for the data request
             const urlParams = new URLSearchParams(window.location.search);
@@ -580,40 +555,6 @@
                         gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
                     }
                 });
-        }
-
-        // Auto-submit form when filters change
-        document.getElementById('data_type').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-        
-        // Весь код должен выполняться ПОСЛЕ загрузки DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, checking for saved filters...');
-            
-            // Пробуем восстановить фильтры
-            const saved = localStorage.getItem('pl_filters');
-            if (saved) {
-                try {
-                    const filters = JSON.parse(saved);
-                    document.getElementById('from_month').value = filters.from_month || 'Jan';
-                    document.getElementById('from_year').value = filters.from_year || '2024';
-                    document.getElementById('to_month').value = filters.to_month || 'Jul';
-                    document.getElementById('to_year').value = filters.to_year || '2025';
-                    document.getElementById('data_type').value = filters.data_type || 'Actual';
-                    console.log('Filters restored:', filters);
-                    
-                    // Загружаем данные с восстановленными фильтрами
-                    setTimeout(function() {
-                        console.log('Auto-loading data with restored filters...');
-                        loadReportData();
-                    }, 300);
-                } catch (e) {
-                    console.error('Error restoring filters:', e);
-                }
-            } else {
-                console.log('No saved filters found');
-            }
         });
     </script>
 </body>
