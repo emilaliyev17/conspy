@@ -138,6 +138,12 @@
             width: 100%;
         }
         
+        /* ТАКЖЕ добавь стиль для контейнера AG Grid (если его нет) */
+        #bsGrid {
+            height: 600px; /* Фиксированная высота для включения скролла */
+            width: 100%;
+        }
+        
         /* AG Grid scrolling improvements */
         #bsGrid {
             border: 1px solid #ddd;
@@ -386,15 +392,16 @@
                             sortable: true,
                             filter: true,
                             resizable: true,
-                            wrapHeaderText: true,
-                            autoHeaderHeight: true
+                            suppressMenu: true
                         },
-                        // Enable sticky headers
-                        suppressColumnVirtualisation: false,
-                        suppressRowVirtualisation: false,
-                        // Ensure headers stay visible during scrolling
-                        suppressHorizontalScroll: false,
-                        suppressVerticalScroll: false,
+                        // ДОБАВЬ ЭТИ СТРОКИ для закрепления заголовка
+                        headerHeight: 40,
+                        floatingFiltersHeight: 40,
+                        pivotHeaderHeight: 40,
+                        pivotGroupHeaderHeight: 40,
+                        // Включаем вертикальный скролл с фиксированной высотой
+                        domLayout: 'normal',
+                        animateRows: true,
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number
@@ -419,7 +426,6 @@
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader
                         },
-                        domLayout: 'autoHeight',
                         rowSelection: {
                             enableClickSelection: false
                         },

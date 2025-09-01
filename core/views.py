@@ -1728,7 +1728,10 @@ def bs_report(request):
     return render(request, 'core/bs_report.html', context)
 
 def export_report_excel(request):
-    """Export report data to Excel."""
+    """Export report data to Excel using new DB-driven structure."""
+    from datetime import date
+    import io
+    
     report_type = request.GET.get('type', 'pl')
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
@@ -1736,69 +1739,92 @@ def export_report_excel(request):
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     
-    from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
-    to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
+    # Преобразуем в даты
+    from_date_start, _ = convert_month_year_to_date_range(from_month, from_year)
+    _, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
-    companies = Company.objects.all().order_by('name')
+    # Генерируем список периодов
+    periods = []
+    if from_date_start and to_date_end:
+        current = date(from_date_start.year, from_date_start.month, 1)
+        end = date(to_date_end.year, to_date_end.month, 1)
+        while current <= end:
+            periods.append(current)
+            if current.month == 12:
+                current = date(current.year + 1, 1, 1)
+            else:
+                current = date(current.year, current.month + 1, 1)
     
-    if report_type == 'pl':
-        accounts = ChartOfAccounts.objects.filter(
-            account_type__in=['INCOME', 'EXPENSE']
-        ).order_by('sort_order')
-        report_title = 'Profit & Loss Report'
-    else:
-        accounts = ChartOfAccounts.objects.filter(
-            account_type__in=['ASSET', 'LIABILITY', 'EQUITY']
-        ).order_by('sort_order')
-        report_title = 'Balance Sheet Report'
+    if not periods:
+        return HttpResponse("No data available for export", status=400)
     
-    account_codes = accounts.values_list('account_code', flat=True)
-    periods_query = FinancialData.objects.filter(account_code__in=account_codes)
+    # Получаем компании
+    companies = list(Company.objects.all().order_by('name'))
     
-    if from_date_start:
-        periods_query = periods_query.filter(period__gte=from_date_start)
-    if to_date_end:
-        periods_query = periods_query.filter(period__lte=to_date_end)
+    # Генерируем данные для основной компании (F2Fin)
+    main_company = Company.objects.filter(code='F2Fin').first()
+    if not main_company:
+        main_company = companies[0] if companies else None
     
-    periods = periods_query.values_list('period', flat=True).distinct().order_by('period')
+    if not main_company:
+        return HttpResponse("No company data available", status=400)
     
-    # Prepare Excel data
+    # Получаем данные отчета используя новую функцию
+    report_data = generate_report_data(main_company, periods, report_type.upper())
+    
+    # Подготавливаем данные для Excel
     excel_data = []
     
-    # Add headers
-    header_row = ['Account Code', 'Account Name']
+    # Добавляем заголовки
+    header_row = ['Account Code', 'Account Name', 'Type']
     for period in periods:
-        for company in companies:
-            header_row.append(f"{period.strftime('%Y-%m')} {company.code}")
-        header_row.append(f"{period.strftime('%Y-%m')} TOTAL")
+        header_row.append(f"{period.strftime('%b-%y')}")
     excel_data.append(header_row)
     
-    # Add data rows
-    for account in accounts:
-        row = [account.account_code or '', account.account_name]
+    # Добавляем данные строк
+    for row in report_data:
+        excel_row = [
+            row.get('code', ''),
+            row['name'],
+            row['type']
+        ]
         
+        # Добавляем данные по периодам
         for period in periods:
-            period_total = 0
-            for company in companies:
-                amount = FinancialData.objects.filter(
-                    company=company,
-                    account_code=account.account_code,
-                    period=period,
-                    data_type=data_type
-                ).aggregate(total=Sum('amount'))['total'] or 0
-                row.append(float(amount))
-                period_total += amount
-            row.append(float(period_total))
+            value = row.get('periods', {}).get(period, 0)
+            excel_row.append(float(value) if value is not None else 0.0)
         
-        excel_data.append(row)
+        excel_data.append(excel_row)
     
-    # Create DataFrame and export
+    # Создаем DataFrame
     df = pd.DataFrame(excel_data[1:], columns=excel_data[0])
     
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="{report_title.lower().replace(" ", "_")}.xlsx"'
+    # Определяем название файла
+    report_title = 'Profit & Loss Report' if report_type == 'pl' else 'Balance Sheet Report'
+    filename = f"{report_title.lower().replace(' ', '_')}_{from_month}_{from_year}_to_{to_month}_{to_year}.xlsx"
     
+    # Создаем ответ
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    # Экспортируем в Excel
     with pd.ExcelWriter(response, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name=report_title, index=False)
+        
+        # Автоматически подгоняем ширину колонок
+        worksheet = writer.sheets[report_title]
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)  # Максимум 50 символов
+            worksheet.column_dimensions[column_letter].width = adjusted_width
     
     return response
