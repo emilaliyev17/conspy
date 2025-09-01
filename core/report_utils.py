@@ -68,3 +68,81 @@ def test_structure():
         'pl_count': len(pl_structure),
         'bs_count': len(bs_structure)
     }
+
+def generate_report_data(company, periods, report_type='PL'):
+    """
+    Генерирует данные отчета на основе структуры ChartOfAccounts.
+    
+    Args:
+        company: объект Company
+        periods: список дат (date objects)
+        report_type: 'PL' или 'BS'
+    
+    Returns:
+        list: список строк отчета с данными
+    """
+    from decimal import Decimal
+    
+    structure = get_report_structure(report_type)
+    
+    # Получаем все account_codes из структуры
+    all_account_codes = []
+    for category in structure:
+        for child in category.get('children', []):
+            if child.get('code'):
+                all_account_codes.append(child['code'])
+    
+    # Получаем данные из FinancialData
+    financial_data = FinancialData.objects.filter(
+        company=company,
+        period__in=periods,
+        account_code__in=all_account_codes
+    )
+    
+    # Индексируем данные для быстрого доступа
+    data_index = {}
+    for fd in financial_data:
+        key = (fd.period, fd.account_code)
+        data_index[key] = fd.amount
+    
+    # Формируем отчет
+    report_rows = []
+    
+    for category in structure:
+        # Добавляем заголовок категории
+        header_row = {
+            'type': 'header',
+            'name': category['name'],
+            'code': '',
+            'periods': {p: None for p in periods}
+        }
+        report_rows.append(header_row)
+        
+        # Обрабатываем счета в категории
+        category_totals = {p: Decimal('0') for p in periods}
+        
+        for account in category.get('children', []):
+            account_row = {
+                'type': 'account',
+                'name': account['name'],
+                'code': account['code'],
+                'periods': {}
+            }
+            
+            for period in periods:
+                amount = data_index.get((period, account['code']), Decimal('0'))
+                account_row['periods'][period] = float(amount)
+                category_totals[period] += amount
+            
+            report_rows.append(account_row)
+        
+        # Добавляем итог по категории
+        subtotal_row = {
+            'type': 'subtotal',
+            'name': f"Total {category['name']}",
+            'code': '',
+            'periods': {p: float(category_totals[p]) for p in periods}
+        }
+        report_rows.append(subtotal_row)
+    
+    return report_rows
