@@ -47,6 +47,20 @@
         .th-wrap { display: flex; flex-direction: column; align-items: center; }
         .th-wrap span:first-child { font-size: 9px; } /* Month - уменьшен на 2 пункта */
         .th-bottom { font-weight: bold; font-size: 11px; }
+        
+        /* Черная разделительная линия между Account Code и Account Name */
+        #reportTable th:first-child,
+        #reportTable td:first-child {
+            border-right: 2px solid black !important;
+        }
+
+        /* Уменьшаем размер шрифта для Account Code и Account Name */
+        #reportTable th:first-child,
+        #reportTable td:first-child,
+        #reportTable th:nth-child(2),
+        #reportTable td:nth-child(2) {
+            font-size: 9px;
+        }
 
         /* Row and Column Cosmetics */
         .parent-header-row { background-color: #e8e8e8; font-weight: bold; }
