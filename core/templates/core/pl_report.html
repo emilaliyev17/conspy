@@ -587,10 +587,32 @@
             document.getElementById('filterForm').submit();
         });
         
+        // Весь код должен выполняться ПОСЛЕ загрузки DOM
         document.addEventListener('DOMContentLoaded', function() {
-            if (restoreFilters()) {
-                // Если были сохраненные фильтры, загружаем данные
-                setTimeout(loadReportData, 200);
+            console.log('DOM loaded, checking for saved filters...');
+            
+            // Пробуем восстановить фильтры
+            const saved = localStorage.getItem('pl_filters');
+            if (saved) {
+                try {
+                    const filters = JSON.parse(saved);
+                    document.getElementById('from_month').value = filters.from_month || 'Jan';
+                    document.getElementById('from_year').value = filters.from_year || '2024';
+                    document.getElementById('to_month').value = filters.to_month || 'Jul';
+                    document.getElementById('to_year').value = filters.to_year || '2025';
+                    document.getElementById('data_type').value = filters.data_type || 'Actual';
+                    console.log('Filters restored:', filters);
+                    
+                    // Загружаем данные с восстановленными фильтрами
+                    setTimeout(function() {
+                        console.log('Auto-loading data with restored filters...');
+                        loadReportData();
+                    }, 300);
+                } catch (e) {
+                    console.error('Error restoring filters:', e);
+                }
+            } else {
+                console.log('No saved filters found');
             }
         });
     </script>
