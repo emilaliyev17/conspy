@@ -192,7 +192,7 @@
                 <div class="filter-row">
                     <div class="filter-group">
                         <label>From Month:</label>
-                        <select name="from_month" class="month-select">
+                        <select name="from_month" id="from_month" class="month-select">
                             <option value="">All</option>
                             <option value="01" {% if request.GET.from_month == '01' %}selected{% endif %}>Jan</option>
                             <option value="02" {% if request.GET.from_month == '02' %}selected{% endif %}>Feb</option>
@@ -211,7 +211,7 @@
                     
                     <div class="filter-group">
                         <label>From Year:</label>
-                        <select name="from_year" class="year-select">
+                        <select name="from_year" id="from_year" class="year-select">
                             <option value="">All</option>
                             {% for year in year_range %}
                                 <option value="{{ year }}" {% if request.GET.from_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
@@ -221,7 +221,7 @@
                     
                     <div class="filter-group">
                         <label>To Month:</label>
-                        <select name="to_month" class="month-select">
+                        <select name="to_month" id="to_month" class="month-select">
                             <option value="">All</option>
                             <option value="01" {% if request.GET.to_month == '01' %}selected{% endif %}>Jan</option>
                             <option value="02" {% if request.GET.to_month == '02' %}selected{% endif %}>Feb</option>
@@ -240,7 +240,7 @@
                     
                     <div class="filter-group">
                         <label>To Year:</label>
-                        <select name="to_year" class="year-select">
+                        <select name="to_year" id="to_year" class="year-select">
                             <option value="">All</option>
                             {% for year in year_range %}
                                 <option value="{{ year }}" {% if request.GET.to_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
@@ -456,6 +456,50 @@
                     }
                 });
         });
+
+        // BS Report filter persistence - isolated code
+        (function() {
+            'use strict';
+            
+            // Save filters when form is submitted
+            const form = document.getElementById('filterForm');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    try {
+                        const filterData = {
+                            from_month: document.getElementById('from_month')?.value || '',
+                            from_year: document.getElementById('from_year')?.value || '',
+                            to_month: document.getElementById('to_month')?.value || '',
+                            to_year: document.getElementById('to_year')?.value || '',
+                            data_type: document.getElementById('data_type')?.value || ''
+                        };
+                        localStorage.setItem('bsReportFilters', JSON.stringify(filterData));
+                    } catch(e) {
+                        console.log('Could not save BS filters:', e);
+                    }
+                });
+            }
+            
+            // Restore filters after page loads
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    try {
+                        const saved = localStorage.getItem('bsReportFilters');
+                        if (saved) {
+                            const filters = JSON.parse(saved);
+                            Object.keys(filters).forEach(function(key) {
+                                const element = document.getElementById(key);
+                                if (element && filters[key]) {
+                                    element.value = filters[key];
+                                }
+                            });
+                        }
+                    } catch(e) {
+                        console.log('Could not restore BS filters:', e);
+                    }
+                }, 100);
+            });
+        })();
     </script>
 </body>
 </html>
