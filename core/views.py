@@ -1040,7 +1040,24 @@ def pl_report_data(request):
 
     # Колонки AG Grid
     column_defs = [
-        {'field': 'account_code', 'headerName': 'A/C', 'pinned': 'left', 'width': 90},
+        {
+            "headerName": "+",
+            "field": "toggler",
+            "headerComponent": "togglerHeader",
+            "width": 40,
+            "pinned": "left",
+            "hide": False
+        },
+        {
+            "field": "account_code",
+            "colId": "account_code",
+            "headerName": "A/C",
+            "headerComponent": "hideableHeader",
+            "width": 90,
+            "pinned": "left",
+            "hide": True,
+            "sortable": True
+        },
         {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
     ]
     for p in periods:

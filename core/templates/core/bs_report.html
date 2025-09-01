@@ -378,9 +378,17 @@
                         loadingDiv.style.display = 'none';
                     }
                     
+                    // Ensure A/C column is sortable without altering header components
+                    const adjustedColumnDefs = (data.columnDefs || []).map(col => {
+                        if (col && col.field === 'account_code') {
+                            if (col.sortable === undefined) col.sortable = true;
+                        }
+                        return col;
+                    });
+
                     // Initialize AG Grid
                     const gridOptions = {
-                        columnDefs: data.columnDefs,
+                        columnDefs: adjustedColumnDefs,
                         rowData: data.rowData,
                         defaultColDef: {
                             sortable: true,
