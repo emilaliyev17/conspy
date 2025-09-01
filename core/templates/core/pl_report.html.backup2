@@ -248,12 +248,6 @@
             width: 100%;
         }
         
-        /* ТАКЖЕ добавь стиль для контейнера AG Grid (если его нет) */
-        #plGrid {
-            height: 600px; /* Фиксированная высота для включения скролла */
-            width: 100%;
-        }
-        
 
 
         
@@ -377,7 +371,7 @@
         
         <!-- AG Grid Container -->
         <div class="table-container">
-            <div id="plGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+            <div id="plGrid" class="ag-theme-alpine" style="height: 80vh; width: 100%;"></div>
             <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>Loading data...</h3>
                 <p>Please wait while we load your P&L report.</p>
@@ -495,6 +489,7 @@
                             wrapHeaderText: true,
                             autoHeaderHeight: true
                         },
+
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number
@@ -519,7 +514,7 @@
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader
                         },
-                        domLayout: 'normal',  // Это включит скролл при фиксированной высоте
+                        domLayout: 'autoHeight',
                         rowSelection: {
                             enableClickSelection: false
                         },
@@ -558,35 +553,33 @@
         });
     </script>
     <script>
-    // Filter persistence - minimal code that won't break anything
-    (function() {
+    // Filter persistence functions
+    function saveFilters() {
+        const filters = {
+            company: document.getElementById('company').value,
+            year: document.getElementById('year').value,
+            scenario: document.getElementById('scenario').value
+        };
+        localStorage.setItem('plReportFilters', JSON.stringify(filters));
+    }
+
+    function loadSavedFilters() {
+        const saved = localStorage.getItem('plReportFilters');
+        if (saved) {
+            const filters = JSON.parse(saved);
+            if (filters.company) document.getElementById('company').value = filters.company;
+            if (filters.year) document.getElementById('year').value = filters.year;
+            if (filters.scenario) document.getElementById('scenario').value = filters.scenario;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(loadSavedFilters, 100);
         const form = document.getElementById('filterForm');
         if (form) {
-            form.addEventListener('submit', function() {
-                localStorage.setItem('plFilters', JSON.stringify({
-                    from_month: document.getElementById('from_month')?.value,
-                    from_year: document.getElementById('from_year')?.value,
-                    to_month: document.getElementById('to_month')?.value,
-                    to_year: document.getElementById('to_year')?.value,
-                    data_type: document.getElementById('data_type')?.value
-                }));
-            });
+            form.addEventListener('submit', saveFilters);
         }
-        
-        setTimeout(function() {
-            const saved = localStorage.getItem('plFilters');
-            if (saved) {
-                try {
-                    const filters = JSON.parse(saved);
-                    if (filters.from_month) document.getElementById('from_month').value = filters.from_month;
-                    if (filters.from_year) document.getElementById('from_year').value = filters.from_year;
-                    if (filters.to_month) document.getElementById('to_month').value = filters.to_month;
-                    if (filters.to_year) document.getElementById('to_year').value = filters.to_year;
-                    if (filters.data_type) document.getElementById('data_type').value = filters.data_type;
-                } catch(e) {}
-            }
-        }, 100);
-    })();
+    });
     </script>
 </body>
 </html>
