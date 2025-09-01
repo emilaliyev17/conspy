@@ -433,6 +433,31 @@
             destroy() {}
         }
 
+        // Функция для сохранения фильтров
+        function saveFilters() {
+            const filters = {
+                from_month: document.getElementById('from_month').value,
+                from_year: document.getElementById('from_year').value,
+                to_month: document.getElementById('to_month').value,
+                to_year: document.getElementById('to_year').value,
+                data_type: document.getElementById('data_type').value
+            };
+            localStorage.setItem('pl_filters', JSON.stringify(filters));
+        }
+
+        // Функция для загрузки фильтров
+        function loadSavedFilters() {
+            const saved = localStorage.getItem('pl_filters');
+            if (saved) {
+                const filters = JSON.parse(saved);
+                if (filters.from_month) document.getElementById('from_month').value = filters.from_month;
+                if (filters.from_year) document.getElementById('from_year').value = filters.from_year;
+                if (filters.to_month) document.getElementById('to_month').value = filters.to_month;
+                if (filters.to_year) document.getElementById('to_year').value = filters.to_year;
+                if (filters.data_type) document.getElementById('data_type').value = filters.data_type;
+            }
+        }
+
         // Auto-submit form when filters change
         document.getElementById('data_type').addEventListener('change', function() {
             document.getElementById('filterForm').submit();
@@ -459,6 +484,8 @@
                 return;
             }
             console.log('AG Grid library loaded successfully');
+            
+            saveFilters(); // Сохраняем фильтры при каждой загрузке
             
             // Get current URL parameters for the data request
             const urlParams = new URLSearchParams(window.location.search);
@@ -555,6 +582,11 @@
                         gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
                     }
                 });
+        });
+        
+        // Загружаем сохраненные фильтры при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedFilters();
         });
     </script>
 </body>
