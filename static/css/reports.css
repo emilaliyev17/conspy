@@ -3,22 +3,22 @@
 
 /* Responsive table adjustments */
 @media (min-width: 1920px) {
-    #bsTable { font-size: 12px; }
+    #bsTable { font-size: 14px; }
     #bsTable thead th, #bsTable tbody td { padding: 10px 12px; }
 }
 
 @media (min-width: 1440px) and (max-width: 1919px) {
-    #bsTable { font-size: 11px; }
+    #bsTable { font-size: 13px; }
     #bsTable thead th, #bsTable tbody td { padding: 8px 10px; }
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
-    #bsTable { font-size: 11px; }
+    #bsTable { font-size: 13px; }
     #bsTable thead th, #bsTable tbody td { padding: 6px 8px; }
 }
 
 @media (max-width: 1023px) {
-    #bsTable { font-size: 10px; }
+    #bsTable { font-size: 12px; }
     #bsTable thead th, #bsTable tbody td { padding: 4px 6px; }
 }
 .dataTables_wrapper table#bsTable, #bsTable th, #bsTable td { box-sizing: border-box }
@@ -42,12 +42,74 @@ table.dataTable#bsTable thead th, table.dataTable#bsTable tbody td { padding: 8p
 
 /* header two-line wrapper */
 #bsTable .th-wrap { display: inline-flex; flex-direction: column; line-height: 1.1; white-space: normal }
-#bsTable thead th, #bsTable tbody td { font-size: 11px }
+#bsTable thead th, #bsTable tbody td { font-size: 13px }
+/* Override for Account Code and Account Name headers */
+#bsTable thead th:first-child,
+#bsTable thead th:nth-child(2) {
+    font-size: 11px !important;
+}
+
+/* More aggressive override for headers */
+#reportTable thead th:first-child,
+#reportTable thead th:nth-child(2) {
+    font-size: 11px !important;
+}
+
+/* Force override for all header cells */
+table thead th:first-child,
+table thead th:nth-child(2) {
+    font-size: 11px !important;
+}
+
+/* Ultra aggressive override for DataTables */
+.dataTables_wrapper .dataTables_scrollHead table thead th:first-child,
+.dataTables_wrapper .dataTables_scrollHead table thead th:nth-child(2),
+.dataTables_wrapper .dataTables_scrollHeadInner table thead th:first-child,
+.dataTables_wrapper .dataTables_scrollHeadInner table thead th:nth-child(2) {
+    font-size: 11px !important;
+    font-size: 11px !important;
+    font-size: 11px !important;
+}
+
+/* CSS variable approach */
+:root {
+    --header-font-size: 11px;
+}
+
+#reportTable thead th:first-child,
+#reportTable thead th:nth-child(2) {
+    font-size: var(--header-font-size) !important;
+}
 /* account name indentation levels */
 #bsTable td.lvl-0 { padding-left: 10px }
 #bsTable td.lvl-1 { padding-left: 24px }
 #bsTable td.lvl-2 { padding-left: 36px }
 #bsTable td.lvl-3 { padding-left: 48px }
+
+/* FixedColumns overrides all width settings - keeping default width */
+
+/* Center align headers A/C and Account Name */
+#bsTable thead th:first-child,
+#bsTable thead th:nth-child(2) {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* More aggressive centering for DataTables */
+.dataTables_wrapper .dataTables_scrollHead table thead th:first-child,
+.dataTables_wrapper .dataTables_scrollHead table thead th:nth-child(2),
+.dataTables_wrapper .dataTables_scrollHeadInner table thead th:first-child,
+.dataTables_wrapper .dataTables_scrollHeadInner table thead th:nth-child(2) {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* Force centering for all header cells */
+table thead th:first-child,
+table thead th:nth-child(2) {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
 /* emphasize by row class only, no inner <strong> in cells */
 #bsTable .parent-header-row,
 #bsTable .parent-total-row { font-weight: 700 }

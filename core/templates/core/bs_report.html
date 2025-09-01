@@ -45,7 +45,7 @@
         }
         #reportTable td:nth-child(n+3) { text-align: right; }
         .th-wrap { display: flex; flex-direction: column; align-items: center; }
-        .th-wrap span:first-child { font-size: 9px; } /* Month - уменьшен на 2 пункта */
+        .th-wrap span:first-child { font-size: 11px; } /* Month - увеличен на 2 пункта */
         .th-bottom { font-weight: bold; font-size: 11px; }
         
         /* Черная разделительная линия между Account Code и Account Name */
@@ -54,12 +54,12 @@
             border-right: 2px solid black !important;
         }
 
-        /* Уменьшаем размер шрифта для Account Code и Account Name */
-        #reportTable th:first-child,
-        #reportTable td:first-child,
-        #reportTable th:nth-child(2),
-        #reportTable td:nth-child(2) {
-            font-size: 9px;
+        /* Устанавливаем размер шрифта для заголовков Account Code и Account Name */
+        #reportTable thead th:first-child,
+        #reportTable thead th:nth-child(2) {
+            font-size: 11px !important;
+            text-align: center !important;
+            vertical-align: middle !important;
         }
 
         /* Row and Column Cosmetics */
@@ -156,7 +156,7 @@
             <table id="reportTable" class="display">
                 <thead>
                     <tr>
-                        <th style="min-width: 150px;">Account Code</th>
+                        <th style="min-width: 20px; max-width: 20px;">A/C</th>
                         <th style="min-width: 300px;">Account Name</th>
                         {% for period in periods %}
                             {% for company in companies %}
@@ -198,7 +198,7 @@
 
     <script>
         $(document).ready(function() {
-            $('#reportTable').DataTable({
+            var table = $('#reportTable').DataTable({
                 // Vertical scrolling
                 scrollY: '70vh',
                 scrollCollapse: true,
@@ -209,10 +209,12 @@
                 // Enable FixedHeader
                 fixedHeader: true,
 
-                // NEW: Enable FixedColumns for the first 2 columns
+                // Enable FixedColumns for the first 2 columns
                 fixedColumns: {
                     left: 2
                 },
+
+
 
                 // Disable unnecessary features
                 paging: false,
@@ -220,6 +222,35 @@
                 info: false,
                 ordering: false
             });
+            
+            // Force font size for headers using JavaScript
+            function forceFontSize() {
+                // Try multiple selectors
+                $('th:first-child, th:nth-child(2)').each(function() {
+                    $(this).css('font-size', '11px');
+                    $(this).css('text-align', 'center');
+                    $(this).css('vertical-align', 'middle');
+                    $(this).attr('style', $(this).attr('style') + '; font-size: 11px !important; text-align: center !important; vertical-align: middle !important;');
+                });
+                
+                // Try DataTables specific selectors
+                $('.dataTables_scrollHead th:first-child, .dataTables_scrollHead th:nth-child(2)').each(function() {
+                    $(this).css('font-size', '11px');
+                    $(this).css('text-align', 'center');
+                    $(this).css('vertical-align', 'middle');
+                    $(this).attr('style', $(this).attr('style') + '; font-size: 11px !important; text-align: center !important; vertical-align: middle !important;');
+                });
+            }
+            
+
+            
+            // Try multiple times
+            setTimeout(forceFontSize, 100);
+            setTimeout(forceFontSize, 500);
+            setTimeout(forceFontSize, 1000);
+            setTimeout(forceFontSize, 2000);
+            
+
         });
     </script>
 </body>

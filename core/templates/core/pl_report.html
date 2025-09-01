@@ -736,7 +736,7 @@
             <table id="plTable" class="display">
                 <thead>
                     <tr>
-                        <th>Account Code</th>
+                        <th>A/C</th>
                         <th>Account Name</th>
                         {% for period in periods %}
                             {% for company in companies %}
@@ -758,15 +758,15 @@
                                 {% if row.type == 'parent_header' %}
                                     <strong>{{ row.account_name }}</strong>
                                 {% elif row.type == 'sub_header' %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                    {{ row.account_name }}
                                 {% elif row.type == 'sub_total' %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;<strong>{{ row.account_name }}</strong>
+                                    <strong>{{ row.account_name }}</strong>
                                 {% elif row.type == 'parent_total' %}
                                     <strong>{{ row.account_name }}</strong>
                                 {% elif row.type == 'calculated_total' %}
                                     <strong>{{ row.account_name }}</strong>
                                 {% else %}
-                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ row.account_name }}
+                                    {{ row.account_name }}
                                 {% endif %}
                             </td>
                             {% for period in periods %}
