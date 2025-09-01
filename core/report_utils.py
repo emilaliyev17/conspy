@@ -8,51 +8,51 @@ logger = logging.getLogger(__name__)
 def get_report_structure(report_type='PL'):
     """
     Получает структуру отчета на основе ChartOfAccounts.
-    report_type: 'PL' для P&L или 'BS' для Balance Sheet
+    Группирует счета по sub_category автоматически.
     """
     if report_type == 'PL':
         account_types = ['INCOME', 'EXPENSE']
     else:  # BS
         account_types = ['ASSET', 'LIABILITY', 'EQUITY']
     
-    # Получаем все счета нужного типа
+    # Получаем все счета с кодами
     accounts = ChartOfAccounts.objects.filter(
-        account_type__in=account_types
+        account_type__in=account_types,
+        account_code__isnull=False
+    ).exclude(
+        account_code=''
     ).order_by('sort_order')
     
-    # Строим иерархию
+    # Группируем по sub_category
     structure = []
-    parent_map = {}
+    categories = {}
     
     for account in accounts:
-        if not account.account_code:  # Это заголовок/категория
-            structure.append({
+        sub_cat = account.sub_category or 'UNCATEGORIZED'
+        
+        # Создаем категорию если её еще нет
+        if sub_cat not in categories:
+            category = {
                 'type': 'header',
-                'name': account.account_name,
-                'parent_category': account.parent_category,
-                'sub_category': account.sub_category,
-                'sort_order': account.sort_order,
+                'name': sub_cat,
+                'sort_order': account.sort_order,  # Берем sort_order первого счета
                 'children': []
-            })
-            parent_map[account.account_name] = structure[-1]
-        else:  # Это счет с кодом
-            account_data = {
-                'type': 'account',
-                'code': account.account_code,
-                'name': account.account_name,
-                'account_type': account.account_type,
-                'parent_category': account.parent_category,
-                'sub_category': account.sub_category,
-                'sort_order': account.sort_order
             }
-            
-            # Добавляем в правильное место иерархии
-            if account.sub_category and account.sub_category in parent_map:
-                parent_map[account.sub_category]['children'].append(account_data)
-            elif account.parent_category and account.parent_category in parent_map:
-                parent_map[account.parent_category]['children'].append(account_data)
-            else:
-                structure.append(account_data)
+            categories[sub_cat] = category
+            structure.append(category)
+        
+        # Добавляем счет в категорию
+        account_data = {
+            'type': 'account',
+            'code': account.account_code,
+            'name': account.account_name,
+            'account_type': account.account_type,
+            'sort_order': account.sort_order
+        }
+        categories[sub_cat]['children'].append(account_data)
+    
+    # Сортируем структуру по sort_order
+    structure.sort(key=lambda x: x['sort_order'])
     
     return structure
 
