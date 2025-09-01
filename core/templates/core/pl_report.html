@@ -198,6 +198,54 @@
             z-index: 101 !important;
         }
         
+        /* Aggressive gap removal - hide gap elements */
+        .dataTables_wrapper .dataTables_scrollHead {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+            border-bottom: none !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBody {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            border-top: none !important;
+        }
+        
+        /* Hide any elements that might create gaps */
+        .dataTables_wrapper .dataTables_scrollHeadInner {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        .dataTables_wrapper .dataTables_scrollBodyInner {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Remove spacing from table elements */
+        #plTable thead {
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        #plTable tbody {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        
+        /* Hide any DataTables elements that create gaps */
+        .dataTables_wrapper .dataTables_scrollHead:after,
+        .dataTables_wrapper .dataTables_scrollBody:before {
+            display: none !important;
+            content: none !important;
+        }
+        
+        /* Force close positioning */
+        .dataTables_wrapper .dataTables_scrollBody {
+            position: relative;
+            top: -1px !important;
+        }
+        
         /* Alternative header positioning */
         .dataTables_wrapper .dataTables_scrollHead {
             position: relative !important;
@@ -338,6 +386,8 @@
             min-height: 35px !important;
             box-sizing: border-box !important;
         }
+        
+
         
         /* Ensure header text is properly spaced */
         #plTable th br {
