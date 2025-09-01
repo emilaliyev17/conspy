@@ -152,3 +152,45 @@ table thead th:nth-child(2) {
 #bs-report #bsTable .company-gl001 { background-color: rgba(144,238,144,0.3) }
 #bs-report #bsTable .total-column { background-color: rgba(211,211,211,0.3); border-left: 2px solid #999; border-right: 2px solid #999 }
 
+/* ===== CSS POSITION: STICKY FOR P&L REPORT ===== */
+
+/* 1. Создаем контейнер с прокруткой */
+.table-container {
+    overflow-x: auto; /* Включаем горизонтальную прокрутку */
+    overflow-y: auto; /* Включаем вертикальную прокрутку */
+    max-height: 800px; /* Ограничиваем высоту, как в DataTables */
+    width: 100%;
+}
+
+/* 2. Делаем весь заголовок таблицы "липким" */
+#financial-report-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8f9fa; /* Важно! Липкие элементы должны иметь фон */
+}
+
+/* 3. Делаем "липкими" ячейки в первых двух колонках */
+#financial-report-table tbody td:nth-child(1),
+#financial-report-table thead th:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: #f8f9fa;
+}
+
+#financial-report-table tbody td:nth-child(2),
+#financial-report-table thead th:nth-child(2) {
+    position: sticky;
+    /* ВАЖНО: Укажите здесь примерную ширину первой колонки */
+    /* Например, если первая колонка ~80px */
+    left: 80px; 
+    z-index: 5;
+    background: #f8f9fa;
+}
+
+/* 4. Решаем проблему "угла", где пересекаются липкие строки и столбцы */
+#financial-report-table thead th:nth-child(1),
+#financial-report-table thead th:nth-child(2) {
+    z-index: 15;
+}

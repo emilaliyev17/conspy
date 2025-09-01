@@ -1,12 +1,12 @@
 {% load report_filters %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profit & Loss Report</title>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.2.2/css/fixedColumns.dataTables.min.css">
+    <link rel="stylesheet" href="{% static 'css/reports.css' %}">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -99,14 +99,15 @@
         }
         
         /* Table borders */
-        #plTable {
-            border-collapse: collapse;
+        #financial-report-table {
+            border-collapse: separate;
             border: 1px solid #ddd;
-            width: 100%;
+            white-space: nowrap;
+            table-layout: auto;
         }
         
-        #plTable th,
-        #plTable td {
+        #financial-report-table th,
+        #financial-report-table td {
             border: 1px solid #e0e0e0;
             padding: 8px;
         }
@@ -119,7 +120,7 @@
         }
         
         /* Header styling */
-        #plTable thead th {
+        #financial-report-table thead th {
             border-bottom: 2px solid #999;
             background-color: #f5f5f5;
         }
@@ -182,263 +183,25 @@
             border-bottom: 1px solid #f0f0f0 !important;
         }
         
-        /* Fix header positioning for horizontal scroll */
-        .dataTables_wrapper .dataTables_scrollHead {
-            overflow: hidden !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollHeadInner {
-            width: 100% !important;
-        }
-        
-        /* Ensure fixed columns don't overlap with header */
-        .dataTables_wrapper .DTFC_LeftWrapper {
-            z-index: 100 !important;
-        }
-        
-        .dataTables_wrapper .DTFC_LeftHeadWrapper {
-            z-index: 101 !important;
-        }
-        
-        /* Aggressive gap removal - hide gap elements */
-        .dataTables_wrapper .dataTables_scrollHead {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-            border-bottom: none !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-            border-top: none !important;
-        }
-        
-        /* Hide any elements that might create gaps */
-        .dataTables_wrapper .dataTables_scrollHeadInner {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBodyInner {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Remove spacing from table elements */
-        #plTable thead {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        #plTable tbody {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Hide any DataTables elements that create gaps */
-        .dataTables_wrapper .dataTables_scrollHead:after,
-        .dataTables_wrapper .dataTables_scrollBody:before {
-            display: none !important;
-            content: none !important;
-        }
-        
-        /* Force close positioning */
-        .dataTables_wrapper .dataTables_scrollBody {
-            position: relative;
-            top: -1px !important;
-        }
-        
-        /* Alternative header positioning */
-        .dataTables_wrapper .dataTables_scrollHead {
-            position: relative !important;
-            z-index: 1 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody {
-            position: relative !important;
-            z-index: 0 !important;
-        }
-        
-        /* Manual fixed columns using CSS */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(1),
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            position: sticky !important;
-            left: 0 !important;
-            background-color: white !important;
-            z-index: 10 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(2) {
-            left: 60px !important; /* Reduced gap between columns */
-        }
-        
-        .dataTables_wrapper .dataTables_scrollHead th:nth-child(1),
-        .dataTables_wrapper .dataTables_scrollHead th:nth-child(2) {
-            position: sticky !important;
-            left: 0 !important;
-            background-color: white !important;
-            z-index: 5 !important; /* Lower z-index to prevent overlap */
-        }
-        
-        .dataTables_wrapper .dataTables_scrollHead th:nth-child(2) {
-            left: 60px !important; /* Reduced gap between columns */
-        }
-        
-        /* Fix header overlap issue */
-        .dataTables_wrapper .dataTables_scrollHead {
-            z-index: 1 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody {
-            z-index: 0 !important;
-        }
-        
-        /* Reduce gap between header and first data row */
-        .dataTables_wrapper .dataTables_scrollHead {
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody {
-            margin-top: 0 !important;
-            border-top: none !important;
-            padding-top: 0 !important;
-        }
-        
-        /* ELIMINATE GAP BETWEEN HEADER AND FIRST DATA ROW */
-        .dataTables_wrapper .dataTables_scrollHead table {
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody table {
-            margin-top: 0 !important;
-            border-top: none !important;
-        }
-        
-        /* Force no gap between thead and tbody */
-        #plTable thead {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        #plTable tbody {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Remove any DataTables default spacing */
-        .dataTables_wrapper .dataTables_scrollHeadInner {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBodyInner {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        
-        /* Remove any spacing between header and body */
-        .dataTables_wrapper .dataTables_scrollHeadInner {
-            margin-bottom: 0 !important;
-            padding-bottom: 0 !important;
-        }
-        
-        /* Force minimal spacing */
-        .dataTables_wrapper .dataTables_scrollHead table {
-            margin-bottom: 0 !important;
-            border-bottom: none !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody table {
-            margin-top: 0 !important;
-            border-top: none !important;
-        }
-        
-        /* Remove any gaps from table cells */
-        .dataTables_wrapper .dataTables_scrollHead th {
-            padding-bottom: 0 !important;
-            margin-bottom: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody td:first-child {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
-        }
-        
-        /* ELIMINATE GAP - Target first row specifically */
-        #plTable tbody tr:first-child td {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
-        }
-        
-        .dataTables_wrapper .dataTables_scrollBody tr:first-child td {
-            padding-top: 0 !important;
-            margin-top: 0 !important;
-        }
-        
-        /* Fix vertical alignment - force consistent height */
-        #plTable th, #plTable td,
-        .dataTables_wrapper .dataTables_scrollHead th,
-        .dataTables_wrapper .dataTables_scrollBody td {
-            padding: 8px 4px !important;
-            vertical-align: middle !important;
-            line-height: 1.2 !important;
-            min-height: 35px !important;
-            box-sizing: border-box !important;
-        }
-        
-
-        
-        /* Ensure header text is properly spaced */
-        #plTable th br {
-            display: block;
-            content: "";
-            margin-top: 1px;
-        }
-        
-        /* Table alignment fixes - minimal approach */
-        #plTable th {
+        /* Table alignment fixes for native table */
+        #financial-report-table th {
             vertical-align: middle !important;
             text-align: center !important;
         }
         
-        #plTable td {
+        #financial-report-table td {
             vertical-align: middle !important;
             text-align: right !important;
         }
         
         /* Keep Account Code and Account Name left-aligned */
-        #plTable td:nth-child(1),
-        #plTable td:nth-child(2) {
+        #financial-report-table td:nth-child(1),
+        #financial-report-table td:nth-child(2) {
             text-align: left !important;
         }
         
         /* Force right alignment for all data cells (except first two columns) */
-        #plTable tbody td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        /* Override DataTables default alignment */
-        .dataTables_wrapper .dataTables_scrollBody td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        /* Maximum specificity override for all data cells */
-        body .dataTables_wrapper .dataTables_scrollBody table.dataTable tbody tr td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        /* Force alignment for all numerical data */
-        #plTable tbody tr td:nth-child(n+3),
-        .dataTables_scrollBody tbody tr td:nth-child(n+3),
-        table.dataTable tbody tr td:nth-child(n+3) {
-            text-align: right !important;
-        }
-        
-        /* Override any inline styles */
-        #plTable tbody tr td:nth-child(n+3)[style*="text-align"] {
+        #financial-report-table tbody td:nth-child(n+3) {
             text-align: right !important;
         }
         .btn {
@@ -735,7 +498,7 @@
         <!-- Report Table -->
         <div class="table-container">
             {% if report_data %}
-            <table id="plTable" class="display">
+            <table id="financial-report-table" class="display">
                 <thead>
                     <tr>
                         <th>A/C</th>
@@ -847,49 +610,23 @@
     </div>
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/fixedcolumns/4.2.2/js/dataTables.fixedColumns.min.js"></script>
     <script>
         // Auto-submit form when filters change
         document.getElementById('data_type').addEventListener('change', function() {
             document.getElementById('filterForm').submit();
         });
         
-        // Initialize DataTable with fixed columns
+        // Simple alignment for native table
         $(document).ready(function() {
-            $('#plTable').DataTable({
-                scrollX: true,
-                scrollXInner: "120%", // Add 20% extra space for last column
-                scrollY: "800px", // Increased height to show more rows including EXPENSE TOTAL
-                paging: false,
-                searching: false,
-                ordering: false,  // DISABLE SORTING COMPLETELY
-                info: false,      // Remove "Showing X entries" text
-                autoWidth: false,
-                columnDefs: [
-                    {
-                        targets: [0, 1], // Account Code and Account Name
-                        className: 'text-left'
-                    },
-                    {
-                        targets: '_all', // All other columns
-                        className: 'text-right'
-                    }
-                ]
+            // Force right alignment for all data cells (except first two columns)
+            $('#financial-report-table tbody tr').each(function() {
+                $(this).find('td:nth-child(n+3)').attr('style', 'text-align: right !important');
             });
             
-            // Force alignment after table is initialized
-            setTimeout(function() {
-                // Force right alignment for all data cells (except first two columns)
-                $('#plTable tbody tr').each(function() {
-                    $(this).find('td:nth-child(n+3)').attr('style', 'text-align: right !important');
-                });
-                
-                // Force left alignment for Account Code and Account Name
-                $('#plTable tbody tr').each(function() {
-                    $(this).find('td:nth-child(1), td:nth-child(2)').attr('style', 'text-align: left !important');
-                });
-            }, 500);
+            // Force left alignment for Account Code and Account Name
+            $('#financial-report-table tbody tr').each(function() {
+                $(this).find('td:nth-child(1), td:nth-child(2)').attr('style', 'text-align: left !important');
+            });
         });
     </script>
 </body>
