@@ -461,14 +461,8 @@
             }
         }
 
-        // Auto-submit form when filters change
-        document.getElementById('data_type').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-        
-        // AG Grid initialization
-        document.addEventListener('DOMContentLoaded', function() {
-            restoreFilters();  // восстанавливаем фильтры
+        // Функция для загрузки данных отчета
+        function loadReportData() {
             console.log('DOM loaded, initializing AG Grid...');
             
             const gridDiv = document.querySelector('#plGrid');
@@ -489,7 +483,7 @@
             }
             console.log('AG Grid library loaded successfully');
             
-            saveCurrentFilters();  // ДОБАВЬ ТОЛЬКО ЭТУ СТРОКУ
+            saveCurrentFilters();  // Сохраняем фильтры при каждой загрузке
             
             // Get current URL parameters for the data request
             const urlParams = new URLSearchParams(window.location.search);
@@ -586,6 +580,26 @@
                         gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
                     }
                 });
+        }
+
+        // Auto-submit form when filters change
+        document.getElementById('data_type').addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+        
+        // При загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Восстанавливаем фильтры
+            restoreFilters();
+            
+            // Проверяем, есть ли сохраненные фильтры
+            const savedFilters = localStorage.getItem('pl_filters');
+            if (savedFilters) {
+                // Если фильтры есть, загружаем данные автоматически
+                setTimeout(function() {
+                    loadReportData();
+                }, 100);
+            }
         });
     </script>
 </body>
