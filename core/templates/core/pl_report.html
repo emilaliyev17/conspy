@@ -11,7 +11,7 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0 2mm;
+            padding: 0 2mm 0 8mm;
             background-color: #f5f5f5;
         }
         .container {
@@ -859,6 +859,7 @@
         $(document).ready(function() {
             $('#plTable').DataTable({
                 scrollX: true,
+                scrollXInner: "120%", // Add 20% extra space for last column
                 scrollY: "800px", // Increased height to show more rows including EXPENSE TOTAL
                 paging: false,
                 searching: false,
