@@ -433,7 +433,7 @@
             destroy() {}
         }
 
-        // НОВЫЕ функции для сохранения фильтров
+        // Функции для сохранения и восстановления фильтров
         function saveCurrentFilters() {
             const filters = {
                 from_month: document.getElementById('from_month').value,
@@ -443,22 +443,22 @@
                 data_type: document.getElementById('data_type').value
             };
             localStorage.setItem('pl_filters', JSON.stringify(filters));
+            console.log('Filters saved:', filters);
         }
 
         function restoreFilters() {
             const saved = localStorage.getItem('pl_filters');
             if (saved) {
-                try {
-                    const filters = JSON.parse(saved);
-                    if (filters.from_month) document.getElementById('from_month').value = filters.from_month;
-                    if (filters.from_year) document.getElementById('from_year').value = filters.from_year;
-                    if (filters.to_month) document.getElementById('to_month').value = filters.to_month;
-                    if (filters.to_year) document.getElementById('to_year').value = filters.to_year;
-                    if (filters.data_type) document.getElementById('data_type').value = filters.data_type;
-                } catch (e) {
-                    console.error('Error restoring filters:', e);
-                }
+                const filters = JSON.parse(saved);
+                document.getElementById('from_month').value = filters.from_month || 'Jan';
+                document.getElementById('from_year').value = filters.from_year || '2024';
+                document.getElementById('to_month').value = filters.to_month || 'Jul';
+                document.getElementById('to_year').value = filters.to_year || '2025';
+                document.getElementById('data_type').value = filters.data_type || 'Actual';
+                console.log('Filters restored:', filters);
+                return true;
             }
+            return false;
         }
 
         // Функция для загрузки данных отчета
@@ -587,18 +587,10 @@
             document.getElementById('filterForm').submit();
         });
         
-        // При загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
-            // Восстанавливаем фильтры
-            restoreFilters();
-            
-            // Проверяем, есть ли сохраненные фильтры
-            const savedFilters = localStorage.getItem('pl_filters');
-            if (savedFilters) {
-                // Если фильтры есть, загружаем данные автоматически
-                setTimeout(function() {
-                    loadReportData();
-                }, 100);
+            if (restoreFilters()) {
+                // Если были сохраненные фильтры, загружаем данные
+                setTimeout(loadReportData, 200);
             }
         });
     </script>
