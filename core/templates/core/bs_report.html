@@ -276,7 +276,7 @@
         
         <!-- AG Grid Container -->
         <div class="table-container">
-            <div id="bsGrid" class="ag-theme-alpine" style="height: 80vh; width: 100%;"></div>
+            <div id="bsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
             <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>Loading data...</h3>
                 <p>Please wait while we load your Balance Sheet report.</p>
@@ -392,16 +392,9 @@
                             sortable: true,
                             filter: true,
                             resizable: true,
-                            suppressMenu: true
+                            wrapHeaderText: true,
+                            autoHeaderHeight: true
                         },
-                        // ДОБАВЬ ЭТИ СТРОКИ для закрепления заголовка
-                        headerHeight: 40,
-                        floatingFiltersHeight: 40,
-                        pivotHeaderHeight: 40,
-                        pivotGroupHeaderHeight: 40,
-                        // Включаем вертикальный скролл с фиксированной высотой
-                        domLayout: 'normal',
-                        animateRows: true,
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number
@@ -426,6 +419,7 @@
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader
                         },
+                        domLayout: 'normal',  // Это включит скролл при фиксированной высоте
                         rowSelection: {
                             enableClickSelection: false
                         },
