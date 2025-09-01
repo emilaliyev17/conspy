@@ -460,13 +460,8 @@
             }
         }
 
-        // Auto-submit form when filters change
-        document.getElementById('data_type').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-        
-        // AG Grid initialization
-        document.addEventListener('DOMContentLoaded', function() {
+        // Функция для загрузки данных отчета
+        function loadReportData() {
             console.log('DOM loaded, initializing AG Grid...');
             
             const gridDiv = document.querySelector('#plGrid');
@@ -584,11 +579,25 @@
                         gridDiv.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc3545;"><h3>Error loading data</h3><p>Please try refreshing the page.</p><p>Error: ' + error.message + '</p></div>';
                     }
                 });
+        }
+
+        // Обработка отправки формы фильтров
+        document.getElementById('filterForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // Предотвращаем стандартную отправку формы
+            loadReportData(); // Загружаем данные с новыми фильтрами
+        });
+
+        // Auto-submit form when filters change
+        document.getElementById('data_type').addEventListener('change', function() {
+            loadReportData(); // Загружаем данные при изменении типа данных
         });
         
         // Загружаем сохраненные фильтры при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedFilters();
+            // НЕ вызываем loadReportData() автоматически - пусть пользователь нажмет Apply Filters
+            // Или если хотите автозагрузку с сохраненными фильтрами, раскомментируйте:
+            // setTimeout(() => loadReportData(), 100);
         });
     </script>
 </body>
