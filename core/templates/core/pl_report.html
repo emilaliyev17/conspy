@@ -247,6 +247,39 @@
             padding: 0 2mm;
             width: 100%;
         }
+        
+        /* AG Grid scrolling improvements */
+        #plGrid {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        /* Ensure headers are always visible */
+        .ag-header {
+            position: sticky !important;
+            top: 0;
+            z-index: 100;
+        }
+        
+        /* Custom scrollbar for better UX */
+        #plGrid ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+        
+        #plGrid ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 6px;
+        }
+        
+        #plGrid ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 6px;
+        }
+        
+        #plGrid ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
 
         
 
@@ -369,7 +402,7 @@
         
         <!-- AG Grid Container -->
         <div class="table-container">
-            <div id="plGrid" class="ag-theme-alpine" style="height: 800px; width: 100%;"></div>
+            <div id="plGrid" class="ag-theme-alpine" style="height: 80vh; width: 100%;"></div>
             <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>Loading data...</h3>
                 <p>Please wait while we load your P&L report.</p>
@@ -487,6 +520,12 @@
                             wrapHeaderText: true,
                             autoHeaderHeight: true
                         },
+                        // Enable sticky headers
+                        suppressColumnVirtualisation: false,
+                        suppressRowVirtualisation: false,
+                        // Ensure headers stay visible during scrolling
+                        suppressHorizontalScroll: false,
+                        suppressVerticalScroll: false,
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number

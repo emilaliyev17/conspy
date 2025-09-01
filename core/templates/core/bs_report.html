@@ -137,6 +137,39 @@
             padding: 20px;
             width: 100%;
         }
+        
+        /* AG Grid scrolling improvements */
+        #bsGrid {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        /* Ensure headers are always visible */
+        .ag-header {
+            position: sticky !important;
+            top: 0;
+            z-index: 100;
+        }
+        
+        /* Custom scrollbar for better UX */
+        #bsGrid ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+        
+        #bsGrid ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 6px;
+        }
+        
+        #bsGrid ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 6px;
+        }
+        
+        #bsGrid ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
     </style>
 </head>
 <body>
@@ -237,7 +270,7 @@
         
         <!-- AG Grid Container -->
         <div class="table-container">
-            <div id="bsGrid" class="ag-theme-alpine" style="height: 800px; width: 100%;"></div>
+            <div id="bsGrid" class="ag-theme-alpine" style="height: 80vh; width: 100%;"></div>
             <div id="loadingMessage" style="text-align: center; padding: 40px; color: #6c757d;">
                 <h3>Loading data...</h3>
                 <p>Please wait while we load your Balance Sheet report.</p>
@@ -356,6 +389,12 @@
                             wrapHeaderText: true,
                             autoHeaderHeight: true
                         },
+                        // Enable sticky headers
+                        suppressColumnVirtualisation: false,
+                        suppressRowVirtualisation: false,
+                        // Ensure headers stay visible during scrolling
+                        suppressHorizontalScroll: false,
+                        suppressVerticalScroll: false,
                         columnTypes: {
                             numberColumnWithCommas: {
                                 // This function formats the number
