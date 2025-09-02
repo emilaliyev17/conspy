@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData
 import json
 from datetime import datetime
 
@@ -141,3 +141,19 @@ class DataBackupAdmin(admin.ModelAdmin):
             messages.error(request, f"Error restoring backup: {e}")
         
         return HttpResponseRedirect('/admin/core/databackup/')
+
+
+@admin.register(CFDashboardMetric)
+class CFDashboardMetricAdmin(admin.ModelAdmin):
+    list_display = ['metric_name', 'metric_code', 'display_order', 'is_active']
+    list_editable = ['display_order', 'is_active']
+    ordering = ['display_order']
+
+
+@admin.register(CFDashboardData)
+class CFDashboardDataAdmin(admin.ModelAdmin):
+    list_display = ['company', 'period', 'metric', 'value']
+    list_filter = ['company', 'period', 'metric']
+    search_fields = ['company__name', 'metric__metric_name']
+    ordering = ['-period', 'company', 'metric__display_order']
+    list_editable = ['value']  # Allow inline editing in admin
