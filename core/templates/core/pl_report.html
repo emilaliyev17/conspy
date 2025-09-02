@@ -534,6 +534,8 @@
                                     if (parts.length >= 2) {
                                         const period = parts[0];
                                         const company = parts[1];
+                                        // Visual feedback: set value immediately
+                                        params.node.setDataValue(colId, params.newValue);
                                         fetch('/api/cf-dashboard/update/', {
                                             method: 'POST',
                                             headers: {
@@ -544,8 +546,17 @@
                                                 metric_id: params.data.metric_id,
                                                 company_code: company,
                                                 period: period,
-                                                value: params.newValue
+                                                value: params.newValue || 0
                                             })
+                                        }).then(function(response) {
+                                            if (!response.ok) {
+                                                // Revert on error
+                                                params.node.setDataValue(colId, params.oldValue);
+                                                alert('Failed to save. Please try again.');
+                                            }
+                                        }).catch(function(error) {
+                                            params.node.setDataValue(colId, params.oldValue);
+                                            alert('Error saving data: ' + error);
                                         });
                                     }
                                 }

@@ -1072,6 +1072,7 @@ def pl_report_data(request):
                     'backgroundColor': '#E6F3FF' if str(c.code).upper().startswith('F2') else '#E8F5E9'
                 }
             })
+        # P&L TOTAL per period (existing)
         column_defs.append({
             'field': f'{p.strftime("%b-%y")}_TOTAL',
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
@@ -1081,6 +1082,17 @@ def pl_report_data(request):
                 'textAlign': 'right',
                 'backgroundColor': '#FFF9E6'
             }
+        })
+        # CF Dashboard TOTAL per period (YYYYMM_total) to match CF rows
+        column_defs.append({
+            'field': f'{p.strftime("%Y%m")}_total',
+            'headerName': f'{p.strftime("%b-%y")} TOTAL',
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#FFF9E6'
+            },
+            'editable': False
         })
     for c in companies:
         column_defs.append({
