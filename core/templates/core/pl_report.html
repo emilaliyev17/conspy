@@ -493,7 +493,37 @@
                             filter: true,
                             resizable: true,
                             wrapHeaderText: true,
-                            autoHeaderHeight: true
+                            autoHeaderHeight: true,
+                            // Only CF Dashboard rows are editable
+                            editable: function(params) {
+                                return params.data && params.data.is_cf_dashboard === true;
+                            }
+                        },
+                        // Handle inline edits for CF Dashboard rows
+                        onCellValueChanged: function(params) {
+                            if (params.data && params.data.is_cf_dashboard) {
+                                const colId = params.column && params.column.colId;
+                                if (typeof colId === 'string') {
+                                    const parts = colId.split('_');
+                                    if (parts.length >= 2) {
+                                        const period = parts[0];
+                                        const company = parts[1];
+                                        fetch('/api/cf-dashboard/update/', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': getCookie('csrftoken')
+                                            },
+                                            body: JSON.stringify({
+                                                metric_id: params.data.metric_id,
+                                                company_code: company,
+                                                period: period,
+                                                value: params.newValue
+                                            })
+                                        });
+                                    }
+                                }
+                            }
                         },
                         columnTypes: {
                             numberColumnWithCommas: {
