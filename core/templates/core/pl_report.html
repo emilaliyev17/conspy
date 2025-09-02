@@ -527,13 +527,23 @@
                         },
                         // Handle inline edits for CF Dashboard rows
                         onCellValueChanged: function(params) {
+                            console.log('Cell changed:', params);
                             if (params.data && params.data.is_cf_dashboard) {
                                 const colId = params.column && params.column.colId;
+                                console.log('Column ID:', colId);
                                 if (typeof colId === 'string') {
                                     const parts = colId.split('_');
+                                    console.log('Parts:', parts);
                                     if (parts.length >= 2) {
                                         const period = parts[0];
                                         const company = parts[1];
+                                        const requestData = {
+                                            metric_id: params.data.metric_id,
+                                            company_code: company,
+                                            period: period,
+                                            value: params.newValue || 0
+                                        };
+                                        console.log('Sending data:', requestData);
                                         // Visual feedback: set value immediately
                                         params.node.setDataValue(colId, params.newValue);
                                         fetch('/api/cf-dashboard/update/', {
@@ -542,19 +552,18 @@
                                                 'Content-Type': 'application/json',
                                                 'X-CSRFToken': getCookie('csrftoken')
                                             },
-                                            body: JSON.stringify({
-                                                metric_id: params.data.metric_id,
-                                                company_code: company,
-                                                period: period,
-                                                value: params.newValue || 0
-                                            })
+                                            body: JSON.stringify(requestData)
                                         }).then(function(response) {
-                                            if (!response.ok) {
-                                                // Revert on error
+                                            console.log('Response:', response);
+                                            return response.json();
+                                        }).then(function(data) {
+                                            console.log('Response data:', data);
+                                            if (!data || data.status !== 'success') {
                                                 params.node.setDataValue(colId, params.oldValue);
-                                                alert('Failed to save. Please try again.');
+                                                alert('Failed: ' + (data && data.message ? data.message : 'Unknown error'));
                                             }
                                         }).catch(function(error) {
+                                            console.error('Error:', error);
                                             params.node.setDataValue(colId, params.oldValue);
                                             alert('Error saving data: ' + error);
                                         });
