@@ -1129,6 +1129,20 @@ def pl_report_data(request):
 
     # Данные строк для AG Grid
     row_data = []
+    
+    # Add CF Dashboard rows at the top
+    for cf_row in cf_rows:
+        row_data.append(cf_row)
+    
+    # Add visual separator after CF Dashboard
+    if cf_rows:
+        row_data.append({
+            'account_code': '',
+            'account_name': '━' * 30 + ' P&L REPORT ' + '━' * 30,
+            'is_separator': True
+        })
+    
+    # Then add regular P&L rows
     for r in report_data:
         grid_row = {
             'account_code': r['account_code'],
