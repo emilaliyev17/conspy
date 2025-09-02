@@ -1122,7 +1122,7 @@ def pl_report_data(request):
             
             # Add value for each company and sum for total
             for company in companies:
-                period_key = f"{period.strftime('%Y%m')}_{company.code.lower()}"
+                period_key = f"{period.strftime('%b-%y')}_{company.code}"
                 cf_value = cf_data.filter(
                     company=company,
                     period=period,
@@ -1133,7 +1133,7 @@ def pl_report_data(request):
                 period_total += value
             
             # Add TOTAL column for this period
-            period_total_key = f"{period.strftime('%Y%m')}_total"
+            period_total_key = f"{period.strftime('%b-%y')}_TOTAL"
             row[period_total_key] = period_total
         
         cf_rows.append(row)
