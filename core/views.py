@@ -1206,12 +1206,18 @@ def pl_report_data(request):
         for p in periods:
             for c in companies:
                 field = f'{p.strftime("%b-%y")}_{c.code}'
-                grid_row[field] = float(r['periods'].get(p, {}).get(c.code, 0))
+                value = r['periods'].get(p, {}).get(c.code, 0)
+                # Send None for zero values so grid shows empty cells
+                grid_row[field] = None if value == 0 else float(value)
             field_total = f'{p.strftime("%b-%y")}_TOTAL'
+            # TOTAL should always display, even if zero
             grid_row[field_total] = float(r['periods'].get(p, {}).get('TOTAL', 0))
         for c in companies:
             field = f'grand_total_{c.code}'
-            grid_row[field] = float(r['grand_totals'].get(c.code, 0))
+            gt_val = r['grand_totals'].get(c.code, 0)
+            # Hide zero company grand totals by sending None
+            grid_row[field] = None if gt_val == 0 else float(gt_val)
+        # Overall grand total should always display
         grid_row['grand_total_TOTAL'] = float(r['grand_totals'].get('TOTAL', 0))
 
         # Стили для разных типов строк
