@@ -77,3 +77,31 @@ class DataBackup(models.Model):
         ordering = ['-backup_date']
 
 
+class CFDashboardMetric(models.Model):
+    """Flexible metrics for CF Dashboard - loan movements and funding"""
+    metric_name = models.CharField(max_length=100, unique=True)  # e.g. "Loans advanced in month"
+    metric_code = models.CharField(max_length=50, unique=True)  # e.g. "loans_advanced"
+    display_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['display_order', 'metric_name']
+    
+    def __str__(self):
+        return self.metric_name
+
+
+class CFDashboardData(models.Model):
+    """Actual data values for CF Dashboard metrics"""
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    period = models.DateField()
+    metric = models.ForeignKey(CFDashboardMetric, on_delete=models.CASCADE)
+    value = models.DecimalField(decimal_places=2, max_digits=15, default=0)
+    
+    class Meta:
+        unique_together = ['company', 'period', 'metric']
+        ordering = ['period', 'company', 'metric__display_order']
+    
+    def __str__(self):
+        return f"{self.company.name} - {self.period} - {self.metric.metric_name}: {self.value}"
+
