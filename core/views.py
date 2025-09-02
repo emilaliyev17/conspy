@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData
 import pandas as pd
 import csv
 from datetime import datetime, date
@@ -1095,6 +1095,37 @@ def pl_report_data(request):
         'width': 120,
         'type': 'numberColumnWithCommas'
     })
+
+    # CF Dashboard section - loan movements and funding metrics
+    cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
+    cf_data = CFDashboardData.objects.filter(
+        company__in=companies,
+        period__gte=from_date_start,
+        period__lte=to_date_end
+    ).select_related('metric', 'company')
+    
+    # Build CF Dashboard rows
+    cf_rows = []
+    for metric in cf_metrics:
+        row = {
+            'account_code': '',
+            'account_name': metric.metric_name,
+            'is_cf_dashboard': True,
+            'metric_id': metric.id
+        }
+        
+        # Add data for each period
+        for period in periods:
+            for company in companies:
+                period_key = f"{period.strftime('%Y%m')}_{company.code.lower()}"
+                cf_value = cf_data.filter(
+                    company=company,
+                    period=period,
+                    metric=metric
+                ).values_list('value', flat=True).first()
+                row[period_key] = cf_value or 0
+        
+        cf_rows.append(row)
 
     # Данные строк для AG Grid
     row_data = []
