@@ -589,18 +589,15 @@
                         },
                         columnTypes: {
                             numberColumnWithCommas: {
-                                // This function formats the number
-                                valueFormatter: params => {
-                                    // Check if the value is a number
-                                    if (typeof params.value === 'number') {
-                                        // Format with thousand separators and 2 decimal places
-                                        return new Intl.NumberFormat('en-US', {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 0
-                                        }).format(params.value);
-                                    }
-                                    // Return as is if it's not a number (e.g., for empty cells)
-                                    return params.value;
+                                // Display numbers with thousand separators and 2 decimals
+                                cellRenderer: function(params) {
+                                    if (params.value == null || params.value === '') return '';
+                                    const num = typeof params.value === 'number' ? params.value : Number(params.value);
+                                    if (isNaN(num)) return params.value;
+                                    return num.toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
                                 },
                                 // Align numbers to the right for better readability
                                 cellStyle: { 'textAlign': 'right' }
