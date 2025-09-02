@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboard
 import pandas as pd
 import csv
 from datetime import datetime, date
@@ -1097,6 +1097,40 @@ def pl_report_data(request):
         'width': 120,
         'type': 'numberColumnWithCommas'
     })
+
+    # CF Dashboard section - investment flows
+    cf_data = CFDashboard.objects.filter(
+        company__in=companies,
+        period__gte=from_date_start if 'from_date_start' in locals() else None,
+        period__lte=to_date_end if 'to_date_end' in locals() else None
+    )
+    
+    # CF Dashboard rows - will be added at the top of report
+    cf_metrics = [
+        ('opening_balance', 'Opening Balance'),
+        ('new_investors', 'New Investors'),
+        ('redemptions', 'Redemptions'),
+        ('profit_share', 'Profit Share'),
+        ('management_fee', 'Management Fee'),
+        ('closing_balance', 'Closing Balance')
+    ]
+    
+    cf_rows = []
+    for metric_field, metric_label in cf_metrics:
+        row = {
+            'account_code': '',
+            'account_name': metric_label,
+            'is_cf_dashboard': True  # Flag for frontend
+        }
+        
+        # Add values for each period
+        for period in periods:
+            for company in companies:
+                cf_record = cf_data.filter(company=company, period=period).first()
+                period_key = f"{period.strftime('%Y%m')}_{company.code.lower()}"
+                row[period_key] = getattr(cf_record, metric_field, 0) if cf_record else 0
+        
+        cf_rows.append(row)
 
     # Данные строк для AG Grid
     row_data = []
