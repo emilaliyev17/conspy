@@ -1116,25 +1116,68 @@ def pl_report_data(request):
             'metric_id': metric.id
         }
         
-        # Add data for each period
+        # Identify metric type
+        name_val = metric.metric_name or ''
+        is_cumulative_metric = 'Cumulative' in name_val
+        is_ytd_metric = ('YTD' in name_val) and not is_cumulative_metric
+        
+        previous_total = 0  # for YTD accumulation of TOTAL only
+        loans_advanced_row = None
+        
+        # If cumulative, try to find the already-built "Loans advanced in month" row
+        if is_cumulative_metric:
+            for existing_row in cf_rows:
+                if 'Loans advanced in month' in (existing_row.get('account_name') or ''):
+                    loans_advanced_row = existing_row
+                    break
+        
+        # Process each period
         for period in periods:
             period_total = 0
             
-            # Add value for each company and sum for total
+            # Get values for each company
             for company in companies:
                 period_key = f"{period.strftime('%b-%y')}_{company.code}"
-                cf_value = cf_data.filter(
-                    company=company,
-                    period=period,
-                    metric=metric
-                ).values_list('value', flat=True).first()
-                value = cf_value or 0
+                
+                if is_cumulative_metric:
+                    # For January: use input value for cumulative metric
+                    if period.month == 1:
+                        cf_value = cf_data.filter(
+                            company=company,
+                            period=period,
+                            metric=metric
+                        ).values_list('value', flat=True).first()
+                        value = cf_value or 0
+                    else:
+                        # Feb-Dec: previous month cumulative + current month loans advanced
+                        prev_month = period.month - 1
+                        prev_period = period.replace(month=prev_month)
+                        prev_key = f"{prev_period.strftime('%b-%y')}_{company.code}"
+                        prev_cumulative = row.get(prev_key, 0)
+                        current_loans = 0
+                        if loans_advanced_row is not None:
+                            current_loans = loans_advanced_row.get(period_key, 0) or 0
+                        value = (prev_cumulative or 0) + (current_loans or 0)
+                else:
+                    # Regular or YTD metric: use input values per company-month
+                    cf_value = cf_data.filter(
+                        company=company,
+                        period=period,
+                        metric=metric
+                    ).values_list('value', flat=True).first()
+                    value = cf_value or 0
+                
                 row[period_key] = value
                 period_total += value
             
-            # Add TOTAL column for this period
+            # Calculate TOTAL column
             period_total_key = f"{period.strftime('%b-%y')}_TOTAL"
-            row[period_total_key] = period_total
+            if is_ytd_metric:
+                current_ytd_total = previous_total + period_total
+                row[period_total_key] = current_ytd_total
+                previous_total = current_ytd_total
+            else:
+                row[period_total_key] = period_total
         
         cf_rows.append(row)
 
