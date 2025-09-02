@@ -759,15 +759,7 @@ def pl_report_data(request):
             'amount': float(all_financial_data[0].amount)
         }]
 
-    # Сначала добавляем раздел REVENUE
-    revenue_total_row = {
-        'type': 'section_header',
-        'account_name': 'REVENUE',
-        'account_code': '',
-        'periods': {},
-        'grand_totals': {}
-    }
-    report_data.append(revenue_total_row)
+    # (Removed visual REVENUE section header to simplify layout)
     
     # Обрабатываем Income счета
     income_accounts = [a for a in chart_accounts if a.account_type == 'INCOME']
@@ -798,6 +790,7 @@ def pl_report_data(request):
                 'periods': {},
                 'grand_totals': {}
             }
+            has_non_zero_value = False
             # Помесячно
             for p in periods:
                 row['periods'][p] = {}
@@ -806,6 +799,8 @@ def pl_report_data(request):
                     amount = financial_data[p][c.code].get(acc.account_code, Decimal('0'))
                     row['periods'][p][c.code] = float(amount or Decimal('0'))
                     period_total += amount or Decimal('0')
+                    if amount != 0:
+                        has_non_zero_value = True
                 row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
 
             # Гранд тоталы
@@ -818,7 +813,8 @@ def pl_report_data(request):
             )
             row['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
 
-            report_data.append(row)
+            if has_non_zero_value:
+                report_data.append(row)
 
         # Субитог секции
         sub_total = {
@@ -925,6 +921,7 @@ def pl_report_data(request):
                 'periods': {},
                 'grand_totals': {}
             }
+            has_non_zero_value = False
             # Помесячно
             for p in periods:
                 row['periods'][p] = {}
@@ -933,6 +930,8 @@ def pl_report_data(request):
                     amount = financial_data[p][c.code].get(acc.account_code, 0)
                     row['periods'][p][c.code] = float(amount or 0)
                     period_total += amount or 0
+                    if amount != 0:
+                        has_non_zero_value = True
                 row['periods'][p]['TOTAL'] = float(period_total or 0)
 
             # Гранд тоталы
@@ -945,7 +944,8 @@ def pl_report_data(request):
             )
             row['grand_totals']['TOTAL'] = float(overall or 0)
 
-            report_data.append(row)
+            if has_non_zero_value:
+                report_data.append(row)
 
         # Субитог секции
         sub_total = {
