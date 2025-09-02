@@ -1067,7 +1067,6 @@ def pl_report_data(request):
                 'headerName': f'{p.strftime("%b-%y")} {c.code}',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
-                'headerClass': 'col-f2fin-header' if str(c.code).upper().startswith('F2') else 'col-glob-header',
                 'cellStyle': {
                     'textAlign': 'right',
                     'backgroundColor': '#E6F3FF' if str(c.code).upper().startswith('F2') else '#E8F5E9'
@@ -1078,7 +1077,6 @@ def pl_report_data(request):
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
             'width': 120,
             'type': 'numberColumnWithCommas',
-            'headerClass': 'col-total-header',
             'cellStyle': {
                 'textAlign': 'right',
                 'backgroundColor': '#FFF9E6'
@@ -1456,7 +1454,6 @@ def bs_report_data(request):
                 'headerName': f'{period.strftime("%b-%y")} {company.code}',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
-                'headerClass': 'col-f2fin-header' if str(company.code).upper().startswith('F2') else 'col-glob-header',
                 'cellStyle': {
                     'textAlign': 'right',
                     'backgroundColor': '#E6F3FF' if str(company.code).upper().startswith('F2') else '#E8F5E9'
@@ -1467,7 +1464,6 @@ def bs_report_data(request):
             'headerName': f'{period.strftime("%b-%y")} TOTAL',
             'width': 120,
             'type': 'numberColumnWithCommas',
-            'headerClass': 'col-total-header',
             'cellStyle': {
                 'textAlign': 'right',
                 'backgroundColor': '#FFF9E6'

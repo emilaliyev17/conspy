@@ -77,26 +77,3 @@ class DataBackup(models.Model):
         ordering = ['-backup_date']
 
 
-class CFDashboard(models.Model):
-    """Investment flow dashboard data - shown at top of P&L report"""
-    company = models.ForeignKey(Company, on_delete=models.CASCADE)
-    period = models.DateField()
-    opening_balance = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    new_investors = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    redemptions = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    profit_share = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    management_fee = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    closing_balance = models.DecimalField(decimal_places=2, max_digits=15, default=0)
-    
-    class Meta:
-        unique_together = ['company', 'period']
-        ordering = ['period', 'company']
-    
-    def calculate_closing_balance(self):
-        """Auto-calculate closing balance"""
-        return (self.opening_balance + self.new_investors - 
-                self.redemptions + self.profit_share - self.management_fee)
-    
-    def __str__(self):
-        return f"{self.company.name} - {self.period}"
-
