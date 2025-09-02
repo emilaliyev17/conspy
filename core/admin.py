@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboard
 import json
 from datetime import datetime
 
@@ -141,3 +141,17 @@ class DataBackupAdmin(admin.ModelAdmin):
             messages.error(request, f"Error restoring backup: {e}")
         
         return HttpResponseRedirect('/admin/core/databackup/')
+
+
+@admin.register(CFDashboard)
+class CFDashboardAdmin(admin.ModelAdmin):
+    list_display = ['company', 'period', 'opening_balance', 'new_investors', 
+                    'redemptions', 'profit_share', 'management_fee', 'closing_balance']
+    list_filter = ['company', 'period']
+    search_fields = ['company__name']
+    ordering = ['-period', 'company']
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-calculate closing balance on save"""
+        obj.closing_balance = obj.calculate_closing_balance()
+        super().save_model(request, obj, form, change)
