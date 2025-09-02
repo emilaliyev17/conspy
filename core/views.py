@@ -1083,17 +1083,7 @@ def pl_report_data(request):
                 'backgroundColor': '#FFF9E6'
             }
         })
-        # CF Dashboard TOTAL per period (YYYYMM_total) to match CF rows
-        column_defs.append({
-            'field': f'{p.strftime("%Y%m")}_total',
-            'headerName': f'{p.strftime("%b-%y")} TOTAL',
-            'type': 'numberColumnWithCommas',
-            'cellStyle': {
-                'textAlign': 'right',
-                'backgroundColor': '#FFF9E6'
-            },
-            'editable': False
-        })
+        # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
     for c in companies:
         column_defs.append({
             'field': f'grand_total_{c.code}',
@@ -1707,10 +1697,25 @@ def update_cf_dashboard(request):
             data = json.loads(request.body)
             print(f"Received data: {data}")
             
-            # Parse period from YYYYMM to date
+            # Parse period from different formats
             period_str = data['period']
-            year = int(period_str[:4])
-            month = int(period_str[4:6])
+            print(f"Period string received: {period_str}")
+            
+            # Handle format "Jan-24" or "202401"
+            if '-' in period_str:
+                # Format: "Jan-24"
+                month_map = {
+                    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                }
+                month_str, year_str = period_str.split('-')
+                month = month_map.get(month_str, 1)
+                year = 2000 + int(year_str) if len(year_str) == 2 else int(year_str)
+            else:
+                # Format: "202401"
+                year = int(period_str[:4])
+                month = int(period_str[4:6])
+            
             period_date = date(year, month, 1)
             print(f"Parsed date: {period_date}")
             
