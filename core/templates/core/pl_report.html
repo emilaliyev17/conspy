@@ -275,6 +275,32 @@
                 flex-direction: column;
             }
         }
+
+        /* CF Dashboard styling */
+        .ag-row[row-index] .ag-cell[col-id] {
+            /* Default styles already exist */
+        }
+
+        /* CF Dashboard rows - light blue background */
+        .ag-row .ag-cell[col-id]:has(+ [col-id*="is_cf_dashboard"]) {
+            background-color: #f0f8ff !important;
+            font-weight: 500;
+        }
+
+        /* Separator row styling */
+        .ag-row .ag-cell[col-id]:has(+ [col-id*="is_separator"]) {
+            background-color: #e0e0e0 !important;
+            font-weight: bold;
+            text-align: center;
+            border-top: 2px solid #999;
+            border-bottom: 2px solid #999;
+        }
+
+        /* Editable CF cells on hover */
+        .ag-row:hover .ag-cell.ag-cell-inline-editing {
+            background-color: #e6f3ff !important;
+            cursor: text;
+        }
     </style>
 </head>
 <body>
