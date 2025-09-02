@@ -1674,3 +1674,39 @@ def export_report_excel(request):
         df.to_excel(writer, sheet_name=report_title, index=False)
     
     return response
+
+
+@csrf_exempt
+def update_cf_dashboard(request):
+    """API endpoint for updating CF Dashboard values from inline editing"""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            
+            # Parse period from YYYYMM to date
+            period_str = data['period']
+            year = int(period_str[:4])
+            month = int(period_str[4:6])
+            period_date = date(year, month, 1)
+            
+            # Get company by code
+            company = Company.objects.get(code__iexact=data['company_code'])
+            
+            # Get metric
+            metric = CFDashboardMetric.objects.get(id=data['metric_id'])
+            
+            # Update or create the data
+            cf_data, created = CFDashboardData.objects.update_or_create(
+                company=company,
+                period=period_date,
+                metric=metric,
+                defaults={'value': data['value']}
+            )
+            
+            return JsonResponse({'status': 'success', 'created': created})
+            
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
+    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
