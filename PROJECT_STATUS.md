@@ -161,3 +161,5 @@ IMPORTANT:
 ### CF Dashboard Budget Implementation:
 - Step 1: Created CFDashboardBudget model ✅
 - Registered in admin for manual data entry
+- Step 2: Added Budget column display ✅
+- Shows Budget values when data_type is budget/forecast

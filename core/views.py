@@ -1083,6 +1083,15 @@ def pl_report_data(request):
                 'backgroundColor': '#FFF9E6'
             }
         })
+        # Add Budget/Forecast consolidated column when viewing Budget or Forecast
+        if data_type in ['budget', 'forecast']:
+            column_defs.append({
+                'headerName': f'{p.strftime("%b-%y")} Budget',
+                'field': f'{p.strftime("%b-%y")}_Budget',
+                'type': 'numberColumnWithCommas',
+                'cellClass': 'budget-cell',
+                'width': 120
+            })
         # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
     for c in companies:
         column_defs.append({
@@ -1105,6 +1114,14 @@ def pl_report_data(request):
         period__gte=from_date_start,
         period__lte=to_date_end
     ).select_related('metric', 'company')
+    
+    # Load CF Dashboard Budget/Forecast data (consolidated, not per company)
+    from .models import CFDashboardBudget
+    cf_budget_data = CFDashboardBudget.objects.filter(
+        data_type=data_type if data_type in ['budget', 'forecast'] else 'budget',
+        period__gte=from_date_start,
+        period__lte=to_date_end
+    ).select_related('metric')
     
     # Build CF Dashboard rows
     cf_rows = []
@@ -1178,6 +1195,15 @@ def pl_report_data(request):
                 previous_total = current_ytd_total
             else:
                 row[period_total_key] = period_total
+            
+            # Add Budget/Forecast consolidated value for this period (single column)
+            if data_type in ['budget', 'forecast']:
+                period_budget_key = f"{period.strftime('%b-%y')}_Budget"
+                budget_value = cf_budget_data.filter(
+                    metric=metric,
+                    period=period
+                ).values_list('value', flat=True).first()
+                row[period_budget_key] = float(budget_value) if budget_value is not None else None
         
         cf_rows.append(row)
 
