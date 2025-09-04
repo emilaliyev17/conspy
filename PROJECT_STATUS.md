@@ -173,3 +173,5 @@ IMPORTANT:
 - CONSOLIDATED company created via migration ✅
 - CONSOLIDATED hidden from columns but available in upload ✅
 - Ready for Budget data upload
+### Fixed Issues:
+- IndentationError in views.py line 1161 - fixed alignment

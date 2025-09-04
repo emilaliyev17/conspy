@@ -1155,8 +1155,8 @@ def pl_report_data(request):
             period_total = 0
             
             # Get values for each company
-        for company in display_companies:  # Use filtered list
-            period_key = f"{period.strftime('%b-%y')}_{company.code}"
+            for company in display_companies:  # Use filtered list
+                period_key = f"{period.strftime('%b-%y')}_{company.code}"
                 
                 if is_cumulative_metric:
                     # For January: use input value for cumulative metric
