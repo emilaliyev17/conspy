@@ -170,3 +170,6 @@ IMPORTANT:
 ### Budget Integration:
 - Added migration to create CONSOLIDATED company automatically
 - Will work on any deployment (Digital Ocean, Google Cloud, etc.)
+- CONSOLIDATED company created via migration ✅
+- CONSOLIDATED hidden from columns but available in upload ✅
+- Ready for Budget data upload

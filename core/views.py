@@ -581,6 +581,8 @@ def pl_report_data(request):
 
     # Компании
     companies = list(Company.objects.all().order_by('name'))
+    # Filter CONSOLIDATED from display columns
+    display_companies = [c for c in companies if c.code != 'CONSOLIDATED']
     logger.info(f"Found {len(companies)} companies.")
 
     # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
@@ -1061,7 +1063,7 @@ def pl_report_data(request):
         {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
     ]
     for p in periods:
-        for c in companies:
+        for c in display_companies:  # Use filtered list
             column_defs.append({
                 'field': f'{p.strftime("%b-%y")}_{c.code}',
                 'headerName': f'{p.strftime("%b-%y")} {c.code}',
@@ -1153,8 +1155,8 @@ def pl_report_data(request):
             period_total = 0
             
             # Get values for each company
-            for company in companies:
-                period_key = f"{period.strftime('%b-%y')}_{company.code}"
+        for company in display_companies:  # Use filtered list
+            period_key = f"{period.strftime('%b-%y')}_{company.code}"
                 
                 if is_cumulative_metric:
                     # For January: use input value for cumulative metric
