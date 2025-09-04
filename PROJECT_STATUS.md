@@ -116,3 +116,44 @@ IMPORTANT:
 - Safe to change: yes, with conditions:
   - If introducing Budget/Forecast display without per-company data, either (a) seed `FinancialData` for the target `data_type` and period range, or (b) decouple CF periods from P&L’s `periods` and/or relax period derivation to use explicit date range when no data exists.
   - Preserve `[start, end_exclusive)` logic to avoid off-by-one month errors.
+
+## 🔍 CF DASHBOARD BUDGET ANALYSIS
+### Current Structure:
+- Models:
+  - `CFDashboardMetric(id, metric_name, metric_code, display_order, is_active)` with ordering on `display_order, metric_name` — defines the set and order of metrics.
+  - `CFDashboardData(id, company(FK), period(Date), metric(FK), value)` with `unique_together = (company, period, metric)` — one value per company-month-metric.
+- Views (P&L endpoint `pl_report_data`):
+  - CF block starts after P&L columnDefs; metrics fetched via `CFDashboardMetric.objects.filter(is_active=True)`.
+  - CF data fetched via `CFDashboardData` filtered by selected companies and by `from_date_start..to_date_end` (no `data_type`).
+  - Rows built per metric with flags `is_cf_dashboard=True` and `metric_id` attached for editing.
+  - Iterates the same `periods` list as P&L; per-company fields use the same column naming `"%b-%y"_COMPANYCODE` ensuring alignment.
+  - Supports two behaviors by metric name: contains "Cumulative" (running total using prior month + "Loans advanced in month") and contains "YTD" (year-to-date accumulation at TOTAL level).
+- Frontend (pl_report.html):
+  - Grid cells are editable only when `row.is_cf_dashboard === true`.
+  - `onCellValueChanged` parses `colId` as `<Mon-YY>_<COMPANYCODE>`, posts JSON to `/api/cf-dashboard/update/` with `{metric_id, company_code, period, value}` and optimistic UI update; on failure rolls back.
+- Update endpoint (`update_cf_dashboard`):
+  - Parses `period` in two formats: `Mon-YY` or `YYYYMM` → first day of month.
+  - Resolves `Company` by `company_code` (case-insensitive) and `CFDashboardMetric` by `metric_id`.
+  - Upserts `CFDashboardData` via `update_or_create`.
+
+### Integration Points:
+1. Periods list from P&L drives CF columns and iteration.
+2. Column naming shares the P&L convention `<Mon-YY>_<COMPANYCODE>` so CF aligns under the same headers.
+3. CF data range uses filter `from_date_start..to_date_end` (independent of `data_type`).
+4. Editable gating via `is_cf_dashboard` flag in row objects.
+5. AJAX payload schema `{metric_id, company_code, period, value}` matches server expectations.
+6. Metric semantics controlled by `metric_name` (contains "Cumulative"/"YTD").
+
+### Risks:
+- Adding a Budget column without corresponding `periods` (when viewing Budget `data_type` and no Budget FinancialData) results in CF not rendering at all, because CF loops the P&L `periods` and the view returns early on empty periods.
+- Introducing Budget values for CF without separating them from Actual could commingle data, since `CFDashboardData` has no `data_type`; writing Budget into the same rows would overwrite Actual.
+- Column alignment must remain identical to P&L; any alternative header naming for Budget would break `onCellValueChanged` parsing logic.
+- Inline editing currently assumes company-specific cells; a single Budget TOTAL column (no company split) would not map cleanly to `<Mon-YY>_<COMPANYCODE>` parsing.
+
+### Safe Implementation Path:
+1. Decide storage model for Budget CF: either extend `CFDashboardData` with a `data_type` field or create a parallel table; avoid overwriting Actual.
+2. Period sourcing: when viewing Budget, ensure `periods` is non-empty (seed minimal `FinancialData` for Budget or decouple CF periods from P&L by deriving from date selectors when `periods` is empty).
+3. Column design: keep the same `<Mon-YY>_<COMPANYCODE>` convention; if only TOTAL is needed for Budget, introduce a synthetic company code like `BUDGET` consistently, or add separate `'<Mon-YY>_TOTAL'` mapping with custom edit handler.
+4. Inline editing: preserve `is_cf_dashboard` flag; extend `onCellValueChanged` to recognize the Budget column mapping while keeping the existing Actual path intact (server must distinguish Actual vs Budget).
+5. Update endpoint: accept an optional `data_type` or `scope` parameter to route writes to Budget storage; maintain backward compatibility for existing Actual writes.
+6. Validation: test with mixed views (Actual vs Budget) to confirm CF rows render and edits commit to the correct dataset; verify no changes to P&L calculations and columnDefs under Actual.
