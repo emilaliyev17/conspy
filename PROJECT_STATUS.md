@@ -157,3 +157,7 @@ IMPORTANT:
 4. Inline editing: preserve `is_cf_dashboard` flag; extend `onCellValueChanged` to recognize the Budget column mapping while keeping the existing Actual path intact (server must distinguish Actual vs Budget).
 5. Update endpoint: accept an optional `data_type` or `scope` parameter to route writes to Budget storage; maintain backward compatibility for existing Actual writes.
 6. Validation: test with mixed views (Actual vs Budget) to confirm CF rows render and edits commit to the correct dataset; verify no changes to P&L calculations and columnDefs under Actual.
+
+### CF Dashboard Budget Implementation:
+- Step 1: Created CFDashboardBudget model ✅
+- Registered in admin for manual data entry

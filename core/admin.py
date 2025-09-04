@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget
 import json
 from datetime import datetime
 
@@ -157,3 +157,9 @@ class CFDashboardDataAdmin(admin.ModelAdmin):
     search_fields = ['company__name', 'metric__metric_name']
     ordering = ['-period', 'company', 'metric__display_order']
     list_editable = ['value']  # Allow inline editing in admin
+
+@admin.register(CFDashboardBudget)
+class CFDashboardBudgetAdmin(admin.ModelAdmin):
+    list_display = ['metric', 'period', 'value', 'data_type']
+    list_filter = ['data_type', 'metric', 'period']
+    ordering = ['-period', 'metric__display_order']

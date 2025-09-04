@@ -105,3 +105,24 @@ class CFDashboardData(models.Model):
     def __str__(self):
         return f"{self.company.name} - {self.period} - {self.metric.metric_name}: {self.value}"
 
+
+class CFDashboardBudget(models.Model):
+    """
+    Stores consolidated budget/forecast for CF Dashboard.
+    One value per metric per period (not per company).
+    """
+    metric = models.ForeignKey(CFDashboardMetric, on_delete=models.CASCADE)
+    period = models.DateField()
+    value = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    data_type = models.CharField(
+        max_length=20,
+        choices=[('budget', 'Budget'), ('forecast', 'Forecast')],
+        default='budget'
+    )
+    
+    class Meta:
+        unique_together = ('metric', 'period', 'data_type')
+        ordering = ['period', 'metric__display_order']
+    
+    def __str__(self):
+        return f"{self.metric.metric_name} - {self.period.strftime('%b-%y')} - {self.data_type}"
