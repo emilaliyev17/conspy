@@ -537,9 +537,14 @@
                             resizable: true,
                             wrapHeaderText: true,
                             autoHeaderHeight: true,
-                            // Only CF Dashboard rows are editable
+                            // Only CF Dashboard rows are editable; include Budget columns
                             editable: function(params) {
-                                return params.data && params.data.is_cf_dashboard === true;
+                                if (!params.data || !params.data.is_cf_dashboard) return false;
+                                const colId = params.column && params.column.colId;
+                                if (colId && typeof colId === 'string' && colId.includes('_Budget')) {
+                                    return true; // Budget consolidated column
+                                }
+                                return true; // Regular company columns
                             }
                         },
                         // Handle inline edits for CF Dashboard rows
@@ -554,6 +559,39 @@
                                     if (parts.length >= 2) {
                                         const period = parts[0];
                                         const company = parts[1];
+
+                                        // Budget consolidated column save
+                                        if (company === 'Budget') {
+                                            const requestData = {
+                                                metric_id: params.data.metric_id,
+                                                period: period,
+                                                value: params.newValue || 0,
+                                                is_budget: true
+                                            };
+                                            // Optimistic update
+                                            params.node.setDataValue(colId, params.newValue);
+                                            fetch('/api/cf-dashboard/update/', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRFToken': getCookie('csrftoken')
+                                                },
+                                                body: JSON.stringify(requestData)
+                                            }).then(function(response) { return response.json(); })
+                                              .then(function(data) {
+                                                if (!data || data.status !== 'success') {
+                                                    params.node.setDataValue(colId, params.oldValue);
+                                                    alert('Failed to save Budget value');
+                                                }
+                                              }).catch(function(error) {
+                                                console.error('Error:', error);
+                                                params.node.setDataValue(colId, params.oldValue);
+                                                alert('Error saving data: ' + error);
+                                              });
+                                            return; // handled Budget
+                                        }
+
+                                        // Regular company update
                                         const requestData = {
                                             metric_id: params.data.metric_id,
                                             company_code: company,

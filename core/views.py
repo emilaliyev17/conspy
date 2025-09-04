@@ -1774,6 +1774,43 @@ def update_cf_dashboard(request):
             data = json.loads(request.body)
             print(f"Received data: {data}")
             
+            # Handle consolidated Budget/Forecast updates (no company dimension)
+            if data.get('is_budget'):
+                from .models import CFDashboardBudget
+                # Parse period string similar to below
+                period_str = data.get('period')
+                if not period_str:
+                    return JsonResponse({'status': 'error', 'message': 'Missing period'}, status=400)
+                # Accept formats: "Jan-24" or "202401"
+                if '-' in period_str:
+                    month_map = {
+                        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                    }
+                    month_str, year_str = period_str.split('-')
+                    month = month_map.get(month_str, 1)
+                    year = 2000 + int(year_str) if len(year_str) == 2 else int(year_str)
+                else:
+                    year = int(period_str[:4])
+                    month = int(period_str[4:6])
+                period_date = date(year, month, 1)
+
+                metric_id = data.get('metric_id')
+                if not metric_id:
+                    return JsonResponse({'status': 'error', 'message': 'Missing metric_id'}, status=400)
+                # Determine type (default to budget)
+                dtype = data.get('data_type')
+                if dtype not in ('budget', 'forecast'):
+                    dtype = 'budget'
+
+                CFDashboardBudget.objects.update_or_create(
+                    metric_id=metric_id,
+                    period=period_date,
+                    data_type=dtype,
+                    defaults={'value': data.get('value', 0)}
+                )
+                return JsonResponse({'status': 'success'})
+            
             # Parse period from different formats
             period_str = data['period']
             print(f"Period string received: {period_str}")
