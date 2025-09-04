@@ -1210,15 +1210,17 @@ def pl_report_data(request):
                 # Send None for zero values so grid shows empty cells
                 grid_row[field] = None if value == 0 else float(value)
             field_total = f'{p.strftime("%b-%y")}_TOTAL'
-            # TOTAL should always display, even if zero
-            grid_row[field_total] = float(r['periods'].get(p, {}).get('TOTAL', 0))
+            total_value = r['periods'].get(p, {}).get('TOTAL', 0)
+            # Hide zeros in TOTAL columns as well
+            grid_row[field_total] = None if total_value == 0 else float(total_value)
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
             # Hide zero company grand totals by sending None
             grid_row[field] = None if gt_val == 0 else float(gt_val)
-        # Overall grand total should always display
-        grid_row['grand_total_TOTAL'] = float(r['grand_totals'].get('TOTAL', 0))
+        # Overall grand total: hide zero as empty
+        overall_total_value = r['grand_totals'].get('TOTAL', 0)
+        grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':
