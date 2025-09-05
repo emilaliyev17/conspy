@@ -826,6 +826,7 @@ def pl_report_data(request):
             # Sum if multiple entries per period/account
             prev = budget_values[p].get(acc, 0)
             budget_values[p][acc] = prev + (fd.amount or 0)
+            print(f"DEBUG: Added to budget_values - period: {p}, account: {acc}, amount: {fd.amount}")  # ДОБАВЬТЕ ЭТУ СТРОКУ
     else:
         for fd in all_financial_data:
             p = fd.period
@@ -1453,6 +1454,7 @@ def pl_report_data(request):
                 if r['type'] == 'account':
                     acc = r.get('account_code')
                     if acc:
+                        print(f"DEBUG: Getting budget for account {acc}, period {p}: {budget_values.get(p, {}).get(acc, 0)}")  # ДОБАВЬТЕ
                         budget_amount = float(budget_values.get(p, {}).get(acc, 0))
                 # For non-account rows, leave budget empty (could be summed separately if needed)
                 grid_row[field_budget] = None if not budget_amount else float(budget_amount)
