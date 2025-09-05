@@ -293,7 +293,8 @@ def upload_financial_data(request):
         try:
             uploaded_file = request.FILES['file']
             company_id = request.POST.get('company')
-            data_type = request.POST.get('data_type', 'actual')
+            data_type_raw = request.POST.get('data_type', 'actual')
+            data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
             
             if not company_id:
                 if is_ajax:
@@ -564,7 +565,9 @@ def pl_report_data(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
+    data_type_raw = request.GET.get('data_type', 'actual')
+    # Normalize to match database: actual->Actual, budget->Budget
+    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
     # CRITICAL DIAGNOSTICS (feature flags and data types)
     try:
@@ -573,8 +576,8 @@ def pl_report_data(request):
         print(f"[FEATURE FLAG] PL_BUDGET_PARALLEL setting: {getattr(_dj_settings, 'PL_BUDGET_PARALLEL', 'NOT_FOUND')}")
         print(f"[FEATURE FLAG] Environment var: {os.environ.get('PL_BUDGET_PARALLEL', 'NOT_SET')}")
         print(f"[FEATURE FLAG] is_enabled result: {is_enabled('PL_BUDGET_PARALLEL')}")
-        print(f"[DATA TYPE] Received: '{data_type}'")
-        print(f"[DATA TYPE] Lower case: '{data_type.lower() if data_type else 'None'}'")
+        print(f"[DATA TYPE] Received raw: '{data_type_raw}'")
+        print(f"[DATA TYPE] Normalized: '{data_type}'")
     except Exception:
         pass
     # Execution flow diagnostics
@@ -629,7 +632,7 @@ def pl_report_data(request):
             # Actual periods (always from 'actual' stream)
             ap_q = FinancialData.objects.filter(
                 company__in=actual_companies,
-                data_type='actual',
+                data_type='Actual',
                 account_code__in=pl_account_codes,
             )
             if start:
@@ -709,7 +712,7 @@ def pl_report_data(request):
 
         actual_financial_data = list(
             FinancialData.objects.filter(
-                data_type='actual',
+                data_type='Actual',
                 period__in=periods,
                 company__in=actual_companies,
                 account_code__in=pl_account_codes
@@ -1493,7 +1496,8 @@ def bs_report_data(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
+    data_type_raw = request.GET.get('data_type', 'actual')
+    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
@@ -1864,7 +1868,8 @@ def pl_report(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
+    data_type_raw = request.GET.get('data_type', 'actual')
+    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
     year_range = range(2023, 2031)
     
@@ -1886,7 +1891,8 @@ def bs_report(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
+    data_type_raw = request.GET.get('data_type', 'actual')
+    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
 
     year_range = range(2023, 2031)
 
@@ -1909,7 +1915,8 @@ def export_report_excel(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type = request.GET.get('data_type', 'actual')
+    data_type_raw = request.GET.get('data_type', 'actual')
+    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
