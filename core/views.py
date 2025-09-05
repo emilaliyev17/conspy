@@ -1286,8 +1286,6 @@ def pl_report_data(request):
                 'field': f'{p.strftime("%b-%y")}_Budget',
                 'type': 'numberColumnWithCommas',
                 'cellClass': 'budget-cell',
-                'colType': 'budget',
-                'periodKey': p.strftime('%Y-%m'),
                 'width': 120
             })
         # Extend into main column defs in the exact order
