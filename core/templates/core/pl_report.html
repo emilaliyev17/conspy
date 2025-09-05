@@ -537,92 +537,83 @@
                             resizable: true,
                             wrapHeaderText: true,
                             autoHeaderHeight: true,
-                            // Only CF Dashboard rows are editable; include Budget columns
+                            // Only CF Dashboard rows are editable; determine by column metadata, not names
                             editable: function(params) {
                                 if (!params.data || !params.data.is_cf_dashboard) return false;
-                                const colId = params.column && params.column.colId;
-                                if (colId && typeof colId === 'string' && colId.includes('_Budget')) {
-                                    return true; // Budget consolidated column
-                                }
-                                return true; // Regular company columns
+                                const colType = params.colDef && params.colDef.colType;
+                                // Allow editing for company and budget columns in CF rows
+                                return colType === 'company' || colType === 'budget';
                             }
                         },
                         // Handle inline edits for CF Dashboard rows
                         onCellValueChanged: function(params) {
                             console.log('Cell changed:', params);
                             if (params.data && params.data.is_cf_dashboard) {
+                                const colDef = params.colDef || {};
+                                const colType = colDef.colType;
+                                const periodKey = colDef.periodKey; // 'YYYY-MM'
+                                // Build period in 'YYYYMM' to satisfy endpoint parser
+                                const periodForApi = (periodKey && typeof periodKey === 'string') ? periodKey.replace('-', '') : null;
+
+                                // Optimistic UI update target
                                 const colId = params.column && params.column.colId;
-                                console.log('Column ID:', colId);
-                                if (typeof colId === 'string') {
-                                    const parts = colId.split('_');
-                                    console.log('Parts:', parts);
-                                    if (parts.length >= 2) {
-                                        const period = parts[0];
-                                        const company = parts[1];
 
-                                        // Budget consolidated column save
-                                        if (company === 'Budget') {
-                                            const requestData = {
-                                                metric_id: params.data.metric_id,
-                                                period: period,
-                                                value: params.newValue || 0,
-                                                is_budget: true
-                                            };
-                                            // Optimistic update
-                                            params.node.setDataValue(colId, params.newValue);
-                                            fetch('/api/cf-dashboard/update/', {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                    'X-CSRFToken': getCookie('csrftoken')
-                                                },
-                                                body: JSON.stringify(requestData)
-                                            }).then(function(response) { return response.json(); })
-                                              .then(function(data) {
-                                                if (!data || data.status !== 'success') {
-                                                    params.node.setDataValue(colId, params.oldValue);
-                                                    alert('Failed to save Budget value');
-                                                }
-                                              }).catch(function(error) {
-                                                console.error('Error:', error);
-                                                params.node.setDataValue(colId, params.oldValue);
-                                                alert('Error saving data: ' + error);
-                                              });
-                                            return; // handled Budget
+                                if (colType === 'budget') {
+                                    const requestData = {
+                                        metric_id: params.data.metric_id,
+                                        period: periodForApi || (colId ? colId.split('_')[0] : ''),
+                                        value: params.newValue || 0,
+                                        is_budget: true
+                                    };
+                                    // Optimistic update
+                                    if (colId) params.node.setDataValue(colId, params.newValue);
+                                    fetch('/api/cf-dashboard/update/', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': getCookie('csrftoken')
+                                        },
+                                        body: JSON.stringify(requestData)
+                                    }).then(r => r.json()).then(function(data) {
+                                        if (!data || data.status !== 'success') {
+                                            if (colId) params.node.setDataValue(colId, params.oldValue);
+                                            alert('Failed to save Budget value');
                                         }
+                                    }).catch(function(error) {
+                                        console.error('Error:', error);
+                                        if (colId) params.node.setDataValue(colId, params.oldValue);
+                                        alert('Error saving data: ' + error);
+                                    });
+                                    return;
+                                }
 
-                                        // Regular company update
-                                        const requestData = {
-                                            metric_id: params.data.metric_id,
-                                            company_code: company,
-                                            period: period,
-                                            value: params.newValue || 0
-                                        };
-                                        console.log('Sending data:', requestData);
-                                        // Visual feedback: set value immediately
-                                        params.node.setDataValue(colId, params.newValue);
-                                        fetch('/api/cf-dashboard/update/', {
-                                            method: 'POST',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                'X-CSRFToken': getCookie('csrftoken')
-                                            },
-                                            body: JSON.stringify(requestData)
-                                        }).then(function(response) {
-                                            console.log('Response:', response);
-                                            return response.json();
-                                        }).then(function(data) {
-                                            console.log('Response data:', data);
-                                            if (!data || data.status !== 'success') {
-                                                params.node.setDataValue(colId, params.oldValue);
-                                                alert('Failed: ' + (data && data.message ? data.message : 'Unknown error'));
-                                            }
-                                        }).catch(function(error) {
-                                            console.error('Error:', error);
-                                            params.node.setDataValue(colId, params.oldValue);
-                                            alert('Error saving data: ' + error);
-                                        });
-                                    }
+                                if (colType === 'company') {
+                                    const requestData = {
+                                        metric_id: params.data.metric_id,
+                                        company_code: colDef.companyCode || (colId ? colId.split('_')[1] : ''),
+                                        period: periodForApi || (colId ? colId.split('_')[0] : ''),
+                                        value: params.newValue || 0
+                                    };
+                                    if (colId) params.node.setDataValue(colId, params.newValue);
+                                    fetch('/api/cf-dashboard/update/', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': getCookie('csrftoken')
+                                        },
+                                        body: JSON.stringify(requestData)
+                                    }).then(function(response) {
+                                        return response.json();
+                                    }).then(function(data) {
+                                        if (!data || data.status !== 'success') {
+                                            if (colId) params.node.setDataValue(colId, params.oldValue);
+                                            alert('Failed: ' + (data && data.message ? data.message : 'Unknown error'));
+                                        }
+                                    }).catch(function(error) {
+                                        console.error('Error:', error);
+                                        if (colId) params.node.setDataValue(colId, params.oldValue);
+                                        alert('Error saving data: ' + error);
+                                    });
                                 }
                             }
                         },

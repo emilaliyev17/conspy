@@ -1072,12 +1072,18 @@ def pl_report_data(request):
         {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
     ]
     for p in periods:
+        # Build columns for this period explicitly in desired order:
+        # 1) Company columns, 2) TOTAL, 3) Budget
+        period_cols = []
         for c in display_companies:  # Use filtered list
-            column_defs.append({
+            period_cols.append({
                 'field': f'{p.strftime("%b-%y")}_{c.code}',
                 'headerName': f'{p.strftime("%b-%y")} {c.code}',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
+                'colType': 'company',
+                'periodKey': p.strftime('%Y-%m'),
+                'companyCode': c.code,
                 'cellStyle': {
                     'textAlign': 'right',
                     # Styling based on company id instead of code prefix
@@ -1085,11 +1091,13 @@ def pl_report_data(request):
                 }
             })
         # P&L TOTAL per period (existing)
-        column_defs.append({
+        period_cols.append({
             'field': f'{p.strftime("%b-%y")}_TOTAL',
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
             'width': 120,
             'type': 'numberColumnWithCommas',
+            'colType': 'total',
+            'periodKey': p.strftime('%Y-%m'),
             'cellStyle': {
                 'textAlign': 'right',
                 'backgroundColor': '#FFF9E6'
@@ -1097,13 +1105,17 @@ def pl_report_data(request):
         })
         # Add Budget/Forecast consolidated column when viewing Budget or Forecast
         if data_type in ['budget', 'forecast']:
-            column_defs.append({
+            period_cols.append({
                 'headerName': f'{p.strftime("%b-%y")} Budget',
                 'field': f'{p.strftime("%b-%y")}_Budget',
                 'type': 'numberColumnWithCommas',
                 'cellClass': 'budget-cell',
+                'colType': 'budget',
+                'periodKey': p.strftime('%Y-%m'),
                 'width': 120
             })
+        # Extend into main column defs in the exact order
+        column_defs.extend(period_cols)
         # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
     for c in companies:
         column_defs.append({
@@ -1254,6 +1266,11 @@ def pl_report_data(request):
             total_value = r['periods'].get(p, {}).get('TOTAL', 0)
             # Hide zeros in TOTAL columns as well
             grid_row[field_total] = None if total_value == 0 else float(total_value)
+            # Populate consolidated Budget for P&L rows when Budget/Forecast mode is active
+            if data_type in ['budget', 'forecast']:
+                field_budget = f'{p.strftime("%b-%y")}_Budget'
+                # Use the per-period TOTAL as consolidated budget (companies_with_data contains budget-only company in this mode)
+                grid_row[field_budget] = None if total_value == 0 else float(total_value)
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
