@@ -566,6 +566,8 @@ def pl_report_data(request):
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
+    # Budget map for dual-streams (period -> account_code -> amount)
+    budget_values = {}
 
     # Помощники для нормализации месяцев
     def month_start(d: date) -> date:
@@ -599,39 +601,74 @@ def pl_report_data(request):
 
     # Периоды: берём только там, где реально есть P&L данные
     try:
-        q = FinancialData.objects.filter(
-            data_type=data_type,
-            account_code__in=pl_account_codes  # Фильтруем только P&L счета
-        )
-        if start:
-            q = q.filter(period__gte=start)
-        if end_exclusive:
-            q = q.filter(period__lt=end_exclusive)
-        if companies:
-            q = q.filter(company_id__in=[c.id for c in companies])
-        periods = list(q.values_list('period', flat=True).distinct().order_by('period'))
-        logger.info(f"Found {len(periods)} periods with P&L data.")
-        
-        # Если периодов нет, проверяем есть ли вообще P&L данные
-        if not periods:
-            all_pl_periods = list(FinancialData.objects.filter(
-                account_code__in=pl_account_codes
-            ).values_list('period', flat=True).distinct().order_by('period'))
-            logger.warning(f"No P&L data in selected range. Available P&L periods: {all_pl_periods[:10]}")
-            
-            # Предлагаем использовать доступный диапазон
-            if all_pl_periods:
-                suggested_start = all_pl_periods[0].strftime('%B %Y')
-                suggested_end = all_pl_periods[-1].strftime('%B %Y')
-                return JsonResponse({
-                    'columnDefs': [],
-                    'rowData': [],
-                    'error': f'No P&L data found for selected period. P&L data is available from {suggested_start} to {suggested_end}',
-                    'available_range': {
-                        'start': all_pl_periods[0].strftime('%Y-%m-%d'),
-                        'end': all_pl_periods[-1].strftime('%Y-%m-%d')
-                    }
-                })
+        if is_enabled('PL_BUDGET_PARALLEL'):
+            # Define company sets for dual streams
+            actual_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+            budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
+
+            # Actual periods (always from 'actual' stream)
+            ap_q = FinancialData.objects.filter(
+                company__in=actual_companies,
+                data_type='actual',
+                account_code__in=pl_account_codes,
+            )
+            if start:
+                ap_q = ap_q.filter(period__gte=start)
+            if end_exclusive:
+                ap_q = ap_q.filter(period__lt=end_exclusive)
+            actual_periods = ap_q.values_list('period', flat=True).distinct()
+
+            # Budget/Forecast periods (from current filter)
+            if budget_company:
+                bp_q = FinancialData.objects.filter(
+                    company=budget_company,
+                    data_type=data_type,
+                    account_code__in=pl_account_codes,
+                )
+                if start:
+                    bp_q = bp_q.filter(period__gte=start)
+                if end_exclusive:
+                    bp_q = bp_q.filter(period__lt=end_exclusive)
+                budget_periods = bp_q.values_list('period', flat=True).distinct()
+            else:
+                budget_periods = []
+
+            periods = sorted(list(set(actual_periods) | set(budget_periods)))
+            logger.info(f"Dual-stream periods count: {len(periods)} (actual+budget)")
+        else:
+            q = FinancialData.objects.filter(
+                data_type=data_type,
+                account_code__in=pl_account_codes  # Фильтруем только P&L счета
+            )
+            if start:
+                q = q.filter(period__gte=start)
+            if end_exclusive:
+                q = q.filter(period__lt=end_exclusive)
+            if companies:
+                q = q.filter(company_id__in=[c.id for c in companies])
+            periods = list(q.values_list('period', flat=True).distinct().order_by('period'))
+            logger.info(f"Found {len(periods)} periods with P&L data.")
+
+            # Если периодов нет, проверяем есть ли вообще P&L данные
+            if not periods:
+                all_pl_periods = list(FinancialData.objects.filter(
+                    account_code__in=pl_account_codes
+                ).values_list('period', flat=True).distinct().order_by('period'))
+                logger.warning(f"No P&L data in selected range. Available P&L periods: {all_pl_periods[:10]}")
+
+                # Предлагаем использовать доступный диапазон
+                if all_pl_periods:
+                    suggested_start = all_pl_periods[0].strftime('%B %Y')
+                    suggested_end = all_pl_periods[-1].strftime('%B %Y')
+                    return JsonResponse({
+                        'columnDefs': [],
+                        'rowData': [],
+                        'error': f'No P&L data found for selected period. P&L data is available from {suggested_start} to {suggested_end}',
+                        'available_range': {
+                            'start': all_pl_periods[0].strftime('%Y-%m-%d'),
+                            'end': all_pl_periods[-1].strftime('%Y-%m-%d')
+                        }
+                    })
     except Exception as e:
         logger.error(f"Error fetching periods: {e}")
         periods = []
@@ -645,14 +682,42 @@ def pl_report_data(request):
         })
 
     # Загружаем только P&L данные за выбранные периоды и компании
-    all_financial_data = list(
-        FinancialData.objects.filter(
-            data_type=data_type,
-            period__in=periods,
-            company_id__in=[c.id for c in companies],
-            account_code__in=pl_account_codes  # Только P&L счета
-        ).select_related('company')
-    )
+    if is_enabled('PL_BUDGET_PARALLEL'):
+        # Actual companies (non-budget-only) for actual stream
+        actual_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+        budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
+
+        actual_financial_data = list(
+            FinancialData.objects.filter(
+                data_type='actual',
+                period__in=periods,
+                company__in=actual_companies,
+                account_code__in=pl_account_codes
+            ).select_related('company')
+        )
+
+        budget_financial_data = []
+        if budget_company:
+            budget_financial_data = list(
+                FinancialData.objects.filter(
+                    data_type=data_type,  # respect current filter (budget/forecast)
+                    period__in=periods,
+                    company=budget_company,
+                    account_code__in=pl_account_codes
+                ).select_related('company')
+            )
+
+        all_financial_data = actual_financial_data + budget_financial_data
+        logger.info(f"Dual-stream loaded records: actual={len(actual_financial_data)}, budget={len(budget_financial_data)}")
+    else:
+        all_financial_data = list(
+            FinancialData.objects.filter(
+                data_type=data_type,
+                period__in=periods,
+                company_id__in=[c.id for c in companies],
+                account_code__in=pl_account_codes  # Только P&L счета
+            ).select_related('company')
+        )
     logger.info(f"Found {len(all_financial_data)} P&L financial data records.")
     
     # Добавляем детальное отладочное логирование
@@ -673,26 +738,67 @@ def pl_report_data(request):
     else:
         logger.info(f"Companies with data: {[c.code for c in companies_with_data]}")
 
+    # Parallel logic: choose P&L companies for calculations (exclude budget-only)
+    pl_companies = companies_with_data
+    if is_enabled('PL_BUDGET_PARALLEL'):
+        pl_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+        logger.info(f"PL companies for P&L calculations: {[c.code for c in pl_companies]}")
+        # Also include budget-only company for structure initialization
+        budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
+        all_report_companies = pl_companies + ([budget_company] if budget_company else [])
+
     # Индексация: period -> company_code -> account_code -> amount
     logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
     logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
     financial_data = {}
     for p in periods:
         financial_data[p] = {}
-        for c in companies_with_data:  # Используем только компании с данными
-            financial_data[p][c.code] = {}
-    
-    # Заполняем financial_data с проверками
-    for fd in all_financial_data:
-        p = fd.period
-        ccode = fd.company.code
-        logger.debug(f"Processing: period={p}, company={ccode}, account={fd.account_code}, amount={fd.amount}")
-        
-        if p in financial_data and ccode in financial_data[p]:
-            financial_data[p][ccode][fd.account_code] = fd.amount
-            logger.debug(f"Added to financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
+        if is_enabled('PL_BUDGET_PARALLEL'):
+            # Initialize keys for both actual companies and budget-only company
+            for c in all_report_companies:
+                financial_data[p][c.code] = {}
         else:
-            logger.warning(f"Failed to add: period={p}, company={ccode} not found in financial_data structure")
+            for c in pl_companies:  # Используем компании для P&L расчета
+                financial_data[p][c.code] = {}
+        # Diagnostic: confirm initialized company keys for this period
+        try:
+            logger.info(
+                f"INITIALIZED financial_data for period {p}: companies={list(financial_data[p].keys()) if p in financial_data else 'NONE'}"
+            )
+        except Exception:
+            pass
+    
+    # Заполняем financial_data с проверками (dual streams under feature flag)
+    if is_enabled('PL_BUDGET_PARALLEL'):
+        # Populate actual stream into financial_data
+        for fd in actual_financial_data:
+            p = fd.period
+            ccode = fd.company.code
+            logger.debug(f"Actual stream: period={p}, company={ccode}, account={fd.account_code}, amount={fd.amount}")
+            if p in financial_data and ccode in financial_data[p]:
+                logger.info(f"STORING: financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
+                financial_data[p][ccode][fd.account_code] = fd.amount
+            else:
+                logger.warning(f"Actual: period={p}, company={ccode} not in financial_data structure")
+
+        # Build budget-only mapping per period/account (do not mix into financial_data)
+        budget_values = {}
+        for fd in budget_financial_data:
+            p = fd.period
+            acc = fd.account_code
+            budget_values.setdefault(p, {})
+            # Sum if multiple entries per period/account
+            prev = budget_values[p].get(acc, 0)
+            budget_values[p][acc] = prev + (fd.amount or 0)
+    else:
+        for fd in all_financial_data:
+            p = fd.period
+            ccode = fd.company.code
+            logger.debug(f"Processing: period={p}, company={ccode}, account={fd.account_code}, amount={fd.amount}")
+            if p in financial_data and ccode in financial_data[p]:
+                financial_data[p][ccode][fd.account_code] = fd.amount
+            else:
+                logger.warning(f"Failed to add: period={p}, company={ccode} not found in financial_data structure")
     
     # Проверяем что получилось в financial_data
     if periods:
@@ -808,6 +914,26 @@ def pl_report_data(request):
                 row['periods'][p] = {}
                 period_total = Decimal('0')
                 for c in companies_with_data:  # Используем только компании с данными
+                    # Diagnostic logging for key formats
+                    try:
+                        period_key = p
+                        company_key = c.code
+                        account_code = acc.account_code
+                        logger.info(
+                            f"SEARCHING: period_key='{period_key}', company_key='{company_key}', account='{account_code}'"
+                        )
+                        logger.info(f"AVAILABLE_PERIODS: {list(financial_data.keys())}")
+                    
+                        if period_key in financial_data:
+                            logger.info(
+                                f"AVAILABLE_COMPANIES: {list(financial_data.get(period_key, {}).keys())}"
+                            )
+                        else:
+                            logger.info("AVAILABLE_COMPANIES: PERIOD_NOT_FOUND")
+                        found_val = financial_data.get(period_key, {}).get(company_key, {}).get(account_code, 'NOT_FOUND')
+                        logger.info(f"FOUND_VALUE: {found_val}")
+                    except Exception:
+                        pass
                     amount = financial_data[p][c.code].get(acc.account_code, Decimal('0'))
                     row['periods'][p][c.code] = float(amount or Decimal('0'))
                     period_total += amount or Decimal('0')
@@ -872,7 +998,7 @@ def pl_report_data(request):
     for p in periods:
         total_revenue_row['periods'][p] = {}
         period_total = Decimal('0')
-        for c in companies_with_data:  # Используем только компании с данными
+        for c in pl_companies:  # Используем только компании с данными
             company_total = sum(
                 financial_data[p][c.code].get(a.account_code, Decimal('0'))
                 for a in income_accounts
@@ -881,14 +1007,14 @@ def pl_report_data(request):
             period_total += company_total or Decimal('0')
         total_revenue_row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
     # Grand totals for revenue
-    for c in companies_with_data:  # Используем только компании с данными
+    for c in pl_companies:  # Используем только компании с данными
         gtot = sum(
             sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in income_accounts)
             for p in periods
         )
         total_revenue_row['grand_totals'][c.code] = float(gtot or Decimal('0'))
     overall_revenue = sum(
-        sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in income_accounts) for c in companies_with_data)
+        sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in income_accounts) for c in pl_companies)
         for p in periods
     )
     total_revenue_row['grand_totals']['TOTAL'] = float(overall_revenue or Decimal('0'))
@@ -938,7 +1064,26 @@ def pl_report_data(request):
             for p in periods:
                 row['periods'][p] = {}
                 period_total = Decimal('0')
-                for c in companies_with_data:
+                for c in pl_companies:
+                    # Diagnostic logging for key formats during lookup (expense section)
+                    try:
+                        period_key = p
+                        company_key = c.code
+                        account_code = acc.account_code
+                        logger.info(
+                            f"SEARCHING: period_key='{period_key}', company_key='{company_key}', account='{account_code}'"
+                        )
+                        logger.info(f"AVAILABLE_PERIODS: {list(financial_data.keys())}")
+                        if period_key in financial_data:
+                            logger.info(
+                                f"AVAILABLE_COMPANIES: {list(financial_data.get(period_key, {}).keys())}"
+                            )
+                        else:
+                            logger.info("AVAILABLE_COMPANIES: PERIOD_NOT_FOUND")
+                        found_val = financial_data.get(period_key, {}).get(company_key, {}).get(account_code, 'NOT_FOUND')
+                        logger.info(f"FOUND_VALUE: {found_val}")
+                    except Exception:
+                        pass
                     amount = financial_data[p][c.code].get(acc.account_code, 0)
                     row['periods'][p][c.code] = float(amount or 0)
                     period_total += amount or 0
@@ -947,11 +1092,11 @@ def pl_report_data(request):
                 row['periods'][p]['TOTAL'] = float(period_total or 0)
 
             # Гранд тоталы
-            for c in companies_with_data:
+            for c in pl_companies:
                 grand_total = sum(financial_data[p][c.code].get(acc.account_code, 0) for p in periods)
                 row['grand_totals'][c.code] = float(grand_total or 0)
             overall = sum(
-                sum(financial_data[p][c.code].get(acc.account_code, 0) for c in companies_with_data)
+                sum(financial_data[p][c.code].get(acc.account_code, 0) for c in pl_companies)
                 for p in periods
             )
             row['grand_totals']['TOTAL'] = float(overall or 0)
@@ -970,7 +1115,7 @@ def pl_report_data(request):
         for p in periods:
             sub_total['periods'][p] = {}
             period_total = Decimal('0')
-            for c in companies_with_data:
+            for c in pl_companies:
                 company_total = sum(
                     financial_data[p][c.code].get(a.account_code, 0)
                     for a in category_accounts
@@ -978,14 +1123,14 @@ def pl_report_data(request):
                 sub_total['periods'][p][c.code] = float(company_total or 0)
                 sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
 
-        for c in companies_with_data:
+        for c in pl_companies:
             gtot = sum(
                 sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts)
                 for p in periods
             )
             sub_total['grand_totals'][c.code] = float(gtot or 0)
         overall = sum(
-            sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts) for c in companies_with_data)
+            sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts) for c in pl_companies)
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or 0)
@@ -1002,7 +1147,7 @@ def pl_report_data(request):
     for p in periods:
         total_expense_row['periods'][p] = {}
         period_total = Decimal('0')
-        for c in companies_with_data:
+        for c in pl_companies:
             company_total = sum(
                 financial_data[p][c.code].get(a.account_code, 0)
                 for a in expense_accounts
@@ -1011,14 +1156,14 @@ def pl_report_data(request):
             period_total += company_total or 0
         total_expense_row['periods'][p]['TOTAL'] = float(period_total or 0)
     # Grand totals for expenses
-    for c in companies_with_data:
+    for c in pl_companies:
         gtot = sum(
             sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts)
             for p in periods
         )
         total_expense_row['grand_totals'][c.code] = float(gtot or 0)
     overall_expense = sum(
-        sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts) for c in companies_with_data)
+        sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts) for c in pl_companies)
         for p in periods
     )
     total_expense_row['grand_totals']['TOTAL'] = float(overall_expense or 0)
@@ -1035,7 +1180,7 @@ def pl_report_data(request):
     for p in periods:
         net_income_row['periods'][p] = {}
         period_total = Decimal('0')
-        for c in companies_with_data:
+        for c in pl_companies:
             revenue = Decimal(str(total_revenue_row['periods'][p][c.code]))
             expense = Decimal(str(total_expense_row['periods'][p][c.code]))
             net = revenue - expense
@@ -1043,7 +1188,7 @@ def pl_report_data(request):
             period_total += net
         net_income_row['periods'][p]['TOTAL'] = float(period_total)
     # Grand totals for net income
-    for c in companies_with_data:
+    for c in pl_companies:
         revenue = Decimal(str(total_revenue_row['grand_totals'][c.code]))
         expense = Decimal(str(total_expense_row['grand_totals'][c.code]))
         net_income_row['grand_totals'][c.code] = float(revenue - expense)
@@ -1267,11 +1412,16 @@ def pl_report_data(request):
             total_value = r['periods'].get(p, {}).get('TOTAL', 0)
             # Hide zeros in TOTAL columns as well
             grid_row[field_total] = None if total_value == 0 else float(total_value)
-            # Populate consolidated Budget for P&L rows when Budget/Forecast mode is active
-            if data_type in ['budget', 'forecast']:
+            # Populate consolidated Budget for P&L rows under feature flag using dual stream budget_values
+            if is_enabled('PL_BUDGET_PARALLEL') and data_type in ['budget', 'forecast']:
                 field_budget = f'{p.strftime("%b-%y")}_Budget'
-                # Use the per-period TOTAL as consolidated budget (companies_with_data contains budget-only company in this mode)
-                grid_row[field_budget] = None if total_value == 0 else float(total_value)
+                budget_amount = 0
+                if r['type'] == 'account':
+                    acc = r.get('account_code')
+                    if acc:
+                        budget_amount = float(budget_values.get(p, {}).get(acc, 0))
+                # For non-account rows, leave budget empty (could be summed separately if needed)
+                grid_row[field_budget] = None if not budget_amount else float(budget_amount)
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
