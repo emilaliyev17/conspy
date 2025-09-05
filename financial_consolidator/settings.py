@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -132,3 +133,21 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Feature flags infrastructure
+# Flags can be overridden via env var FEATURE_FLAGS as comma-separated key=true pairs, e.g.:
+# FEATURE_FLAGS="PL_BUDGET_PARALLEL=true,USE_NEW_CF_SAVE=false"
+FEATURE_FLAGS = {
+    'PL_BUDGET_PARALLEL': False,
+    'USE_NEW_CF_SAVE': True,
+}
+
+_env_flags = os.getenv('FEATURE_FLAGS', '')
+if _env_flags:
+    for pair in _env_flags.split(','):
+        if '=' in pair:
+            k, v = pair.split('=', 1)
+            k = k.strip()
+            v = v.strip().lower()
+            if k:
+                FEATURE_FLAGS[k] = v in ('1', 'true', 'yes', 'on')
