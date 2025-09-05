@@ -212,6 +212,7 @@ def upload_chart_of_accounts(request):
                 df = pd.read_csv(uploaded_file)
             else:
                 df = pd.read_excel(uploaded_file)
+
             
             # Check column count
             if len(df.columns) < 6:
@@ -581,8 +582,8 @@ def pl_report_data(request):
 
     # Компании
     companies = list(Company.objects.all().order_by('name'))
-    # Filter CONSOLIDATED from display columns
-    display_companies = [c for c in companies if c.code != 'CONSOLIDATED']
+    # Filter budget-only companies from display columns (no hardcoded codes)
+    display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     logger.info(f"Found {len(companies)} companies.")
 
     # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
@@ -672,6 +673,8 @@ def pl_report_data(request):
         logger.info(f"Companies with data: {[c.code for c in companies_with_data]}")
 
     # Индексация: period -> company_code -> account_code -> amount
+    logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
+    logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
     financial_data = {}
     for p in periods:
         financial_data[p] = {}
@@ -705,7 +708,13 @@ def pl_report_data(request):
     if periods:
         p0 = periods[0]
         for c in companies[:2]:
-            sample_accounts = list(financial_data[p0][c.code].keys())[:3]
+            logger.info(f"DEBUG: Checking company {c.code} in period {p0}")
+            logger.info(f"DEBUG: Available companies in financial_data[{p0}]: {list(financial_data[p0].keys())}")
+            if c.code in financial_data[p0]:
+                sample_accounts = list(financial_data[p0][c.code].keys())[:3]
+            else:
+                logger.warning(f"Company {c.code} not found in financial_data for period {p0}")
+                sample_accounts = []
             logger.info(f"Period {p0}, Company {c.code}, P&L accounts sample: {sample_accounts}")
 
     # Группировка COA по sub_category для структуры
@@ -928,7 +937,7 @@ def pl_report_data(request):
             for p in periods:
                 row['periods'][p] = {}
                 period_total = Decimal('0')
-                for c in companies:
+                for c in companies_with_data:
                     amount = financial_data[p][c.code].get(acc.account_code, 0)
                     row['periods'][p][c.code] = float(amount or 0)
                     period_total += amount or 0
@@ -937,11 +946,11 @@ def pl_report_data(request):
                 row['periods'][p]['TOTAL'] = float(period_total or 0)
 
             # Гранд тоталы
-            for c in companies:
+            for c in companies_with_data:
                 grand_total = sum(financial_data[p][c.code].get(acc.account_code, 0) for p in periods)
                 row['grand_totals'][c.code] = float(grand_total or 0)
             overall = sum(
-                sum(financial_data[p][c.code].get(acc.account_code, 0) for c in companies)
+                sum(financial_data[p][c.code].get(acc.account_code, 0) for c in companies_with_data)
                 for p in periods
             )
             row['grand_totals']['TOTAL'] = float(overall or 0)
@@ -960,7 +969,7 @@ def pl_report_data(request):
         for p in periods:
             sub_total['periods'][p] = {}
             period_total = Decimal('0')
-            for c in companies:
+            for c in companies_with_data:
                 company_total = sum(
                     financial_data[p][c.code].get(a.account_code, 0)
                     for a in category_accounts
@@ -968,14 +977,14 @@ def pl_report_data(request):
                 sub_total['periods'][p][c.code] = float(company_total or 0)
                 sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
 
-        for c in companies:
+        for c in companies_with_data:
             gtot = sum(
                 sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts)
                 for p in periods
             )
             sub_total['grand_totals'][c.code] = float(gtot or 0)
         overall = sum(
-            sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts) for c in companies)
+            sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts) for c in companies_with_data)
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or 0)
@@ -992,7 +1001,7 @@ def pl_report_data(request):
     for p in periods:
         total_expense_row['periods'][p] = {}
         period_total = Decimal('0')
-        for c in companies:
+        for c in companies_with_data:
             company_total = sum(
                 financial_data[p][c.code].get(a.account_code, 0)
                 for a in expense_accounts
@@ -1001,14 +1010,14 @@ def pl_report_data(request):
             period_total += company_total or 0
         total_expense_row['periods'][p]['TOTAL'] = float(period_total or 0)
     # Grand totals for expenses
-    for c in companies:
+    for c in companies_with_data:
         gtot = sum(
             sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts)
             for p in periods
         )
         total_expense_row['grand_totals'][c.code] = float(gtot or 0)
     overall_expense = sum(
-        sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts) for c in companies)
+        sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts) for c in companies_with_data)
         for p in periods
     )
     total_expense_row['grand_totals']['TOTAL'] = float(overall_expense or 0)
@@ -1025,7 +1034,7 @@ def pl_report_data(request):
     for p in periods:
         net_income_row['periods'][p] = {}
         period_total = Decimal('0')
-        for c in companies:
+        for c in companies_with_data:
             revenue = Decimal(str(total_revenue_row['periods'][p][c.code]))
             expense = Decimal(str(total_expense_row['periods'][p][c.code]))
             net = revenue - expense
@@ -1033,7 +1042,7 @@ def pl_report_data(request):
             period_total += net
         net_income_row['periods'][p]['TOTAL'] = float(period_total)
     # Grand totals for net income
-    for c in companies:
+    for c in companies_with_data:
         revenue = Decimal(str(total_revenue_row['grand_totals'][c.code]))
         expense = Decimal(str(total_expense_row['grand_totals'][c.code]))
         net_income_row['grand_totals'][c.code] = float(revenue - expense)
@@ -1071,7 +1080,8 @@ def pl_report_data(request):
                 'type': 'numberColumnWithCommas',
                 'cellStyle': {
                     'textAlign': 'right',
-                    'backgroundColor': '#E6F3FF' if str(c.code).upper().startswith('F2') else '#E8F5E9'
+                    # Styling based on company id instead of code prefix
+                    'backgroundColor': '#E6F3FF' if getattr(c, 'id', None) == 1 else '#E8F5E9'
                 }
             })
         # P&L TOTAL per period (existing)
@@ -1111,19 +1121,22 @@ def pl_report_data(request):
 
     # CF Dashboard section - loan movements and funding metrics
     cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
-    cf_data = CFDashboardData.objects.filter(
-        company__in=companies,
-        period__gte=from_date_start,
-        period__lte=to_date_end
-    ).select_related('metric', 'company')
+    # Guarded date filters for CF data
+    cf_query = CFDashboardData.objects.filter(company__in=companies)
+    if from_date_start:
+        cf_query = cf_query.filter(period__gte=from_date_start)
+    if to_date_end:
+        cf_query = cf_query.filter(period__lte=to_date_end)
+    cf_data = cf_query.select_related('metric', 'company')
     
     # Load CF Dashboard Budget/Forecast data (consolidated, not per company)
     from .models import CFDashboardBudget
-    cf_budget_data = CFDashboardBudget.objects.filter(
-        data_type=data_type if data_type in ['budget', 'forecast'] else 'budget',
-        period__gte=from_date_start,
-        period__lte=to_date_end
-    ).select_related('metric')
+    cf_budget_query = CFDashboardBudget.objects.filter(data_type=data_type)
+    if from_date_start:
+        cf_budget_query = cf_budget_query.filter(period__gte=from_date_start)
+    if to_date_end:
+        cf_budget_query = cf_budget_query.filter(period__lte=to_date_end)
+    cf_budget_data = cf_budget_query
     
     # Build CF Dashboard rows
     cf_rows = []
@@ -1471,7 +1484,7 @@ def bs_report_data(request):
             
             # Calculate overall grand total for sub category
             overall_grand_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in accounts) for company in companies)
+                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in accounts) for company in companies_with_data)
                 for period in periods
             )
             sub_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
@@ -1503,7 +1516,7 @@ def bs_report_data(request):
             parent_total_data['periods'][period]['TOTAL'] = float(period_total or 0)
         
         # Calculate grand totals for parent category
-        for company in companies:
+        for company in companies_with_data:
             grand_total = sum(
                 sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[parent_category].values())
                 for period in periods
@@ -1512,7 +1525,7 @@ def bs_report_data(request):
         
         # Calculate overall grand total for parent category
         overall_grand_total = sum(
-            sum(sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[parent_category].values()) for company in companies)
+            sum(sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[parent_category].values()) for company in companies_with_data)
             for period in periods
         )
         parent_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
@@ -1530,21 +1543,21 @@ def bs_report_data(request):
             assets_total = sum(
                 sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['ASSETS'].values())
                 for period in periods
-                for company in companies
+                for company in companies_with_data
             )
         
         if 'LIABILITIES' in grouped_data:
             liabilities_total = sum(
                 sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['LIABILITIES'].values())
                 for period in periods
-                for company in companies
+                for company in companies_with_data
             )
         
         if 'EQUITY' in grouped_data:
             equity_total = sum(
                 sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['EQUITY'].values())
                 for period in periods
-                for company in companies
+                for company in companies_with_data
             )
         
         check_value = assets_total - liabilities_total - equity_total
@@ -1591,7 +1604,8 @@ def bs_report_data(request):
                 'type': 'numberColumnWithCommas',
                 'cellStyle': {
                     'textAlign': 'right',
-                    'backgroundColor': '#E6F3FF' if str(company.code).upper().startswith('F2') else '#E8F5E9'
+                    # Styling based on company id instead of code prefix
+                    'backgroundColor': '#E6F3FF' if getattr(company, 'id', None) == 1 else '#E8F5E9'
                 }
             })
         column_defs.append({
