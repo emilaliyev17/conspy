@@ -1448,7 +1448,7 @@ def pl_report_data(request):
             # Hide zeros in TOTAL columns as well
             grid_row[field_total] = None if total_value == 0 else float(total_value)
             # Populate consolidated Budget for P&L rows under feature flag using dual stream budget_values
-            if is_enabled('PL_BUDGET_PARALLEL') and data_type in ['budget', 'forecast']:
+            if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
                 field_budget = f'{p.strftime("%b-%y")}_Budget'
                 budget_amount = 0
                 if r['type'] == 'account':
