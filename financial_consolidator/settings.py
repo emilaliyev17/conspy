@@ -151,3 +151,4 @@ if _env_flags:
             v = v.strip().lower()
             if k:
                 FEATURE_FLAGS[k] = v in ('1', 'true', 'yes', 'on')
+PL_BUDGET_PARALLEL = True

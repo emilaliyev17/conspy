@@ -566,6 +566,23 @@ def pl_report_data(request):
     to_year = request.GET.get('to_year', '')
     data_type = request.GET.get('data_type', 'actual')
     logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
+    # CRITICAL DIAGNOSTICS (feature flags and data types)
+    try:
+        import os
+        from django.conf import settings as _dj_settings
+        print(f"[FEATURE FLAG] PL_BUDGET_PARALLEL setting: {getattr(_dj_settings, 'PL_BUDGET_PARALLEL', 'NOT_FOUND')}")
+        print(f"[FEATURE FLAG] Environment var: {os.environ.get('PL_BUDGET_PARALLEL', 'NOT_SET')}")
+        print(f"[FEATURE FLAG] is_enabled result: {is_enabled('PL_BUDGET_PARALLEL')}")
+        print(f"[DATA TYPE] Received: '{data_type}'")
+        print(f"[DATA TYPE] Lower case: '{data_type.lower() if data_type else 'None'}'")
+    except Exception:
+        pass
+    # Execution flow diagnostics
+    try:
+        use_dual_streams = is_enabled('PL_BUDGET_PARALLEL') and data_type and data_type.lower() in ['budget', 'forecast']
+        print(f"[EXECUTION] Will use dual streams: {use_dual_streams}")
+    except Exception:
+        pass
     # Budget map for dual-streams (period -> account_code -> amount)
     budget_values = {}
 
@@ -757,6 +774,10 @@ def pl_report_data(request):
             # Initialize keys for both actual companies and budget-only company
             for c in all_report_companies:
                 financial_data[p][c.code] = {}
+                try:
+                    print(f"[INIT] Created financial_data[{p}][{c.code}]")
+                except Exception:
+                    pass
         else:
             for c in pl_companies:  # Используем компании для P&L расчета
                 financial_data[p][c.code] = {}
@@ -775,14 +796,23 @@ def pl_report_data(request):
             p = fd.period
             ccode = fd.company.code
             logger.debug(f"Actual stream: period={p}, company={ccode}, account={fd.account_code}, amount={fd.amount}")
-            if p in financial_data and ccode in financial_data[p]:
-                logger.info(f"STORING: financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
-                financial_data[p][ccode][fd.account_code] = fd.amount
-            else:
-                logger.warning(f"Actual: period={p}, company={ccode} not in financial_data structure")
+            # Fallback protection for missing keys
+            if p not in financial_data:
+                financial_data[p] = {}
+                try:
+                    print(f"[FALLBACK] Created missing period {p}")
+                except Exception:
+                    pass
+            if ccode not in financial_data[p]:
+                financial_data[p][ccode] = {}
+                try:
+                    print(f"[FALLBACK] Created missing {p}/{ccode}")
+                except Exception:
+                    pass
+            logger.info(f"STORING: financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
+            financial_data[p][ccode][fd.account_code] = fd.amount
 
         # Build budget-only mapping per period/account (do not mix into financial_data)
-        budget_values = {}
         for fd in budget_financial_data:
             p = fd.period
             acc = fd.account_code
