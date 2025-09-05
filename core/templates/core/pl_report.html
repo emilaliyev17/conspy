@@ -460,13 +460,20 @@
             destroy() {}
         }
 
-        // Auto-submit form when filters change
-        document.getElementById('data_type').addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
+        // Temporarily disabled auto-submit to fix Budget selection issue
+        // document.getElementById('data_type').addEventListener('change', function() {
+        //     document.getElementById('filterForm').submit();
+        // });
         
         // AG Grid initialization
         document.addEventListener('DOMContentLoaded', function() {
+            // Ensure data_type dropdown reflects URL param on load
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const dataType = urlParams.get('data_type') || 'actual';
+                const dt = document.getElementById('data_type');
+                if (dt) dt.value = dataType;
+            } catch (e) {}
             console.log('DOM loaded, initializing AG Grid...');
             
             const gridDiv = document.querySelector('#plGrid');
