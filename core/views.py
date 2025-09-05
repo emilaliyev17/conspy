@@ -602,8 +602,11 @@ def pl_report_data(request):
 
     # Компании
     companies = list(Company.objects.all().order_by('name'))
-    # Filter budget-only companies from display columns (no hardcoded codes)
-    display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+    # For Budget/Forecast show ALL companies including budget-only, for Actual exclude budget-only
+    if data_type and data_type.lower() in ['budget', 'forecast']:
+        display_companies = companies  # Show all companies for Budget view
+    else:
+        display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     logger.info(f"Found {len(companies)} companies.")
 
     # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
