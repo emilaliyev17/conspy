@@ -607,7 +607,7 @@ def pl_report_data(request):
     companies = list(Company.objects.all().order_by('name'))
     # For Budget/Forecast show ALL companies including budget-only, for Actual exclude budget-only
     if data_type and data_type.lower() in ['budget', 'forecast']:
-        display_companies = companies  # Show all companies for Budget view
+        display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     else:
         display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     logger.info(f"Found {len(companies)} companies.")
@@ -1287,7 +1287,7 @@ def pl_report_data(request):
             }
         })
         # Add Budget/Forecast consolidated column when viewing Budget or Forecast
-        if data_type in ['budget', 'forecast']:
+        if data_type and data_type.lower() in ['budget', 'forecast']:
             period_cols.append({
                 'headerName': f'{p.strftime("%b-%y")} Budget',
                 'field': f'{p.strftime("%b-%y")}_Budget',
@@ -1324,7 +1324,7 @@ def pl_report_data(request):
     
     # Load CF Dashboard Budget/Forecast data (consolidated, not per company)
     from .models import CFDashboardBudget
-    cf_budget_query = CFDashboardBudget.objects.filter(data_type=data_type)
+    cf_budget_query = CFDashboardBudget.objects.filter(data_type=data_type.lower())
     if from_date_start:
         cf_budget_query = cf_budget_query.filter(period__gte=from_date_start)
     if to_date_end:
@@ -1405,7 +1405,7 @@ def pl_report_data(request):
                 row[period_total_key] = period_total
             
             # Add Budget/Forecast consolidated value for this period (single column)
-            if data_type in ['budget', 'forecast']:
+            if data_type and data_type.lower() in ['budget', 'forecast']:
                 period_budget_key = f"{period.strftime('%b-%y')}_Budget"
                 budget_value = cf_budget_data.filter(
                     metric=metric,
