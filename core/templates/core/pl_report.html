@@ -302,6 +302,12 @@
             background-color: #e6f3ff !important;
             cursor: text;
         }
+
+        /* P&L: Make Account Name cell for sub_total rows white background and bold */
+        .subTotalNameCell {
+            background-color: #ffffff !important;
+            font-weight: bold !important;
+        }
     </style>
 </head>
 <body>
@@ -632,6 +638,18 @@
                         }
                         return cookieValue;
                     }
+
+                    // Ensure Account Name cell for P&L sub_total rows is white and bold only in that cell
+                    try {
+                        const acctCol = data.columnDefs && data.columnDefs.find(c => c.field === 'account_name');
+                        if (acctCol) {
+                            acctCol.cellClassRules = Object.assign({}, acctCol.cellClassRules || {}, {
+                                subTotalNameCell: function(params) {
+                                    return params && params.data && params.data.rowType === 'sub_total' && !params.data.is_cf_dashboard;
+                                }
+                            });
+                        }
+                    } catch (e) { console.warn('Failed to apply subTotalNameCell rules:', e); }
 
                     // Initialize AG Grid
                     const gridOptions = {
