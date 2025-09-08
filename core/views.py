@@ -774,6 +774,10 @@ def pl_report_data(request):
     logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
     logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
     financial_data = {}
+    # Define a soft, readable palette (no reds) and map companies deterministically
+    palette = ['#E6F3FF', '#E8F5E9', '#F0F4FF', '#E6F7F7', '#F6F8E7', '#F0E6FF', '#F5F5F5']
+    color_by_company = {c.id: palette[i % len(palette)] for i, c in enumerate(display_companies)}
+
     for p in periods:
         financial_data[p] = {}
         if is_enabled('PL_BUDGET_PARALLEL'):
@@ -1269,8 +1273,7 @@ def pl_report_data(request):
                 'companyCode': c.code,
                 'cellStyle': {
                     'textAlign': 'right',
-                    # Styling based on company id instead of code prefix
-                    'backgroundColor': '#E6F3FF' if getattr(c, 'id', None) == 1 else '#E8F5E9'
+                    'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
                 }
             })
         # P&L TOTAL per period (existing)
@@ -1305,7 +1308,11 @@ def pl_report_data(request):
             'field': f'grand_total_{c.code}',
             'headerName': f'Grand Total {c.code}',
             'width': 120,
-            'type': 'numberColumnWithCommas'
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
+            }
         })
     column_defs.append({
         'field': 'grand_total_TOTAL',

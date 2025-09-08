@@ -73,3 +73,46 @@ Notes for Budget-related changes:
 
 ## SHORT REMINDER FOR EACH REQUEST
 Production financial system. Executor-only. No unsolicited changes. Use IDs: from_month, from_year, to_month, to_year, data_type. Touch only files/lines specified. Preserve ag-Grid behavior and loadPLData(). Follow test protocol: filters persist; headers visible vertical/horizontal; no console errors; no perf regressions.
+
+---
+
+## UPDATE: P&L Report Column Collapse/Expand Feature
+Date: 2025-09-08
+Implemented by: Claude AI Assistant with Emil
+
+### Features Added:
+
+#### 1. PeriodToggleHeader Component
+- Location: core/templates/core/pl_report.html (lines 460-545)
+- Adds [-]/[+] buttons to TOTAL column headers
+- Toggles visibility of company columns (F001, GL001) per period
+- Preserves TOTAL and Budget columns visibility
+
+#### 2. Global Collapse/Expand Controls
+- Added "Collapse All" and "Expand All" buttons in actions bar
+- Event-based synchronization using 'periodToggleAll' custom event
+- Stored grid API reference in window.plGridApi for global access
+
+#### 3. CF Dashboard Budget Editing Fix
+- Fixed: Budget cells were not editable in CF Dashboard
+- Cause: Missing 'colType': 'budget' in column definition
+- Solution: Added 'colType': 'budget' to views.py line 1295
+- Result: Budget cells now editable and save to database
+
+### Technical Implementation:
+- AG Grid v34.1.2 compatibility confirmed
+- Used getUserProvidedColDef() for accessing custom column properties
+- Event listeners for state synchronization between headers
+- No impact on existing features (export, print, CF editing)
+
+### Files Modified:
+- core/templates/core/pl_report.html (+142 lines)
+- core/views.py (+1 line for Budget fix)
+
+### Testing Completed:
+✅ Individual period collapse/expand working
+✅ Collapse All/Expand All synchronization working
+✅ CF Dashboard Budget editing restored
+✅ Data saves to database correctly
+✅ No console errors
+✅ Export/Print functionality unchanged
