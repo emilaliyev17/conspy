@@ -1315,7 +1315,8 @@ def pl_report_data(request):
             'type': 'numberColumnWithCommas',
             'cellStyle': {
                 'textAlign': 'right',
-                'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
+                # Use lavender for budget-only company's grand total; otherwise use mapped company color
+                'backgroundColor': '#F0F0FF' if getattr(c, 'is_budget_only', False) else color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
             }
         })
     column_defs.append({
