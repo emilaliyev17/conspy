@@ -400,6 +400,8 @@
                 📥 Export to Excel
             </a>
             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+            <button onclick="collapseAllPeriods()" class="btn btn-secondary">➖ Collapse All</button>
+            <button onclick="expandAllPeriods()" class="btn btn-secondary">➕ Expand All</button>
         </div>
         
         <!-- AG Grid Container -->
@@ -483,6 +485,15 @@
                 
                 this.periodKey = colDef.periodKey;
                 this.collapsed = false;
+
+                // Listen for global collapse/expand events
+                this.globalListener = (event) => {
+                    if (event.detail && typeof event.detail.collapsed === 'boolean') {
+                        this.collapsed = event.detail.collapsed;
+                        this.updateDisplay();
+                    }
+                };
+                window.addEventListener('periodToggleAll', this.globalListener);
                 
                 this.eGui = document.createElement('div');
                 this.eGui.style.display = 'flex';
@@ -541,7 +552,11 @@
                 return this.eGui;
             }
             
-            destroy() {}
+            destroy() {
+                if (this.globalListener) {
+                    window.removeEventListener('periodToggleAll', this.globalListener);
+                }
+            }
         }
 
         // Temporarily disabled auto-submit to fix Budget selection issue
@@ -757,6 +772,13 @@
                         throw new Error('AG Grid initialization method not found');
                     }
                     console.log('AG Grid created successfully!');
+
+                    // Save grid API for global access
+                    if (typeof agGrid.createGrid === 'function') {
+                        window.plGridApi = grid;
+                    } else {
+                        window.plGridApi = gridOptions.api;
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading data:', error);
@@ -770,6 +792,39 @@
     </script>
     <script>
     // Filter persistence - minimal code that won't break anything
+    // Global collapse/expand functions
+    window.collapseAllPeriods = function() {
+        if (window.plGridApi) {
+            const allColumns = window.plGridApi.getColumnDefs();
+            const companyFields = allColumns
+                .filter(col => col.colType === 'company')
+                .map(col => col.field);
+            
+            if (companyFields.length > 0) {
+                window.plGridApi.setColumnsVisible(companyFields, false);
+                window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                    detail: { collapsed: true } 
+                }));
+            }
+        }
+    };
+
+    window.expandAllPeriods = function() {
+        if (window.plGridApi) {
+            const allColumns = window.plGridApi.getColumnDefs();
+            const companyFields = allColumns
+                .filter(col => col.colType === 'company')
+                .map(col => col.field);
+            
+            if (companyFields.length > 0) {
+                window.plGridApi.setColumnsVisible(companyFields, true);
+                window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                    detail: { collapsed: false } 
+                }));
+            }
+        }
+    };
+
     (function() {
         const form = document.getElementById('filterForm');
         if (form) {
