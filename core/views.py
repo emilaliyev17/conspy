@@ -1626,19 +1626,23 @@ def pl_report_data(request):
         overall_total_value = r['grand_totals'].get('TOTAL', 0)
         grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
 
-        # P&L: Sum per-period Budget values into grand_total_Budget for account rows (Budget/Forecast only)
+        # P&L: Sum per-period Budget values into grand_total_Budget for all row types (Budget/Forecast only)
         if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-            if r['type'] == 'account':
-                total_budget_sum = 0
-                for p in periods:
-                    key = f"{p.strftime('%b-%y')}_Budget"
-                    val = grid_row.get(key)
-                    if val is not None:
-                        try:
-                            total_budget_sum += float(val)
-                        except Exception:
-                            pass
-                grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
+            total_budget_sum = 0
+            print(f"DEBUG GRAND TOTAL: Calculating for row '{r['account_name']}' (type: {r['type']})")
+            for p in periods:
+                key = f"{p.strftime('%b-%y')}_Budget"
+                val = grid_row.get(key)
+                if val is not None:
+                    try:
+                        total_budget_sum += float(val)
+                        print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
+                    except Exception:
+                        pass
+                else:
+                    print(f"DEBUG GRAND TOTAL:   {key} = None (skipped)")
+            grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
+            print(f"DEBUG GRAND TOTAL: Final grand_total_Budget = {grid_row['grand_total_Budget']}")
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':
