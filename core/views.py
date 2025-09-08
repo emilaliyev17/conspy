@@ -1318,7 +1318,11 @@ def pl_report_data(request):
         'field': 'grand_total_TOTAL',
         'headerName': 'Grand Total',
         'width': 120,
-        'type': 'numberColumnWithCommas'
+        'type': 'numberColumnWithCommas',
+        'cellStyle': {
+            'textAlign': 'right',
+            'backgroundColor': '#FFF9E6'
+        }
     })
 
     # CF Dashboard section - loan movements and funding metrics
