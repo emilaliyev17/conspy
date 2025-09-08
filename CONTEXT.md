@@ -116,3 +116,67 @@ Implemented by: Claude AI Assistant with Emil
 ✅ Data saves to database correctly
 ✅ No console errors
 ✅ Export/Print functionality unchanged
+
+---
+
+## UPDATE: Company Column Colors and Grand Total Budget Implementation
+Date: 2025-01-09
+Implemented by: Claude AI Assistant with Emil
+
+### COMPLETED FEATURES:
+
+1. Dynamic Company Column Colors
+   - Each company gets unique background color from palette
+   - Palette: ['#E6F7FF', '#F0F9FF', '#E6FFFA', '#F6FFED', '#FFF7E6']
+   - Color assignment: palette[index % len(palette)] for visual distinction
+   - Applied to both period columns and Grand Total columns
+   - No red tones (per business requirement)
+
+2. Column Styling Consistency
+   - Company columns: Dynamic soft colors
+   - TOTAL columns: #FFF9E6 (yellowish)
+   - Budget columns: #F0F0FF (lavender)
+   - Grand Total matches source column colors
+
+3. Grand Total Budget Functionality
+   - Added 'grand_total_Budget' column after 'grand_total_TOTAL'
+   - Sums all Budget values across selected period
+   - Works for both P&L and CF Dashboard rows
+   - Non-editable (no colType to prevent editing)
+
+4. Fixed Column Order
+   - Period columns: Companies → TOTAL → Budget
+   - Grand Total: Companies → TOTAL → Budget (consistent order)
+   - Budget-only company Grand Total moved to end
+
+### CRITICAL FIX - Duplicate Grand Total Budget:
+- Problem: Two 'grand_total_Budget' columns appeared
+- Root Cause: Budget-only company has code='Budget', creating field name collision
+- Solution: Skip creating grand_total for budget-only company (was always empty)
+- File: core/views.py lines 1361-1369 - loop now passes instead of appending
+
+### Technical Implementation:
+- Color mapping: core/views.py lines 1258-1262 (color_by_company dict)
+- Company colors: lines 1268-1274 (period columns), 1304-1309 (grand totals)
+- TOTAL color: line 1286 (period), line 1327 (grand total)
+- Budget color: line 1303 (period), line 1347 (grand total)
+- Grand Total Budget: lines 1341-1349 (columnDef), 1467-1478 (CF sum), 1534-1546 (P&L sum)
+
+### Files Modified:
+- core/views.py (color assignments, Grand Total Budget implementation)
+
+### Testing Completed:
+✅ Company colors display correctly
+✅ Grand Total colors match their companies
+✅ Budget columns show lavender
+✅ Grand Total Budget calculates correctly
+✅ No duplicate columns
+✅ CF Dashboard Budget editing still works
+✅ Export/Print functionality unchanged
+✅ Collapse/Expand feature unaffected
+
+### IMPORTANT NOTES:
+- Company names can change dynamically - colors assigned by position, not name
+- Budget-only company grand total intentionally removed (was empty/unused)
+- All changes preserve existing functionality
+- No performance impact observed
