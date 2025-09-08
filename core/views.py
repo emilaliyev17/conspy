@@ -1162,7 +1162,10 @@ def pl_report_data(request):
                     for a in category_accounts
                 )
                 sub_total['periods'][p][c.code] = float(company_total or 0)
-                sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
+                # Accumulate per-company totals into the per-period TOTAL
+                period_total += company_total or 0
+            # Set per-period TOTAL after summing all companies
+            sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
 
         for c in pl_companies:
             gtot = sum(
