@@ -1307,7 +1307,12 @@ def pl_report_data(request):
         # Extend into main column defs in the exact order
         column_defs.extend(period_cols)
         # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
-    for c in companies:
+    # Ensure visual consistency: Non-budget company grand totals first, then overall TOTAL, then budget-only grand total
+    non_budget_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+    budget_only_companies = [c for c in companies if getattr(c, 'is_budget_only', False)]
+
+    # Grand totals for regular companies
+    for c in non_budget_companies:
         column_defs.append({
             'field': f'grand_total_{c.code}',
             'headerName': f'Grand Total {c.code}',
@@ -1315,10 +1320,11 @@ def pl_report_data(request):
             'type': 'numberColumnWithCommas',
             'cellStyle': {
                 'textAlign': 'right',
-                # Use lavender for budget-only company's grand total; otherwise use mapped company color
-                'backgroundColor': '#F0F0FF' if getattr(c, 'is_budget_only', False) else color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
+                'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
             }
         })
+
+    # Overall Grand Total (TOTAL) column
     column_defs.append({
         'field': 'grand_total_TOTAL',
         'headerName': 'Grand Total',
@@ -1329,6 +1335,19 @@ def pl_report_data(request):
             'backgroundColor': '#FFF9E6'
         }
     })
+
+    # Grand total for budget-only company (if present) comes last
+    for c in budget_only_companies:
+        column_defs.append({
+            'field': f'grand_total_{c.code}',
+            'headerName': f'Grand Total {c.code}',
+            'width': 120,
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#F0F0FF'
+            }
+        })
 
     # CF Dashboard section - loan movements and funding metrics
     cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
