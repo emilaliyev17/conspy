@@ -1298,6 +1298,10 @@ def pl_report_data(request):
                 'type': 'numberColumnWithCommas',
                 'cellClass': 'budget-cell',
                 'colType': 'budget',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#F0F0FF'
+                },
                 'width': 120
             })
         # Extend into main column defs in the exact order
