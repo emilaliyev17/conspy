@@ -1277,6 +1277,7 @@ def pl_report_data(request):
         period_cols.append({
             'field': f'{p.strftime("%b-%y")}_TOTAL',
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
+            'headerComponent': 'periodToggleHeader',
             'width': 120,
             'type': 'numberColumnWithCommas',
             'colType': 'total',

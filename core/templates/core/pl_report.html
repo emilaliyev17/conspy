@@ -460,6 +460,90 @@
             destroy() {}
         }
 
+        class PeriodToggleHeader {
+            init(params) {
+                this.params = params;
+                
+                // Safety check for required methods
+                if (!params.column || !params.column.getUserProvidedColDef) {
+                    console.warn('PeriodToggleHeader: Missing required methods');
+                    this.eGui = document.createElement('div');
+                    this.eGui.textContent = params.displayName || '';
+                    return;
+                }
+                
+                const colDef = params.column.getUserProvidedColDef();
+                
+                // Check this is a TOTAL column with periodKey
+                if (!colDef.periodKey || colDef.colType !== 'total') {
+                    this.eGui = document.createElement('div');
+                    this.eGui.textContent = colDef.headerName || '';
+                    return;
+                }
+                
+                this.periodKey = colDef.periodKey;
+                this.collapsed = false;
+                
+                this.eGui = document.createElement('div');
+                this.eGui.style.display = 'flex';
+                this.eGui.style.alignItems = 'center';
+                this.eGui.style.justifyContent = 'space-between';
+                this.eGui.style.width = '100%';
+                
+                this.updateDisplay();
+            }
+            
+            toggleColumns() {
+                try {
+                    const api = this.params.api;
+                    const allColumns = api.getColumnDefs();
+                    
+                    const companyFields = [];
+                    allColumns.forEach(col => {
+                        if (col.periodKey === this.periodKey && col.colType === 'company') {
+                            companyFields.push(col.field);
+                        }
+                    });
+                    
+                    if (companyFields.length === 0) {
+                        console.log('No company columns found for period', this.periodKey);
+                        return;
+                    }
+                    
+                    this.collapsed = !this.collapsed;
+                    api.setColumnsVisible(companyFields, !this.collapsed);
+                    this.updateDisplay();
+                    
+                } catch (error) {
+                    console.error('PeriodToggleHeader: Error toggling', error);
+                }
+            }
+            
+            updateDisplay() {
+                const colDef = this.params.column.getUserProvidedColDef();
+                const headerName = colDef.headerName || '';
+                this.eGui.innerHTML = `
+                    <span>${headerName}</span>
+                    <span class="period-toggle-btn" 
+                          style="cursor: pointer; font-weight: bold; margin-left: 5px;"
+                          title="${this.collapsed ? 'Expand company columns' : 'Collapse company columns'}">
+                        ${this.collapsed ? '[+]' : '[-]'}
+                    </span>
+                `;
+                
+                const btn = this.eGui.querySelector('.period-toggle-btn');
+                if (btn) {
+                    btn.onclick = () => this.toggleColumns();
+                }
+            }
+            
+            getGui() {
+                return this.eGui;
+            }
+            
+            destroy() {}
+        }
+
         // Temporarily disabled auto-submit to fix Budget selection issue
         // document.getElementById('data_type').addEventListener('change', function() {
         //     document.getElementById('filterForm').submit();
@@ -643,7 +727,8 @@
                         // Register the new custom components
                         components: {
                             togglerHeader: TogglerHeader,
-                            hideableHeader: HideableHeader
+                            hideableHeader: HideableHeader,
+                            periodToggleHeader: PeriodToggleHeader
                         },
                         domLayout: 'normal',  // Это включит скролл при фиксированной высоте
                         rowSelection: {
