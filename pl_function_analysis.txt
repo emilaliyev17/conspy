@@ -1,0 +1,729 @@
+def pl_report_data(request):
+    """P&L Report data in JSON format for AG Grid, с нормализацией месяцев и фильтром по диапазону."""
+    logger.info("--- P&L Report Data Generation Started ---")
+    from_month = request.GET.get('from_month', '')
+    from_year = request.GET.get('from_year', '')
+    to_month = request.GET.get('to_month', '')
+    to_year = request.GET.get('to_year', '')
+    data_type = request.GET.get('data_type', 'actual')
+    logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
+
+    # Помощники для нормализации месяцев
+    def month_start(d: date) -> date:
+        return date(d.year, d.month, 1)
+    def next_month(d: date) -> date:
+        if d.month == 12:
+            return date(d.year + 1, 1, 1)
+        return date(d.year, d.month + 1, 1)
+
+    # Превращаем выбор пользователя в месячный диапазон [start, end_exclusive)
+    from_date_start, _ = convert_month_year_to_date_range(from_month, from_year)
+    _, to_date_end = convert_month_year_to_date_range(to_month, to_year)
+    start = month_start(from_date_start) if from_date_start else None
+    end_exclusive = next_month(to_date_end) if to_date_end else None
+
+    # Компании
+    companies = list(Company.objects.all().order_by('name'))
+    # Filter CONSOLIDATED from display columns
+    display_companies = [c for c in companies if c.code != 'CONSOLIDATED']
+    logger.info(f"Found {len(companies)} companies.")
+
+    # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
+    chart_accounts_all = list(ChartOfAccounts.objects.filter(
+        account_type__in=['INCOME', 'EXPENSE']
+    ).order_by('sort_order'))
+    chart_accounts = [a for a in chart_accounts_all if (a.account_code or '').strip()]
+    logger.info(f"P&L ChartOfAccounts: total={len(chart_accounts_all)}, with_code={len(chart_accounts)}")
+    
+    # Получаем список всех P&L account_codes для фильтрации
+    pl_account_codes = [a.account_code for a in chart_accounts if a.account_code]
+
+    # Периоды: берём только там, где реально есть P&L данные
+    try:
+        q = FinancialData.objects.filter(
+            data_type=data_type,
+            account_code__in=pl_account_codes  # Фильтруем только P&L счета
+        )
+        if start:
+            q = q.filter(period__gte=start)
+        if end_exclusive:
+            q = q.filter(period__lt=end_exclusive)
+        if companies:
+            q = q.filter(company_id__in=[c.id for c in companies])
+        periods = list(q.values_list('period', flat=True).distinct().order_by('period'))
+        logger.info(f"Found {len(periods)} periods with P&L data.")
+        
+        # Если периодов нет, проверяем есть ли вообще P&L данные
+        if not periods:
+            all_pl_periods = list(FinancialData.objects.filter(
+                account_code__in=pl_account_codes
+            ).values_list('period', flat=True).distinct().order_by('period'))
+            logger.warning(f"No P&L data in selected range. Available P&L periods: {all_pl_periods[:10]}")
+            
+            # Предлагаем использовать доступный диапазон
+            if all_pl_periods:
+                suggested_start = all_pl_periods[0].strftime('%B %Y')
+                suggested_end = all_pl_periods[-1].strftime('%B %Y')
+                return JsonResponse({
+                    'columnDefs': [],
+                    'rowData': [],
+                    'error': f'No P&L data found for selected period. P&L data is available from {suggested_start} to {suggested_end}',
+                    'available_range': {
+                        'start': all_pl_periods[0].strftime('%Y-%m-%d'),
+                        'end': all_pl_periods[-1].strftime('%Y-%m-%d')
+                    }
+                })
+    except Exception as e:
+        logger.error(f"Error fetching periods: {e}")
+        periods = []
+
+    if not periods:
+        logger.warning("No P&L periods found, returning empty data.")
+        return JsonResponse({
+            'columnDefs': [],
+            'rowData': [],
+            'error': 'No P&L data found. Please check if Income and Expense accounts are properly loaded.'
+        })
+
+    # Загружаем только P&L данные за выбранные периоды и компании
+    all_financial_data = list(
+        FinancialData.objects.filter(
+            data_type=data_type,
+            period__in=periods,
+            company_id__in=[c.id for c in companies],
+            account_code__in=pl_account_codes  # Только P&L счета
+        ).select_related('company')
+    )
+    logger.info(f"Found {len(all_financial_data)} P&L financial data records.")
+    
+    # Добавляем детальное отладочное логирование
+    if all_financial_data:
+        sample = all_financial_data[0]
+        logger.info(f"Sample record: company={sample.company.code} (id={sample.company.id}), account={sample.account_code}, amount={sample.amount}, period={sample.period}")
+    
+    # Проверяем данные по компаниям
+    for c in companies:
+        company_data_count = len([fd for fd in all_financial_data if fd.company.id == c.id])
+        logger.info(f"Company {c.code} (id={c.id}): {company_data_count} records")
+    
+    # Получаем список компаний которые реально имеют данные
+    companies_with_data = list(set(fd.company for fd in all_financial_data))
+    if not companies_with_data:
+        logger.warning("No companies with data found, using all companies as fallback")
+        companies_with_data = companies
+    else:
+        logger.info(f"Companies with data: {[c.code for c in companies_with_data]}")
+
+    # Индексация: period -> company_code -> account_code -> amount
+    logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
+    logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
+    financial_data = {}
+    for p in periods:
+        financial_data[p] = {}
+        for c in companies_with_data:  # Используем только компании с данными
+            financial_data[p][c.code] = {}
+    
+    # Заполняем financial_data с проверками
+    for fd in all_financial_data:
+        p = fd.period
+        ccode = fd.company.code
+        logger.debug(f"Processing: period={p}, company={ccode}, account={fd.account_code}, amount={fd.amount}")
+        
+        if p in financial_data and ccode in financial_data[p]:
+            financial_data[p][ccode][fd.account_code] = fd.amount
+            logger.debug(f"Added to financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
+        else:
+            logger.warning(f"Failed to add: period={p}, company={ccode} not found in financial_data structure")
+    
+    # Проверяем что получилось в financial_data
+    if periods:
+        p0 = periods[0]
+        logger.info(f"Financial data structure for period {p0}:")
+        for ccode in financial_data[p0]:
+            account_count = len(financial_data[p0][ccode])
+            logger.info(f"  Company {ccode}: {account_count} accounts")
+            if account_count > 0:
+                sample_accounts = list(financial_data[p0][ccode].keys())[:3]
+                logger.info(f"    Sample accounts: {sample_accounts}")
+
+    # Лог первого периода
+    if periods:
+        p0 = periods[0]
+        for c in companies[:2]:
+            logger.info(f"DEBUG: Checking company {c.code} in period {p0}")
+            logger.info(f"DEBUG: Available companies in financial_data[{p0}]: {list(financial_data[p0].keys())}")
+            if c.code in financial_data[p0]:
+                sample_accounts = list(financial_data[p0][c.code].keys())[:3]
+            else:
+                logger.warning(f"Company {c.code} not found in financial_data for period {p0}")
+                sample_accounts = []
+            logger.info(f"Period {p0}, Company {c.code}, P&L accounts sample: {sample_accounts}")
+
+    # Группировка COA по sub_category для структуры
+    grouped_data = {}
+    for acc in chart_accounts_all:
+        sub_category = acc.sub_category or 'UNCATEGORIZED'
+        grouped_data.setdefault(sub_category, []).append(acc)
+    logger.info(f"Grouped P&L sub_categories: {list(grouped_data.keys())[:10]}")
+
+    # Порядок разделов для P&L
+    correct_order = [
+        # Revenue sections
+        'INTEREST + DEFAULT',
+        'Other Income',
+        # Expense sections  
+        'COST OF FUNDS AND FEES',
+        'Salaries',
+        'Fund related',
+        'Triple Point funding line related',
+        'OakNorth funding line related',
+        'Marketing',
+        'Administration',
+        'Other Expenses'
+    ]
+    all_sub = list(grouped_data.keys())
+    pl_structure = [c for c in correct_order if c in all_sub] + [c for c in all_sub if c not in correct_order]
+    logger.info(f"Ordered P&L sub categories: {pl_structure}")
+
+    # Сборка отчета
+    report_data = []
+    debug_info = {
+        'periods_count': len(periods),
+        'companies_count': len(companies),
+        'pl_accounts_count': len(chart_accounts),
+        'financial_data_count': len(all_financial_data),
+        'periods': [p.strftime('%Y-%m-%d') for p in periods[:6]],
+        'companies': [c.code for c in companies],
+        'companies_with_data': [c.code for c in companies_with_data],
+        'companies_without_data': [c.code for c in companies if c not in companies_with_data]
+    }
+    
+    # Добавляем счетчики по типам
+    income_count = ChartOfAccounts.objects.filter(account_type='INCOME', account_code__in=pl_account_codes).count()
+    expense_count = ChartOfAccounts.objects.filter(account_type='EXPENSE', account_code__in=pl_account_codes).count()
+    debug_info['income_accounts'] = income_count
+    debug_info['expense_accounts'] = expense_count
+    
+    if all_financial_data:
+        debug_info['sample_financial_data'] = [{
+            'company': all_financial_data[0].company.code,
+            'account': all_financial_data[0].account_code,
+            'period': str(all_financial_data[0].period),
+            'amount': float(all_financial_data[0].amount)
+        }]
+
+    # (Removed visual REVENUE section header to simplify layout)
+    
+    # Обрабатываем Income счета
+    income_accounts = [a for a in chart_accounts if a.account_type == 'INCOME']
+    for sub_category in pl_structure:
+        if sub_category not in grouped_data:
+            continue
+            
+        # Проверяем есть ли Income счета в этой категории
+        category_accounts = [a for a in grouped_data[sub_category] if a.account_type == 'INCOME' and a.account_code]
+        if not category_accounts:
+            continue
+
+        # Подзаголовок
+        report_data.append({
+            'type': 'sub_header',
+            'account_name': sub_category,
+            'account_code': '',
+            'periods': {},
+            'grand_totals': {}
+        })
+
+        # Счета
+        for acc in category_accounts:
+            row = {
+                'type': 'account',
+                'account_name': acc.account_name,
+                'account_code': acc.account_code,
+                'periods': {},
+                'grand_totals': {}
+            }
+            has_non_zero_value = False
+            # Помесячно
+            for p in periods:
+                row['periods'][p] = {}
+                period_total = Decimal('0')
+                for c in companies_with_data:  # Используем только компании с данными
+                    amount = financial_data[p][c.code].get(acc.account_code, Decimal('0'))
+                    row['periods'][p][c.code] = float(amount or Decimal('0'))
+                    period_total += amount or Decimal('0')
+                    if amount != 0:
+                        has_non_zero_value = True
+                row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
+
+            # Гранд тоталы
+            for c in companies_with_data:  # Используем только компании с данными
+                grand_total = sum(financial_data[p][c.code].get(acc.account_code, Decimal('0')) for p in periods)
+                row['grand_totals'][c.code] = float(grand_total or Decimal('0'))
+            overall = sum(
+                sum(financial_data[p][c.code].get(acc.account_code, Decimal('0')) for c in companies_with_data)
+                for p in periods
+            )
+            row['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
+
+            if has_non_zero_value:
+                report_data.append(row)
+
+        # Субитог секции
+        sub_total = {
+            'type': 'sub_total',
+            'account_name': f'Total {sub_category}',
+            'account_code': '',
+            'periods': {},
+            'grand_totals': {}
+        }
+        for p in periods:
+            sub_total['periods'][p] = {}
+            period_total = Decimal('0')
+            for c in companies_with_data:  # Используем только компании с данными
+                company_total = sum(
+                    financial_data[p][c.code].get(a.account_code, Decimal('0'))
+                    for a in category_accounts
+                )
+                sub_total['periods'][p][c.code] = float(company_total or Decimal('0'))
+                period_total += company_total or Decimal('0')
+            sub_total['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
+
+        for c in companies_with_data:  # Используем только компании с данными
+            gtot = sum(
+                sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in category_accounts)
+                for p in periods
+            )
+            sub_total['grand_totals'][c.code] = float(gtot or Decimal('0'))
+        overall = sum(
+            sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in category_accounts) for c in companies_with_data)
+            for p in periods
+        )
+        sub_total['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
+        report_data.append(sub_total)
+
+    # Total Revenue
+    total_revenue_row = {
+        'type': 'total',
+        'account_name': 'TOTAL REVENUE',
+        'account_code': '',
+        'periods': {},
+        'grand_totals': {}
+    }
+    for p in periods:
+        total_revenue_row['periods'][p] = {}
+        period_total = Decimal('0')
+        for c in companies_with_data:  # Используем только компании с данными
+            company_total = sum(
+                financial_data[p][c.code].get(a.account_code, Decimal('0'))
+                for a in income_accounts
+            )
+            total_revenue_row['periods'][p][c.code] = float(company_total or Decimal('0'))
+            period_total += company_total or Decimal('0')
+        total_revenue_row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
+    # Grand totals for revenue
+    for c in companies_with_data:  # Используем только компании с данными
+        gtot = sum(
+            sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in income_accounts)
+            for p in periods
+        )
+        total_revenue_row['grand_totals'][c.code] = float(gtot or Decimal('0'))
+    overall_revenue = sum(
+        sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in income_accounts) for c in companies_with_data)
+        for p in periods
+    )
+    total_revenue_row['grand_totals']['TOTAL'] = float(overall_revenue or Decimal('0'))
+    report_data.append(total_revenue_row)
+    
+    # Добавляем раздел EXPENSES
+    expense_total_row = {
+        'type': 'section_header',
+        'account_name': 'EXPENSES',
+        'account_code': '',
+        'periods': {},
+        'grand_totals': {}
+    }
+    report_data.append(expense_total_row)
+    
+    # Обрабатываем Expense счета
+    expense_accounts = [a for a in chart_accounts if a.account_type == 'EXPENSE']
+    for sub_category in pl_structure:
+        if sub_category not in grouped_data:
+            continue
+            
+        # Проверяем есть ли Expense счета в этой категории
+        category_accounts = [a for a in grouped_data[sub_category] if a.account_type == 'EXPENSE' and a.account_code]
+        if not category_accounts:
+            continue
+
+        # Подзаголовок
+        report_data.append({
+            'type': 'sub_header',
+            'account_name': sub_category,
+            'account_code': '',
+            'periods': {},
+            'grand_totals': {}
+        })
+
+        # Счета (аналогично Income)
+        for acc in category_accounts:
+            row = {
+                'type': 'account',
+                'account_name': acc.account_name,
+                'account_code': acc.account_code,
+                'periods': {},
+                'grand_totals': {}
+            }
+            has_non_zero_value = False
+            # Помесячно
+            for p in periods:
+                row['periods'][p] = {}
+                period_total = Decimal('0')
+                for c in companies:
+                    amount = financial_data[p][c.code].get(acc.account_code, 0)
+                    row['periods'][p][c.code] = float(amount or 0)
+                    period_total += amount or 0
+                    if amount != 0:
+                        has_non_zero_value = True
+                row['periods'][p]['TOTAL'] = float(period_total or 0)
+
+            # Гранд тоталы
+            for c in companies:
+                grand_total = sum(financial_data[p][c.code].get(acc.account_code, 0) for p in periods)
+                row['grand_totals'][c.code] = float(grand_total or 0)
+            overall = sum(
+                sum(financial_data[p][c.code].get(acc.account_code, 0) for c in companies)
+                for p in periods
+            )
+            row['grand_totals']['TOTAL'] = float(overall or 0)
+
+            if has_non_zero_value:
+                report_data.append(row)
+
+        # Субитог секции
+        sub_total = {
+            'type': 'sub_total',
+            'account_name': f'Total {sub_category}',
+            'account_code': '',
+            'periods': {},
+            'grand_totals': {}
+        }
+        for p in periods:
+            sub_total['periods'][p] = {}
+            period_total = Decimal('0')
+            for c in companies:
+                company_total = sum(
+                    financial_data[p][c.code].get(a.account_code, 0)
+                    for a in category_accounts
+                )
+                sub_total['periods'][p][c.code] = float(company_total or 0)
+                sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
+
+        for c in companies:
+            gtot = sum(
+                sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts)
+                for p in periods
+            )
+            sub_total['grand_totals'][c.code] = float(gtot or 0)
+        overall = sum(
+            sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in category_accounts) for c in companies)
+            for p in periods
+        )
+        sub_total['grand_totals']['TOTAL'] = float(overall or 0)
+        report_data.append(sub_total)
+
+    # Total Expenses
+    total_expense_row = {
+        'type': 'total',
+        'account_name': 'TOTAL EXPENSES',
+        'account_code': '',
+        'periods': {},
+        'grand_totals': {}
+    }
+    for p in periods:
+        total_expense_row['periods'][p] = {}
+        period_total = Decimal('0')
+        for c in companies:
+            company_total = sum(
+                financial_data[p][c.code].get(a.account_code, 0)
+                for a in expense_accounts
+            )
+            total_expense_row['periods'][p][c.code] = float(company_total or 0)
+            period_total += company_total or 0
+        total_expense_row['periods'][p]['TOTAL'] = float(period_total or 0)
+    # Grand totals for expenses
+    for c in companies:
+        gtot = sum(
+            sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts)
+            for p in periods
+        )
+        total_expense_row['grand_totals'][c.code] = float(gtot or 0)
+    overall_expense = sum(
+        sum(sum(financial_data[p][c.code].get(a.account_code, 0) for a in expense_accounts) for c in companies)
+        for p in periods
+    )
+    total_expense_row['grand_totals']['TOTAL'] = float(overall_expense or 0)
+    report_data.append(total_expense_row)
+    
+    # NET INCOME (Revenue - Expenses)
+    net_income_row = {
+        'type': 'net_income',
+        'account_name': 'NET INCOME',
+        'account_code': '',
+        'periods': {},
+        'grand_totals': {}
+    }
+    for p in periods:
+        net_income_row['periods'][p] = {}
+        period_total = Decimal('0')
+        for c in companies:
+            revenue = Decimal(str(total_revenue_row['periods'][p][c.code]))
+            expense = Decimal(str(total_expense_row['periods'][p][c.code]))
+            net = revenue - expense
+            net_income_row['periods'][p][c.code] = float(net)
+            period_total += net
+        net_income_row['periods'][p]['TOTAL'] = float(period_total)
+    # Grand totals for net income
+    for c in companies:
+        revenue = Decimal(str(total_revenue_row['grand_totals'][c.code]))
+        expense = Decimal(str(total_expense_row['grand_totals'][c.code]))
+        net_income_row['grand_totals'][c.code] = float(revenue - expense)
+    net_income_row['grand_totals']['TOTAL'] = float(Decimal(str(total_revenue_row['grand_totals']['TOTAL'])) - Decimal(str(total_expense_row['grand_totals']['TOTAL'])))
+    report_data.append(net_income_row)
+
+    # Колонки AG Grid
+    column_defs = [
+        {
+            "headerName": "+",
+            "field": "toggler",
+            "headerComponent": "togglerHeader",
+            "width": 40,
+            "pinned": "left",
+            "hide": False
+        },
+        {
+            "field": "account_code",
+            "colId": "account_code",
+            "headerName": "A/C",
+            "headerComponent": "hideableHeader",
+            "width": 90,
+            "pinned": "left",
+            "hide": True,
+            "sortable": True
+        },
+        {'field': 'account_name', 'headerName': 'Account Name', 'pinned': 'left', 'width': 250}
+    ]
+    for p in periods:
+        for c in display_companies:  # Use filtered list
+            column_defs.append({
+                'field': f'{p.strftime("%b-%y")}_{c.code}',
+                'headerName': f'{p.strftime("%b-%y")} {c.code}',
+                'width': 120,
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#E6F3FF' if str(c.code).upper().startswith('F2') else '#E8F5E9'
+                }
+            })
+        # P&L TOTAL per period (existing)
+        column_defs.append({
+            'field': f'{p.strftime("%b-%y")}_TOTAL',
+            'headerName': f'{p.strftime("%b-%y")} TOTAL',
+            'width': 120,
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#FFF9E6'
+            }
+        })
+        # Add Budget/Forecast consolidated column when viewing Budget or Forecast
+        if data_type in ['budget', 'forecast']:
+            column_defs.append({
+                'headerName': f'{p.strftime("%b-%y")} Budget',
+                'field': f'{p.strftime("%b-%y")}_Budget',
+                'type': 'numberColumnWithCommas',
+                'cellClass': 'budget-cell',
+                'width': 120
+            })
+        # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
+    for c in companies:
+        column_defs.append({
+            'field': f'grand_total_{c.code}',
+            'headerName': f'Grand Total {c.code}',
+            'width': 120,
+            'type': 'numberColumnWithCommas'
+        })
+    column_defs.append({
+        'field': 'grand_total_TOTAL',
+        'headerName': 'Grand Total',
+        'width': 120,
+        'type': 'numberColumnWithCommas'
+    })
+
+    # CF Dashboard section - loan movements and funding metrics
+    cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
+    cf_data = CFDashboardData.objects.filter(
+        company__in=companies,
+        period__gte=from_date_start,
+        period__lte=to_date_end
+    ).select_related('metric', 'company')
+    
+    # Load CF Dashboard Budget/Forecast data (consolidated, not per company)
+    from .models import CFDashboardBudget
+    cf_budget_data = CFDashboardBudget.objects.filter(
+        data_type=data_type if data_type in ['budget', 'forecast'] else 'budget',
+        period__gte=from_date_start,
+        period__lte=to_date_end
+    ).select_related('metric')
+    
+    # Build CF Dashboard rows
+    cf_rows = []
+    for metric in cf_metrics:
+        row = {
+            'account_code': '',
+            'account_name': metric.metric_name,
+            'is_cf_dashboard': True,
+            'metric_id': metric.id
+        }
+        
+        # Identify metric type
+        name_val = metric.metric_name or ''
+        is_cumulative_metric = 'Cumulative' in name_val
+        is_ytd_metric = ('YTD' in name_val) and not is_cumulative_metric
+        
+        previous_total = 0  # for YTD accumulation of TOTAL only
+        loans_advanced_row = None
+        
+        # If cumulative, try to find the already-built "Loans advanced in month" row
+        if is_cumulative_metric:
+            for existing_row in cf_rows:
+                if 'Loans advanced in month' in (existing_row.get('account_name') or ''):
+                    loans_advanced_row = existing_row
+                    break
+        
+        # Process each period
+        for period in periods:
+            period_total = 0
+            
+            # Get values for each company
+            for company in display_companies:  # Use filtered list
+                period_key = f"{period.strftime('%b-%y')}_{company.code}"
+                
+                if is_cumulative_metric:
+                    # For January: use input value for cumulative metric
+                    if period.month == 1:
+                        cf_value = cf_data.filter(
+                            company=company,
+                            period=period,
+                            metric=metric
+                        ).values_list('value', flat=True).first()
+                        value = cf_value or 0
+                    else:
+                        # Feb-Dec: previous month cumulative + current month loans advanced
+                        prev_month = period.month - 1
+                        prev_period = period.replace(month=prev_month)
+                        prev_key = f"{prev_period.strftime('%b-%y')}_{company.code}"
+                        prev_cumulative = row.get(prev_key, 0)
+                        current_loans = 0
+                        if loans_advanced_row is not None:
+                            current_loans = loans_advanced_row.get(period_key, 0) or 0
+                        value = (prev_cumulative or 0) + (current_loans or 0)
+                else:
+                    # Regular or YTD metric: use input values per company-month
+                    cf_value = cf_data.filter(
+                        company=company,
+                        period=period,
+                        metric=metric
+                    ).values_list('value', flat=True).first()
+                    value = cf_value or 0
+                
+                row[period_key] = value
+                period_total += value
+            
+            # Calculate TOTAL column
+            period_total_key = f"{period.strftime('%b-%y')}_TOTAL"
+            if is_ytd_metric:
+                current_ytd_total = previous_total + period_total
+                row[period_total_key] = current_ytd_total
+                previous_total = current_ytd_total
+            else:
+                row[period_total_key] = period_total
+            
+            # Add Budget/Forecast consolidated value for this period (single column)
+            if data_type in ['budget', 'forecast']:
+                period_budget_key = f"{period.strftime('%b-%y')}_Budget"
+                budget_value = cf_budget_data.filter(
+                    metric=metric,
+                    period=period
+                ).values_list('value', flat=True).first()
+                row[period_budget_key] = float(budget_value) if budget_value is not None else None
+        
+        cf_rows.append(row)
+
+    # Данные строк для AG Grid
+    row_data = []
+    
+    # Add CF Dashboard rows at the top
+    for cf_row in cf_rows:
+        row_data.append(cf_row)
+    
+    # Add visual separator after CF Dashboard
+    if cf_rows:
+        row_data.append({
+            'account_code': '',
+            'account_name': '━' * 30 + ' P&L REPORT ' + '━' * 30,
+            'is_separator': True
+        })
+    
+    # Then add regular P&L rows
+    for r in report_data:
+        grid_row = {
+            'account_code': r['account_code'],
+            'account_name': r['account_name'],
+            'rowType': r['type']
+        }
+        for p in periods:
+            for c in companies:
+                field = f'{p.strftime("%b-%y")}_{c.code}'
+                value = r['periods'].get(p, {}).get(c.code, 0)
+                # Send None for zero values so grid shows empty cells
+                grid_row[field] = None if value == 0 else float(value)
+            field_total = f'{p.strftime("%b-%y")}_TOTAL'
+            total_value = r['periods'].get(p, {}).get('TOTAL', 0)
+            # Hide zeros in TOTAL columns as well
+            grid_row[field_total] = None if total_value == 0 else float(total_value)
+        for c in companies:
+            field = f'grand_total_{c.code}'
+            gt_val = r['grand_totals'].get(c.code, 0)
+            # Hide zero company grand totals by sending None
+            grid_row[field] = None if gt_val == 0 else float(gt_val)
+        # Overall grand total: hide zero as empty
+        overall_total_value = r['grand_totals'].get('TOTAL', 0)
+        grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
+
+        # Стили для разных типов строк
+        if r['type'] == 'section_header':
+            grid_row['cellStyle'] = {'backgroundColor': '#d4edda', 'fontWeight': 'bold', 'fontSize': '15px'}
+        elif r['type'] == 'sub_header':
+            grid_row['cellStyle'] = {'backgroundColor': '#f0f8ff', 'fontWeight': 'bold'}
+        elif r['type'] == 'sub_total':
+            grid_row['cellStyle'] = {'backgroundColor': '#fff8dc', 'fontWeight': 'bold'}
+        elif r['type'] == 'total':
+            grid_row['cellStyle'] = {'backgroundColor': '#e8f5e8', 'fontWeight': 'bold', 'fontSize': '14px'}
+        elif r['type'] == 'net_income':
+            grid_row['cellStyle'] = {'backgroundColor': '#ffeaa7', 'fontWeight': 'bold', 'fontSize': '15px'}
+
+        row_data.append(grid_row)
+
+    logger.info(f"Final P&L report data count: {len(report_data)}")
+    logger.info("--- P&L Report Data Generation Finished ---")
+
+    debug_info['ping'] = 'pl_report_data v4 - Fixed indexing and Decimal types'
+
+    return JsonResponse({
+        'columnDefs': column_defs,
+        'rowData': row_data,
+        'debug_info': debug_info
+    })
+
+def bs_report_data(request):

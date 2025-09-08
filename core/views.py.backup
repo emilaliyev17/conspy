@@ -293,8 +293,7 @@ def upload_financial_data(request):
         try:
             uploaded_file = request.FILES['file']
             company_id = request.POST.get('company')
-            data_type_raw = request.POST.get('data_type', 'actual')
-            data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+            data_type = request.POST.get('data_type', 'actual')
             
             if not company_id:
                 if is_ajax:
@@ -565,9 +564,7 @@ def pl_report_data(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type_raw = request.GET.get('data_type', 'actual')
-    # Normalize to match database: actual->Actual, budget->Budget
-    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+    data_type = request.GET.get('data_type', 'actual')
     logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
     # CRITICAL DIAGNOSTICS (feature flags and data types)
     try:
@@ -576,8 +573,8 @@ def pl_report_data(request):
         print(f"[FEATURE FLAG] PL_BUDGET_PARALLEL setting: {getattr(_dj_settings, 'PL_BUDGET_PARALLEL', 'NOT_FOUND')}")
         print(f"[FEATURE FLAG] Environment var: {os.environ.get('PL_BUDGET_PARALLEL', 'NOT_SET')}")
         print(f"[FEATURE FLAG] is_enabled result: {is_enabled('PL_BUDGET_PARALLEL')}")
-        print(f"[DATA TYPE] Received raw: '{data_type_raw}'")
-        print(f"[DATA TYPE] Normalized: '{data_type}'")
+        print(f"[DATA TYPE] Received: '{data_type}'")
+        print(f"[DATA TYPE] Lower case: '{data_type.lower() if data_type else 'None'}'")
     except Exception:
         pass
     # Execution flow diagnostics
@@ -605,11 +602,8 @@ def pl_report_data(request):
 
     # Компании
     companies = list(Company.objects.all().order_by('name'))
-    # For Budget/Forecast show ALL companies including budget-only, for Actual exclude budget-only
-    if data_type and data_type.lower() in ['budget', 'forecast']:
-        display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
-    else:
-        display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+    # Filter budget-only companies from display columns (no hardcoded codes)
+    display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     logger.info(f"Found {len(companies)} companies.")
 
     # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
@@ -632,7 +626,7 @@ def pl_report_data(request):
             # Actual periods (always from 'actual' stream)
             ap_q = FinancialData.objects.filter(
                 company__in=actual_companies,
-                data_type='Actual',
+                data_type='actual',
                 account_code__in=pl_account_codes,
             )
             if start:
@@ -712,7 +706,7 @@ def pl_report_data(request):
 
         actual_financial_data = list(
             FinancialData.objects.filter(
-                data_type='Actual',
+                data_type='actual',
                 period__in=periods,
                 company__in=actual_companies,
                 account_code__in=pl_account_codes
@@ -774,10 +768,6 @@ def pl_report_data(request):
     logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
     logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
     financial_data = {}
-    # Define a soft, readable palette (no reds) and map companies deterministically
-    palette = ['#E6F3FF', '#E8F5E9', '#F0F4FF', '#E6F7F7', '#F6F8E7', '#F0E6FF', '#F5F5F5']
-    color_by_company = {c.id: palette[i % len(palette)] for i, c in enumerate(display_companies)}
-
     for p in periods:
         financial_data[p] = {}
         if is_enabled('PL_BUDGET_PARALLEL'):
@@ -830,14 +820,6 @@ def pl_report_data(request):
             # Sum if multiple entries per period/account
             prev = budget_values[p].get(acc, 0)
             budget_values[p][acc] = prev + (fd.amount or 0)
-            print(f"DEBUG: Added to budget_values - period: {p}, account: {acc}, amount: {fd.amount}")  # ДОБАВЬТЕ
-        
-        # Debug: Show what's in budget_values
-        print(f"DEBUG BUDGET_VALUES: Total periods with budget data: {len(budget_values)}")
-        for period, accounts in budget_values.items():
-            print(f"DEBUG BUDGET_VALUES: Period {period}: {len(accounts)} accounts")
-            for acc, amount in accounts.items():
-                print(f"DEBUG BUDGET_VALUES:   {acc}: {amount}")
     else:
         for fd in all_financial_data:
             p = fd.period
@@ -1021,21 +1003,6 @@ def pl_report_data(request):
                 sub_total['periods'][p][c.code] = float(company_total or Decimal('0'))
                 period_total += company_total or Decimal('0')
             sub_total['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
-            # Budget subtotal per period (Budget/Forecast only)
-            if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-                budget_subtotal = Decimal('0')
-                for acc in category_accounts:
-                    raw_budget = budget_values.get(p, {}).get(acc.account_code)
-                    if raw_budget is not None:
-                        try:
-                            budget_subtotal += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                        except Exception:
-                            pass
-                if budget_subtotal != 0:
-                    try:
-                        sub_total['periods'][p]['Budget'] = float(budget_subtotal)
-                    except Exception:
-                        sub_total['periods'][p]['Budget'] = None
 
         for c in companies_with_data:  # Используем только компании с данными
             gtot = sum(
@@ -1069,28 +1036,6 @@ def pl_report_data(request):
             total_revenue_row['periods'][p][c.code] = float(company_total or Decimal('0'))
             period_total += company_total or Decimal('0')
         total_revenue_row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
-        # Budget total revenue by period (Budget/Forecast only)
-        if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-            budget_total = Decimal('0')
-            print(f"DEBUG TOTAL REVENUE: Calculating Budget for period {p}")
-            for a in income_accounts:
-                raw_budget = budget_values.get(p, {}).get(a.account_code)
-                if raw_budget is not None:
-                    try:
-                        budget_total += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                        print(f"DEBUG TOTAL REVENUE: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
-                    except Exception:
-                        pass
-            print(f"DEBUG TOTAL REVENUE: Final budget_total for period {p} = {budget_total}")
-            if budget_total != 0:
-                try:
-                    total_revenue_row['periods'][p]['Budget'] = float(budget_total)
-                    print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = {float(budget_total)}")
-                except Exception:
-                    total_revenue_row['periods'][p]['Budget'] = None
-                    print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = None (exception)")
-            else:
-                print(f"DEBUG TOTAL REVENUE: budget_total is 0, not setting Budget value")
     # Grand totals for revenue
     for c in pl_companies:  # Используем только компании с данными
         gtot = sum(
@@ -1206,32 +1151,7 @@ def pl_report_data(request):
                     for a in category_accounts
                 )
                 sub_total['periods'][p][c.code] = float(company_total or 0)
-                # Accumulate per-company totals into the per-period TOTAL
-                period_total += company_total or 0
-            # Set per-period TOTAL after summing all companies
-            sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
-            # Budget subtotal per period (Budget/Forecast only)
-            if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-                budget_subtotal = Decimal('0')
-                print(f"DEBUG SUBTOTAL: Calculating Budget for {sub_category}, period {p}")
-                for acc in category_accounts:
-                    raw_budget = budget_values.get(p, {}).get(acc.account_code)
-                    if raw_budget is not None:
-                        try:
-                            budget_subtotal += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                            print(f"DEBUG SUBTOTAL: Added {acc.account_code} = {raw_budget}, running total = {budget_subtotal}")
-                        except Exception:
-                            pass
-                print(f"DEBUG SUBTOTAL: Final budget_subtotal for {sub_category}, period {p} = {budget_subtotal}")
-                if budget_subtotal != 0:
-                    try:
-                        sub_total['periods'][p]['Budget'] = float(budget_subtotal)
-                        print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = {float(budget_subtotal)}")
-                    except Exception:
-                        sub_total['periods'][p]['Budget'] = None
-                        print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = None (exception)")
-                else:
-                    print(f"DEBUG SUBTOTAL: budget_subtotal is 0, not setting Budget value")
+                sub_total['periods'][p]['TOTAL'] = float(period_total or 0)
 
         for c in pl_companies:
             gtot = sum(
@@ -1244,13 +1164,6 @@ def pl_report_data(request):
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or 0)
-        
-        # Debug: Show what's in the subtotal row before adding to report_data
-        print(f"DEBUG SUBTOTAL ROW: Final subtotal for '{sub_total['account_name']}':")
-        for p in periods:
-            budget_val = sub_total['periods'][p].get('Budget')
-            print(f"DEBUG SUBTOTAL ROW:   Period {p}: Budget = {budget_val}")
-        
         report_data.append(sub_total)
 
     # Total Expenses
@@ -1272,28 +1185,6 @@ def pl_report_data(request):
             total_expense_row['periods'][p][c.code] = float(company_total or 0)
             period_total += company_total or 0
         total_expense_row['periods'][p]['TOTAL'] = float(period_total or 0)
-        # Budget total expenses by period (Budget/Forecast only)
-        if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-            budget_total = Decimal('0')
-            print(f"DEBUG TOTAL EXPENSES: Calculating Budget for period {p}")
-            for a in expense_accounts:
-                raw_budget = budget_values.get(p, {}).get(a.account_code)
-                if raw_budget is not None:
-                    try:
-                        budget_total += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                        print(f"DEBUG TOTAL EXPENSES: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
-                    except Exception:
-                        pass
-            print(f"DEBUG TOTAL EXPENSES: Final budget_total for period {p} = {budget_total}")
-            if budget_total != 0:
-                try:
-                    total_expense_row['periods'][p]['Budget'] = float(budget_total)
-                    print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = {float(budget_total)}")
-                except Exception:
-                    total_expense_row['periods'][p]['Budget'] = None
-                    print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = None (exception)")
-            else:
-                print(f"DEBUG TOTAL EXPENSES: budget_total is 0, not setting Budget value")
     # Grand totals for expenses
     for c in pl_companies:
         gtot = sum(
@@ -1371,14 +1262,14 @@ def pl_report_data(request):
                 'companyCode': c.code,
                 'cellStyle': {
                     'textAlign': 'right',
-                    'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
+                    # Styling based on company id instead of code prefix
+                    'backgroundColor': '#E6F3FF' if getattr(c, 'id', None) == 1 else '#E8F5E9'
                 }
             })
         # P&L TOTAL per period (existing)
         period_cols.append({
             'field': f'{p.strftime("%b-%y")}_TOTAL',
             'headerName': f'{p.strftime("%b-%y")} TOTAL',
-            'headerComponent': 'periodToggleHeader',
             'width': 120,
             'type': 'numberColumnWithCommas',
             'colType': 'total',
@@ -1389,69 +1280,30 @@ def pl_report_data(request):
             }
         })
         # Add Budget/Forecast consolidated column when viewing Budget or Forecast
-        if data_type and data_type.lower() in ['budget', 'forecast']:
+        if data_type in ['budget', 'forecast']:
             period_cols.append({
                 'headerName': f'{p.strftime("%b-%y")} Budget',
                 'field': f'{p.strftime("%b-%y")}_Budget',
                 'type': 'numberColumnWithCommas',
                 'cellClass': 'budget-cell',
-                'colType': 'budget',
-                'cellStyle': {
-                    'textAlign': 'right',
-                    'backgroundColor': '#F0F0FF'
-                },
                 'width': 120
             })
         # Extend into main column defs in the exact order
         column_defs.extend(period_cols)
         # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
-    # Ensure visual consistency: Non-budget company grand totals first, then overall TOTAL, then budget-only grand total
-    non_budget_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
-    budget_only_companies = [c for c in companies if getattr(c, 'is_budget_only', False)]
-
-    # Grand totals for regular companies
-    for c in non_budget_companies:
+    for c in companies:
         column_defs.append({
             'field': f'grand_total_{c.code}',
             'headerName': f'Grand Total {c.code}',
             'width': 120,
-            'type': 'numberColumnWithCommas',
-            'cellStyle': {
-                'textAlign': 'right',
-                'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
-            }
+            'type': 'numberColumnWithCommas'
         })
-
-    # Overall Grand Total (TOTAL) column
     column_defs.append({
         'field': 'grand_total_TOTAL',
         'headerName': 'Grand Total',
         'width': 120,
-        'type': 'numberColumnWithCommas',
-        'cellStyle': {
-            'textAlign': 'right',
-            'backgroundColor': '#FFF9E6'
-        }
+        'type': 'numberColumnWithCommas'
     })
-
-    # Grand Total Budget column (only in Budget/Forecast views) — ensure added only once
-    if data_type and data_type.lower() in ['budget', 'forecast']:
-        if not any(col.get('field') == 'grand_total_Budget' for col in column_defs):
-            column_defs.append({
-                'field': 'grand_total_Budget',
-                'headerName': 'Grand Total Budget',
-                'width': 120,
-                'type': 'numberColumnWithCommas',
-                'cellStyle': {
-                    'textAlign': 'right',
-                    'backgroundColor': '#F0F0FF'
-                }
-            })
-
-    # Grand total for budget-only company (if present) is skipped to avoid field name collision
-    # with the overall 'grand_total_Budget' column. This per-company column is unused/empty.
-    for c in budget_only_companies:
-        pass
 
     # CF Dashboard section - loan movements and funding metrics
     cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
@@ -1465,7 +1317,7 @@ def pl_report_data(request):
     
     # Load CF Dashboard Budget/Forecast data (consolidated, not per company)
     from .models import CFDashboardBudget
-    cf_budget_query = CFDashboardBudget.objects.filter(data_type=data_type.lower())
+    cf_budget_query = CFDashboardBudget.objects.filter(data_type=data_type)
     if from_date_start:
         cf_budget_query = cf_budget_query.filter(period__gte=from_date_start)
     if to_date_end:
@@ -1546,7 +1398,7 @@ def pl_report_data(request):
                 row[period_total_key] = period_total
             
             # Add Budget/Forecast consolidated value for this period (single column)
-            if data_type and data_type.lower() in ['budget', 'forecast']:
+            if data_type in ['budget', 'forecast']:
                 period_budget_key = f"{period.strftime('%b-%y')}_Budget"
                 budget_value = cf_budget_data.filter(
                     metric=metric,
@@ -1554,19 +1406,6 @@ def pl_report_data(request):
                 ).values_list('value', flat=True).first()
                 row[period_budget_key] = float(budget_value) if budget_value is not None else None
         
-        # CF: Sum per-period Budget values into grand_total_Budget (Budget/Forecast only)
-        if data_type and data_type.lower() in ['budget', 'forecast']:
-            total_budget_sum = 0
-            for p in periods:
-                key = f"{p.strftime('%b-%y')}_Budget"
-                val = row.get(key)
-                if val is not None:
-                    try:
-                        total_budget_sum += float(val)
-                    except Exception:
-                        pass
-            row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
-
         cf_rows.append(row)
 
     # Данные строк для AG Grid
@@ -1602,21 +1441,15 @@ def pl_report_data(request):
             # Hide zeros in TOTAL columns as well
             grid_row[field_total] = None if total_value == 0 else float(total_value)
             # Populate consolidated Budget for P&L rows under feature flag using dual stream budget_values
-            if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
+            if is_enabled('PL_BUDGET_PARALLEL') and data_type in ['budget', 'forecast']:
                 field_budget = f'{p.strftime("%b-%y")}_Budget'
                 budget_amount = 0
                 if r['type'] == 'account':
                     acc = r.get('account_code')
                     if acc:
-                        print(f"DEBUG: Getting budget for account {acc}, period {p}: {budget_values.get(p, {}).get(acc, 0)}")  # ДОБАВЬТЕ
                         budget_amount = float(budget_values.get(p, {}).get(acc, 0))
-                elif r['type'] == 'sub_total':
-                    # For subtotal rows, get the Budget value from the row data
-                    budget_amount = r['periods'].get(p, {}).get('Budget', 0)
-                    print(f"DEBUG GRID: Processing sub_total row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
                 # For non-account rows, leave budget empty (could be summed separately if needed)
                 grid_row[field_budget] = None if not budget_amount else float(budget_amount)
-                print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
@@ -1625,20 +1458,6 @@ def pl_report_data(request):
         # Overall grand total: hide zero as empty
         overall_total_value = r['grand_totals'].get('TOTAL', 0)
         grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
-
-        # P&L: Sum per-period Budget values into grand_total_Budget for account rows (Budget/Forecast only)
-        if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
-            if r['type'] == 'account':
-                total_budget_sum = 0
-                for p in periods:
-                    key = f"{p.strftime('%b-%y')}_Budget"
-                    val = grid_row.get(key)
-                    if val is not None:
-                        try:
-                            total_budget_sum += float(val)
-                        except Exception:
-                            pass
-                grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':
@@ -1671,8 +1490,7 @@ def bs_report_data(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type_raw = request.GET.get('data_type', 'actual')
-    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+    data_type = request.GET.get('data_type', 'actual')
     
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
@@ -2043,8 +1861,7 @@ def pl_report(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type_raw = request.GET.get('data_type', 'actual')
-    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+    data_type = request.GET.get('data_type', 'actual')
     
     year_range = range(2023, 2031)
     
@@ -2066,8 +1883,7 @@ def bs_report(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type_raw = request.GET.get('data_type', 'actual')
-    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+    data_type = request.GET.get('data_type', 'actual')
 
     year_range = range(2023, 2031)
 
@@ -2090,8 +1906,7 @@ def export_report_excel(request):
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
     to_year = request.GET.get('to_year', '')
-    data_type_raw = request.GET.get('data_type', 'actual')
-    data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
+    data_type = request.GET.get('data_type', 'actual')
     
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
