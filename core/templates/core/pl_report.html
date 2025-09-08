@@ -308,6 +308,11 @@
             background-color: #ffffff !important;
             font-weight: bold !important;
         }
+
+        /* Bold entire row for rows with account_name containing 'Total' */
+        .total-row-bold {
+            font-weight: bold !important;
+        }
     </style>
 </head>
 <body>
@@ -770,12 +775,23 @@
                         suppressCellFocus: true,
                         suppressRowHoverHighlight: true,
                         getRowClass: function(params) {
-                            if (params.data.rowType === 'parent_header') return 'parent-header-row';
-                            if (params.data.rowType === 'sub_header') return 'sub-header-row';
-                            if (params.data.rowType === 'sub_total') return 'sub-total-row';
-                            if (params.data.rowType === 'parent_total') return 'parent-total-row';
-                            if (params.data.rowType === 'calculated_total') return 'calculated-total-row';
-                            return '';
+                            const classes = [];
+                            const rt = params && params.data ? params.data.rowType : null;
+                            if (rt === 'parent_header') classes.push('parent-header-row');
+                            else if (rt === 'sub_header') classes.push('sub-header-row');
+                            else if (rt === 'sub_total') classes.push('sub-total-row');
+                            else if (rt === 'parent_total') classes.push('parent-total-row');
+                            else if (rt === 'calculated_total') classes.push('calculated-total-row');
+
+                            // Bold rows where account_name contains 'Total' or 'TOTAL'
+                            if (params && params.data && params.data.account_name) {
+                                const name = params.data.account_name;
+                                if (name.includes('Total') || name.includes('TOTAL')) {
+                                    classes.push('total-row-bold');
+                                }
+                            }
+
+                            return classes.join(' ');
                         }
                     };
                     
