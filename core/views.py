@@ -1336,18 +1336,24 @@ def pl_report_data(request):
         }
     })
 
-    # Grand total for budget-only company (if present) comes last
+    # Grand Total Budget column (only in Budget/Forecast views) — ensure added only once
+    if data_type and data_type.lower() in ['budget', 'forecast']:
+        if not any(col.get('field') == 'grand_total_Budget' for col in column_defs):
+            column_defs.append({
+                'field': 'grand_total_Budget',
+                'headerName': 'Grand Total Budget',
+                'width': 120,
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#F0F0FF'
+                }
+            })
+
+    # Grand total for budget-only company (if present) is skipped to avoid field name collision
+    # with the overall 'grand_total_Budget' column. This per-company column is unused/empty.
     for c in budget_only_companies:
-        column_defs.append({
-            'field': f'grand_total_{c.code}',
-            'headerName': f'Grand Total {c.code}',
-            'width': 120,
-            'type': 'numberColumnWithCommas',
-            'cellStyle': {
-                'textAlign': 'right',
-                'backgroundColor': '#F0F0FF'
-            }
-        })
+        pass
 
     # CF Dashboard section - loan movements and funding metrics
     cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
@@ -1450,6 +1456,19 @@ def pl_report_data(request):
                 ).values_list('value', flat=True).first()
                 row[period_budget_key] = float(budget_value) if budget_value is not None else None
         
+        # CF: Sum per-period Budget values into grand_total_Budget (Budget/Forecast only)
+        if data_type and data_type.lower() in ['budget', 'forecast']:
+            total_budget_sum = 0
+            for p in periods:
+                key = f"{p.strftime('%b-%y')}_Budget"
+                val = row.get(key)
+                if val is not None:
+                    try:
+                        total_budget_sum += float(val)
+                    except Exception:
+                        pass
+            row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
+
         cf_rows.append(row)
 
     # Данные строк для AG Grid
@@ -1503,6 +1522,20 @@ def pl_report_data(request):
         # Overall grand total: hide zero as empty
         overall_total_value = r['grand_totals'].get('TOTAL', 0)
         grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
+
+        # P&L: Sum per-period Budget values into grand_total_Budget for account rows (Budget/Forecast only)
+        if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
+            if r['type'] == 'account':
+                total_budget_sum = 0
+                for p in periods:
+                    key = f"{p.strftime('%b-%y')}_Budget"
+                    val = grid_row.get(key)
+                    if val is not None:
+                        try:
+                            total_budget_sum += float(val)
+                        except Exception:
+                            pass
+                grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':
