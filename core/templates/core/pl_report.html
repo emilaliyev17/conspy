@@ -167,6 +167,14 @@
             border-bottom: 1px solid #dee2e6 !important;
             font-weight: bold !important; /* Make sub_category headers bold; do not change size */
         }
+
+        /* Marketing sub-header row styling - black border above */
+        .marketing-header-row {
+            background-color: #f1f3f4 !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+            font-weight: bold !important;
+        }
         
         .sub-total-row {
             background-color: #e8f4fd !important;
@@ -179,9 +187,10 @@
             border-bottom: 1px solid #000000 !important;
         }
 
-        /* Total Administration row styling - black border below */
+        /* Total Administration row styling - black border below and above */
         .administration-row {
             background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
         
@@ -811,7 +820,14 @@
                             const classes = [];
                             const rt = params && params.data ? params.data.rowType : null;
                             if (rt === 'parent_header') classes.push('parent-header-row');
-                            else if (rt === 'sub_header') classes.push('sub-header-row');
+                            else if (rt === 'sub_header') {
+                                // Check if this is "Marketing" specifically
+                                if (params && params.data && params.data.account_name === 'Marketing') {
+                                    classes.push('marketing-header-row');
+                                } else {
+                                    classes.push('sub-header-row');
+                                }
+                            }
                             else if (rt === 'sub_total') {
                                 // Check for specific subtotal rows that need black borders
                                 if (params && params.data && params.data.account_name === 'Total Employee related') {
