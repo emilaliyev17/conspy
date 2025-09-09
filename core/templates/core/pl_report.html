@@ -242,6 +242,13 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* TOTAL REVENUE row styling - borders above and below */
+        .total-revenue-row {
+            background-color: #d4edda !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -908,8 +915,10 @@
                             }
                             else if (rt === 'parent_total') classes.push('parent-total-row');
                             else if (rt === 'total') {
-                                // Check if this is TOTAL EXPENSES specifically
-                                if (params && params.data && params.data.account_name === 'TOTAL EXPENSES') {
+                                // Check for specific total rows that need black borders
+                                if (params && params.data && params.data.account_name === 'TOTAL REVENUE') {
+                                    classes.push('total-revenue-row');
+                                } else if (params && params.data && params.data.account_name === 'TOTAL EXPENSES') {
                                     classes.push('total-expenses-row');
                                 } else {
                                     classes.push('parent-total-row');
