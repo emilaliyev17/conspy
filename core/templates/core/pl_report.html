@@ -172,6 +172,12 @@
             background-color: #e8f4fd !important;
             border-bottom: 1px solid #dee2e6 !important;
         }
+
+        /* Total Employee related row styling - black border below */
+        .employee-related-row {
+            background-color: #e8f4fd !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -181,7 +187,7 @@
         /* TOTAL EXPENSES row styling - thick black border below */
         .total-expenses-row {
             background-color: #d4edda !important;
-            border-bottom: 3px solid #000000 !important;
+            border-bottom: 2px solid #000000 !important;
         }
         
         .calculated-total-row {
@@ -800,7 +806,14 @@
                             const rt = params && params.data ? params.data.rowType : null;
                             if (rt === 'parent_header') classes.push('parent-header-row');
                             else if (rt === 'sub_header') classes.push('sub-header-row');
-                            else if (rt === 'sub_total') classes.push('sub-total-row');
+                            else if (rt === 'sub_total') {
+                                // Check if this is "Total Employee related" specifically
+                                if (params && params.data && params.data.account_name === 'Total Employee related') {
+                                    classes.push('employee-related-row');
+                                } else {
+                                    classes.push('sub-total-row');
+                                }
+                            }
                             else if (rt === 'parent_total') classes.push('parent-total-row');
                             else if (rt === 'total') {
                                 // Check if this is TOTAL EXPENSES specifically
