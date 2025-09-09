@@ -228,6 +228,13 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total Salaries row styling - borders above and below */
+        .salaries-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -884,6 +891,8 @@
                                     classes.push('triple-point-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Fund related') {
                                     classes.push('fund-related-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Salaries') {
+                                    classes.push('salaries-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
