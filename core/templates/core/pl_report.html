@@ -161,6 +161,13 @@
             border-top: 2px solid #dee2e6 !important;
             border-bottom: 1px solid #dee2e6 !important;
         }
+
+        /* Administration parent header row styling - black border below */
+        .administration-parent-row {
+            background-color: #f8f9fa !important;
+            border-top: 2px solid #dee2e6 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .sub-header-row {
             background-color: #f1f3f4 !important;
@@ -819,7 +826,14 @@
                         getRowClass: function(params) {
                             const classes = [];
                             const rt = params && params.data ? params.data.rowType : null;
-                            if (rt === 'parent_header') classes.push('parent-header-row');
+                            if (rt === 'parent_header') {
+                                // Check if this is "Administration" specifically
+                                if (params && params.data && params.data.account_name === 'Administration') {
+                                    classes.push('administration-parent-row');
+                                } else {
+                                    classes.push('parent-header-row');
+                                }
+                            }
                             else if (rt === 'sub_header') {
                                 // Check if this is "Marketing" specifically
                                 if (params && params.data && params.data.account_name === 'Marketing') {
