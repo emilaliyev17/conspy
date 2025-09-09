@@ -178,6 +178,12 @@
             background-color: #e8f4fd !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total Administration row styling - black border below */
+        .administration-row {
+            background-color: #e8f4fd !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -807,9 +813,11 @@
                             if (rt === 'parent_header') classes.push('parent-header-row');
                             else if (rt === 'sub_header') classes.push('sub-header-row');
                             else if (rt === 'sub_total') {
-                                // Check if this is "Total Employee related" specifically
+                                // Check for specific subtotal rows that need black borders
                                 if (params && params.data && params.data.account_name === 'Total Employee related') {
                                     classes.push('employee-related-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Administration') {
+                                    classes.push('administration-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
