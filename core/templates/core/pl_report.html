@@ -235,6 +235,13 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total COST OF FUNDS AND FEES row styling - borders above and below */
+        .cost-of-funds-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -893,6 +900,8 @@
                                     classes.push('fund-related-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Salaries') {
                                     classes.push('salaries-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total COST OF FUNDS AND FEES') {
+                                    classes.push('cost-of-funds-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
