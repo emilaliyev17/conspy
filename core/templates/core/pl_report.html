@@ -207,6 +207,12 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total OakNorth funding line related row styling - black border above */
+        .oaknorth-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -857,6 +863,8 @@
                                     classes.push('administration-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Marketing') {
                                     classes.push('marketing-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total OakNorth funding line related') {
+                                    classes.push('oaknorth-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
