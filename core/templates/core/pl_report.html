@@ -200,6 +200,12 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total Marketing row styling - black border below */
+        .marketing-total-row {
+            background-color: #e8f4fd !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -848,6 +854,8 @@
                                     classes.push('employee-related-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Administration') {
                                     classes.push('administration-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Marketing') {
+                                    classes.push('marketing-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
