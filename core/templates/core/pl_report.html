@@ -213,6 +213,12 @@
             background-color: #e8f4fd !important;
             border-top: 1px solid #000000 !important;
         }
+
+        /* Total Triple Point funding line related row styling - spacing below */
+        .triple-point-total-row {
+            background-color: #e8f4fd !important;
+            margin-bottom: 12px !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -865,6 +871,8 @@
                                     classes.push('marketing-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total OakNorth funding line related') {
                                     classes.push('oaknorth-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Triple Point funding line related') {
+                                    classes.push('triple-point-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
