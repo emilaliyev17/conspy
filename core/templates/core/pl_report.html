@@ -255,6 +255,13 @@
             background-color: #e8f4fd !important;
             border-top: 1px solid #000000 !important;
         }
+
+        /* Total INTEREST + DEFAULT row styling - borders above and below */
+        .interest-default-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -917,6 +924,8 @@
                                     classes.push('cost-of-funds-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Other Income') {
                                     classes.push('other-income-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total INTEREST + DEFAULT') {
+                                    classes.push('interest-default-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
