@@ -214,10 +214,19 @@
             border-top: 1px solid #000000 !important;
         }
 
-        /* Total Triple Point funding line related row styling - spacing below */
+        /* Total Triple Point funding line related row styling - borders above and below with spacing */
         .triple-point-total-row {
             background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
             margin-bottom: 12px !important;
+        }
+
+        /* Total Fund related row styling - borders above and below */
+        .fund-related-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 1px solid #000000 !important;
         }
         
         .parent-total-row {
@@ -873,6 +882,8 @@
                                     classes.push('oaknorth-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total Triple Point funding line related') {
                                     classes.push('triple-point-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Fund related') {
+                                    classes.push('fund-related-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
