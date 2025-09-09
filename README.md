@@ -207,8 +207,7 @@ The application includes a bulk upload feature for Financial Data:
 
 **File Structure:**
 - **Column A**: Account Code (required)
-- **Column B**: Account Name (required)
-- **Columns C onwards**: Period data (e.g., Jan-24, Feb-24, Mar-24)
+- **Columns B onwards**: Period data (e.g., Jan-24, Feb-24, Mar-24)
 
 **Number Format Support:**
 The system automatically handles various Excel number formats:

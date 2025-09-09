@@ -514,16 +514,16 @@ def download_financial_data_template(request):
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="financial_data_template.xlsx"'
     
-    # Create sample data
+    # Create sample data (removed Account Name column)
     sample_data = [
-        ['4113000', 'Interest Income', 60000, 80000, 104363, 130182, 150000, 175000],
-        ['5216100', 'Interest Expense', 20000, 25000, 30000, 35000, 40000, 45000],
-        ['6011100', 'Basic Salary', 50000, 50000, 52000, 52000, 54000, 54000]
+        ['4113000', 60000, 80000, 104363, 130182, 150000, 175000],
+        ['5216100', 20000, 25000, 30000, 35000, 40000, 45000],
+        ['6011100', 50000, 50000, 52000, 52000, 54000, 54000]
     ]
     
-    # Create DataFrame
+    # Create DataFrame (removed Account Name column)
     df = pd.DataFrame(sample_data, columns=[
-        'Account Code', 'Account Name', 'Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24', 'Jun-24'
+        'Account Code', 'Jan-24', 'Feb-24', 'Mar-24', 'Apr-24', 'May-24', 'Jun-24'
     ])
     
     # Write to Excel
