@@ -177,6 +177,12 @@
             background-color: #d4edda !important;
             border-bottom: 2px solid #28a745 !important;
         }
+
+        /* TOTAL EXPENSES row styling - thick black border below */
+        .total-expenses-row {
+            background-color: #d4edda !important;
+            border-bottom: 3px solid #000000 !important;
+        }
         
         .calculated-total-row {
             background-color: #fff3cd !important;
@@ -796,6 +802,14 @@
                             else if (rt === 'sub_header') classes.push('sub-header-row');
                             else if (rt === 'sub_total') classes.push('sub-total-row');
                             else if (rt === 'parent_total') classes.push('parent-total-row');
+                            else if (rt === 'total') {
+                                // Check if this is TOTAL EXPENSES specifically
+                                if (params && params.data && params.data.account_name === 'TOTAL EXPENSES') {
+                                    classes.push('total-expenses-row');
+                                } else {
+                                    classes.push('parent-total-row');
+                                }
+                            }
                             else if (rt === 'calculated_total') classes.push('calculated-total-row');
                             else if (rt === 'net_income') {
                                 classes.push('calculated-total-row');
