@@ -667,6 +667,9 @@
                     const gridOptions = {
                         columnDefs: data.columnDefs,
                         rowData: data.rowData,
+                        // Enable text selection in cells
+                        enableCellTextSelection: true,
+                        suppressRowClickSelection: false,
                         defaultColDef: {
                             sortable: true,
                             filter: true,

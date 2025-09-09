@@ -166,6 +166,31 @@ table thead th:nth-child(2) {
     --ag-font-family: Arial, sans-serif;
 }
 
+/* Enable text selection for AG Grid cells */
+.ag-theme-alpine .ag-cell {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    cursor: text;
+}
+
+/* Allow text selection for important data columns */
+.ag-theme-alpine .ag-cell[col-id="account_code"],
+.ag-theme-alpine .ag-cell[col-id="account_name"] {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    cursor: text;
+}
+
+/* Keep headers non-selectable for clean UI */
+.ag-theme-alpine .ag-header-cell {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    cursor: default;
+}
+
 /* Ensure AG Grid takes full width */
 #plGrid {
     width: 100% !important;
