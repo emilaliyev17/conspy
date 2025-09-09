@@ -249,6 +249,12 @@
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
+
+        /* Total Other Income row styling - black border above */
+        .other-income-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #000000 !important;
+        }
         
         .parent-total-row {
             background-color: #d4edda !important;
@@ -909,6 +915,8 @@
                                     classes.push('salaries-total-row');
                                 } else if (params && params.data && params.data.account_name === 'Total COST OF FUNDS AND FEES') {
                                     classes.push('cost-of-funds-total-row');
+                                } else if (params && params.data && params.data.account_name === 'Total Other Income') {
+                                    classes.push('other-income-total-row');
                                 } else {
                                     classes.push('sub-total-row');
                                 }
