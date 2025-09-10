@@ -1968,14 +1968,16 @@ def bs_report_data(request):
         
         report_data.append(account_type_total_data)
         
-        # Add spacer row after account type total
-        report_data.append({
-            'type': 'spacer',
-            'account_name': '',
-            'account_code': '',
-            'periods': {},
-            'grand_totals': {}
-        })
+        # Add spacer row after account type total (except for the last one before CHECK)
+        # Don't add spacer after TOTAL EQUITY since CHECK row follows immediately
+        if account_type != 'EQUITY':
+            report_data.append({
+                'type': 'spacer',
+                'account_name': '',
+                'account_code': '',
+                'periods': {},
+                'grand_totals': {}
+            })
     
     # Add CHECK row at bottom: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
     if 'ASSET' in grouped_data and ('LIABILITY' in grouped_data or 'EQUITY' in grouped_data):
