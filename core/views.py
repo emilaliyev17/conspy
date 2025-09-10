@@ -2064,6 +2064,19 @@ def bs_report_data(request):
         
         row_data.append(grid_row)
     
+    # Filter out rows where ALL TOTAL columns sum to zero within selected date range
+    filtered_rows = []
+    for row in row_data:
+        total_sum = 0
+        for period in periods:  # Only selected periods
+            total_field = f'{period.strftime("%b-%y")}_TOTAL'
+            total_sum += abs(float(row.get(total_field, 0)))
+        
+        if total_sum != 0:  # Keep row if any TOTAL is non-zero
+            filtered_rows.append(row)
+    
+    row_data = filtered_rows
+    
     return JsonResponse({
         'columnDefs': column_defs,
         'rowData': row_data
