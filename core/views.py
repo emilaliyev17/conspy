@@ -1762,6 +1762,14 @@ def bs_report_data(request):
         if fd.period in financial_data and fd.company.code in financial_data[fd.period]:
             financial_data[fd.period][fd.company.code][fd.account_code] = fd.amount
     
+    # Get companies that actually have data (same logic as P&L report)
+    companies_with_data = list(set(fd.company for fd in all_financial_data))
+    if not companies_with_data:
+        logger.warning("No companies with data found for Balance Sheet, using all companies as fallback")
+        companies_with_data = companies
+    else:
+        logger.info(f"Balance Sheet companies with data: {[c.code for c in companies_with_data]}")
+    
     # Group accounts by parent_category and sub_category from ChartOfAccounts
     grouped_data = {}
     
