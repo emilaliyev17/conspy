@@ -412,8 +412,14 @@
                             filter: true,
                             resizable: true,
                             wrapHeaderText: true,
-                            autoHeaderHeight: true
+                            autoHeaderHeight: true,
+                            enableCellTextSelection: true,  // Enable text selection
+                            suppressCellSelection: false    // Allow cell selection
                         },
+                        // Enable text selection and copying
+                        enableCellTextSelection: true,
+                        ensureDomOrder: true,
+                        suppressCellSelection: false,
                         // Enable sticky headers
                         suppressColumnVirtualisation: false,
                         suppressRowVirtualisation: false,
