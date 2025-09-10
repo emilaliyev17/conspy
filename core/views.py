@@ -1770,47 +1770,56 @@ def bs_report_data(request):
     else:
         logger.info(f"Balance Sheet companies with data: {[c.code for c in companies_with_data]}")
     
-    # Group accounts by parent_category and sub_category from ChartOfAccounts
+    # Group accounts by account_type and sub_category from ChartOfAccounts
     grouped_data = {}
     
     for account in chart_accounts:
-        # Use parent_category and sub_category directly from ChartOfAccounts
-        parent_category = account.parent_category or 'UNCATEGORIZED'
+        # Use account_type and sub_category directly from ChartOfAccounts
+        account_type = account.account_type or 'UNCATEGORIZED'
         sub_category = account.sub_category or 'UNCATEGORIZED'
         
-        # Create parent category if it doesn't exist
-        if parent_category not in grouped_data:
-            grouped_data[parent_category] = {}
+        # Create account type if it doesn't exist
+        if account_type not in grouped_data:
+            grouped_data[account_type] = {}
         
         # Create sub category if it doesn't exist
-        if sub_category not in grouped_data[parent_category]:
-            grouped_data[parent_category][sub_category] = []
+        if sub_category not in grouped_data[account_type]:
+            grouped_data[account_type][sub_category] = []
         
         # Add account to sub category
-        grouped_data[parent_category][sub_category].append(account)
+        grouped_data[account_type][sub_category].append(account)
+    
     
     # Build report data with hierarchical structure
     report_data = []
     
-    # Fixed order for Balance Sheet structure - use parent categories (current abbreviations)
-    bs_structure = ['BA', 'FA', 'OCA', 'OCL', 'OC', 'EQ']
+    # Fixed order for Balance Sheet structure: ASSETS → LIABILITIES → EQUITY
+    bs_structure = ['ASSET', 'LIABILITY', 'EQUITY']
     
-    # Process each parent category in the fixed order
-    for parent_category in bs_structure:
-        if parent_category not in grouped_data:
+    # Process each account type in the fixed order
+    for account_type in bs_structure:
+        if account_type not in grouped_data:
             continue
         
-        # Add parent header
+        # Add account type header
+        # Convert singular to plural for display
+        display_name = account_type
+        if account_type == 'ASSET':
+            display_name = 'ASSETS'
+        elif account_type == 'LIABILITY':
+            display_name = 'LIABILITIES'
+        # EQUITY stays the same
+        
         report_data.append({
             'type': 'parent_header',
-            'account_name': parent_category,
+            'account_name': display_name,
             'account_code': '',
             'periods': {},
             'grand_totals': {}
         })
         
         # Process sub categories
-        for sub_category, accounts in grouped_data[parent_category].items():
+        for sub_category, accounts in grouped_data[account_type].items():
             # Add sub header
             report_data.append({
                 'type': 'sub_header',
@@ -1901,64 +1910,72 @@ def bs_report_data(request):
             
             report_data.append(sub_total_data)
         
-        # Add parent total
-        parent_total_data = {
+        # Add account type total
+        # Convert singular to plural for display
+        display_name = account_type
+        if account_type == 'ASSET':
+            display_name = 'ASSETS'
+        elif account_type == 'LIABILITY':
+            display_name = 'LIABILITIES'
+        # EQUITY stays the same
+        
+        account_type_total_data = {
             'type': 'parent_total',
-            'account_name': f'TOTAL {parent_category}',
+            'account_name': f'TOTAL {display_name}',
             'account_code': '',
             'periods': {},
             'grand_totals': {}
         }
         
-        # Calculate parent totals
+        # Calculate account type totals
         for period in periods:
-            parent_total_data['periods'][period] = {}
+            account_type_total_data['periods'][period] = {}
             period_total = 0
             
             for company in companies:
                 company_total = sum(
                     sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts)
-                    for sub_accounts in grouped_data[parent_category].values()
+                    for sub_accounts in grouped_data[account_type].values()
                 )
-                parent_total_data['periods'][period][company.code] = float(company_total or 0)
+                account_type_total_data['periods'][period][company.code] = float(company_total or 0)
                 period_total += company_total or 0
             
-            parent_total_data['periods'][period]['TOTAL'] = float(period_total or 0)
+            account_type_total_data['periods'][period]['TOTAL'] = float(period_total or 0)
         
-        # Calculate grand totals for parent category
+        # Calculate grand totals for account type
         for company in companies_with_data:
             grand_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[parent_category].values())
+                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[account_type].values())
                 for period in periods
             )
-            parent_total_data['grand_totals'][company.code] = float(grand_total or 0)
+            account_type_total_data['grand_totals'][company.code] = float(grand_total or 0)
         
-        # Calculate overall grand total for parent category
+        # Calculate overall grand total for account type
         overall_grand_total = sum(
-            sum(sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[parent_category].values()) for company in companies_with_data)
+            sum(sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data[account_type].values()) for company in companies_with_data)
             for period in periods
         )
-        parent_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
+        account_type_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
         
-        report_data.append(parent_total_data)
+        report_data.append(account_type_total_data)
     
     # Add CHECK row at bottom: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
-    if 'ASSETS' in grouped_data and ('LIABILITIES' in grouped_data or 'EQUITY' in grouped_data):
+    if 'ASSET' in grouped_data and ('LIABILITY' in grouped_data or 'EQUITY' in grouped_data):
         # Calculate totals for each category
         assets_total = 0
         liabilities_total = 0
         equity_total = 0
         
-        if 'ASSETS' in grouped_data:
+        if 'ASSET' in grouped_data:
             assets_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['ASSETS'].values())
+                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['ASSET'].values())
                 for period in periods
                 for company in companies_with_data
             )
         
-        if 'LIABILITIES' in grouped_data:
+        if 'LIABILITY' in grouped_data:
             liabilities_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['LIABILITIES'].values())
+                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['LIABILITY'].values())
                 for period in periods
                 for company in companies_with_data
             )
@@ -2065,14 +2082,23 @@ def bs_report_data(request):
         row_data.append(grid_row)
     
     # Filter out rows where ALL TOTAL columns sum to zero within selected date range
+    # BUT preserve headers, totals, and check rows regardless of their values
     filtered_rows = []
     for row in row_data:
+        row_type = row.get('rowType', 'unknown')
+        
+        # Always keep headers, totals, and check rows
+        if row_type in ['parent_header', 'sub_header', 'sub_total', 'parent_total', 'check_row']:
+            filtered_rows.append(row)
+            continue
+            
+        # For account rows, check if they have non-zero totals
         total_sum = 0
         for period in periods:  # Only selected periods
             total_field = f'{period.strftime("%b-%y")}_TOTAL'
             total_sum += abs(float(row.get(total_field, 0)))
         
-        if total_sum != 0:  # Keep row if any TOTAL is non-zero
+        if total_sum != 0:  # Keep account row if any TOTAL is non-zero
             filtered_rows.append(row)
     
     row_data = filtered_rows
