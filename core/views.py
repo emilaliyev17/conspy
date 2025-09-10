@@ -1701,8 +1701,8 @@ def bs_report_data(request):
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
-    # Get all companies
-    companies = list(Company.objects.all().order_by('name'))
+    # Get all companies (exclude pseudo-companies like Budget)
+    companies = list(Company.objects.filter(is_budget_only=False).order_by('name'))
     
     # Get ASSET, LIABILITY, EQUITY accounts from ChartOfAccounts
     bs_types = [
