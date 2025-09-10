@@ -1909,6 +1909,15 @@ def bs_report_data(request):
             sub_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
             
             report_data.append(sub_total_data)
+            
+            # Add spacer row after sub total
+            report_data.append({
+                'type': 'spacer',
+                'account_name': '',
+                'account_code': '',
+                'periods': {},
+                'grand_totals': {}
+            })
         
         # Add account type total
         # Convert singular to plural for display
@@ -1958,6 +1967,15 @@ def bs_report_data(request):
         account_type_total_data['grand_totals']['TOTAL'] = float(overall_grand_total or 0)
         
         report_data.append(account_type_total_data)
+        
+        # Add spacer row after account type total
+        report_data.append({
+            'type': 'spacer',
+            'account_name': '',
+            'account_code': '',
+            'periods': {},
+            'grand_totals': {}
+        })
     
     # Add CHECK row at bottom: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
     if 'ASSET' in grouped_data and ('LIABILITY' in grouped_data or 'EQUITY' in grouped_data):
@@ -2073,11 +2091,24 @@ def bs_report_data(request):
         elif row['type'] == 'sub_header':
             grid_row['cellStyle'] = {'backgroundColor': '#f0f8ff', 'fontWeight': 'bold'}
         elif row['type'] == 'sub_total':
-            grid_row['cellStyle'] = {'backgroundColor': '#fff8dc', 'fontWeight': 'bold'}
+            # Sub total rows - styling handled by JavaScript getRowClass
+            grid_row['cellStyle'] = {
+                'fontWeight': 'bold'
+            }
         elif row['type'] == 'parent_total':
-            grid_row['cellStyle'] = {'backgroundColor': '#f0fff0', 'fontWeight': 'bold'}
+            # Parent total rows - styling handled by JavaScript getRowClass
+            grid_row['cellStyle'] = {
+                'fontWeight': 'bold'
+            }
         elif row['type'] == 'check_row':
             grid_row['cellStyle'] = {'backgroundColor': '#ffe6e6', 'fontWeight': 'bold'}
+        elif row['type'] == 'spacer':
+            # Spacer rows - empty with minimal height
+            grid_row['cellStyle'] = {
+                'backgroundColor': 'transparent',
+                'height': '10px',
+                'border': 'none'
+            }
         
         row_data.append(grid_row)
     
@@ -2087,8 +2118,8 @@ def bs_report_data(request):
     for row in row_data:
         row_type = row.get('rowType', 'unknown')
         
-        # Always keep headers, totals, and check rows
-        if row_type in ['parent_header', 'sub_header', 'sub_total', 'parent_total', 'check_row']:
+        # Always keep headers, totals, check rows, and spacer rows
+        if row_type in ['parent_header', 'sub_header', 'sub_total', 'parent_total', 'check_row', 'spacer']:
             filtered_rows.append(row)
             continue
             

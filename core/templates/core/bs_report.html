@@ -11,6 +11,23 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css">
     <link rel="stylesheet" href="{% static 'css/reports.css' %}">
     <style>
+        /* Style for subtotal rows (Total Bank Accounts, etc.) */
+        .sub-total-row {
+            background-color: #f8f9fa !important;
+            border-top: 1px solid #000000 !important;
+            border-bottom: 2px solid #000000 !important;
+            font-weight: bold !important;
+        }
+        
+        /* Style for main total rows (TOTAL ASSETS, etc.) */
+        .parent-total-row {
+            background-color: #e9ecef !important;
+            border-top: 2px solid #000000 !important;
+            border-bottom: 3px solid #000000 !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+        }
+        
         body {
             font-family: Arial, sans-serif;
             margin: 0;
