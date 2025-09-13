@@ -2,6 +2,7 @@ asgiref==3.9.1
 beautifulsoup4==4.13.5
 certifi==2025.8.3
 charset-normalizer==3.4.3
+dj-database-url==3.0.1
 Django==5.2.5
 et_xmlfile==2.0.0
 idna==3.10
@@ -19,4 +20,3 @@ typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
 whitenoise==6.10.0
-gunicorn==21.2.0
