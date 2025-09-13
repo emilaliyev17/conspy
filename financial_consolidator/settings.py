@@ -153,6 +153,9 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Use WhiteNoise for efficient static file serving with cache-busting manifests
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 # Add this for production
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
