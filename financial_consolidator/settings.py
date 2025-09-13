@@ -139,6 +139,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Authentication settings
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
+
 # Feature flags infrastructure
 # Flags can be overridden via env var FEATURE_FLAGS as comma-separated key=true pairs, e.g.:
 # FEATURE_FLAGS="PL_BUDGET_PARALLEL=true,USE_NEW_CF_SAVE=false"

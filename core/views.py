@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
@@ -121,10 +122,12 @@ def convert_month_year_to_date_range(month, year):
     except (ValueError, AttributeError):
         return None, None
 
+@login_required
 def home(request):
     """Home page view with navigation to upload functionality."""
     return render(request, 'core/home.html')
 
+@login_required
 def chart_of_accounts_view(request):
     """View for displaying Chart of Accounts with search and hierarchical display."""
     search_query = request.GET.get('search', '')
@@ -170,6 +173,7 @@ def chart_of_accounts_view(request):
     return render(request, 'core/chart_of_accounts_simple.html', context)
 
 @csrf_exempt
+@login_required
 def download_chart_of_accounts(request):
     """Download Chart of Accounts as CSV/Excel."""
     accounts = ChartOfAccounts.objects.all().order_by('sort_order')
@@ -192,6 +196,7 @@ def download_chart_of_accounts(request):
     
     return response
 
+@login_required
 def upload_chart_of_accounts(request):
     """Upload Chart of Accounts from CSV/Excel file."""
     if request.method == 'POST':
@@ -282,6 +287,7 @@ def upload_chart_of_accounts(request):
     
     return render(request, 'core/upload_chart_of_accounts.html')
 
+@login_required
 def upload_financial_data(request):
     """Upload Financial Data from CSV/Excel file."""
     companies = Company.objects.all().order_by('name')
@@ -509,6 +515,7 @@ def upload_financial_data(request):
     return render(request, 'core/upload_financial_data.html', {'companies': companies})
 
 @csrf_exempt
+@login_required
 def download_financial_data_template(request):
     """Download Financial Data template as Excel."""
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -533,6 +540,7 @@ def download_financial_data_template(request):
     return response
 
 @csrf_exempt
+@login_required
 def download_template(request):
     """Download Chart of Accounts template as CSV."""
     response = HttpResponse(content_type='text/csv')
@@ -558,6 +566,7 @@ def download_template(request):
     
     return response
 
+@login_required
 def pl_report_data(request):
     """P&L Report data in JSON format for AG Grid, с нормализацией месяцев и фильтром по диапазону."""
     logger.info("--- P&L Report Data Generation Started ---")
@@ -1689,6 +1698,7 @@ def pl_report_data(request):
         'debug_info': debug_info
     })
 
+@login_required
 def bs_report_data(request):
     """Balance Sheet Report data in JSON format for AG Grid."""
     from_month = request.GET.get('from_month', '')
@@ -2146,6 +2156,7 @@ def bs_report_data(request):
         'rowData': row_data
     })
 
+@login_required
 def pl_report(request):
     """P&L Report view - simplified to only render template, data comes from JSON endpoint."""
     from_month = request.GET.get('from_month', '')
@@ -2169,6 +2180,7 @@ def pl_report(request):
     
     return render(request, 'core/pl_report.html', context)
 
+@login_required
 def bs_report(request):
     """Balance Sheet Report view - simplified to only render template, data comes from JSON endpoint."""
     from_month = request.GET.get('from_month', '')
@@ -2192,6 +2204,7 @@ def bs_report(request):
 
     return render(request, 'core/bs_report.html', context)
 
+@login_required
 def export_report_excel(request):
     """Export report data to Excel."""
     report_type = request.GET.get('type', 'pl')
@@ -2271,6 +2284,7 @@ def export_report_excel(request):
 
 
 @csrf_exempt
+@login_required
 def update_cf_dashboard(request):
     """API endpoint for updating CF Dashboard values from inline editing"""
     print(f"Request method: {request.method}")
