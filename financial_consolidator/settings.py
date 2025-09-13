@@ -47,12 +47,19 @@ if 'DJANGO_ALLOWED_HOST' in os.environ:
 # Application definition
 
 INSTALLED_APPS = [
+    # Admin interface theme apps must come BEFORE 'django.contrib.admin'
+    'admin_interface',
+    'colorfield',
+
+    # Django default apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Project apps
     'core',
 ]
 
@@ -183,6 +190,9 @@ if _env_flags:
             if k:
                 FEATURE_FLAGS[k] = v in ('1', 'true', 'yes', 'on')
 PL_BUDGET_PARALLEL = True
+
+# Allow admin interface to work properly in iframes
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # Security cookies and SSL in production
 if not DEBUG:
