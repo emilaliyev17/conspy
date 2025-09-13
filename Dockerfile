@@ -10,10 +10,15 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install project dependencies and ensure gunicorn is present in the final image
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir gunicorn
+
+# Verify gunicorn is installed during build
+RUN which gunicorn
 
 # Copy project
 COPY . .
 
 # Run the application
-CMD ["gunicorn", "financial_consolidator.wsgi:application", "--bind", "0.0.0.0:8080"]
+CMD ["gunicorn", "financial_consolidator.wsgi:application", "--workers", "2", "--bind", "0.0.0.0:8080"]
