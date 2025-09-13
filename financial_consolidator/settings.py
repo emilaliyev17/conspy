@@ -27,8 +27,21 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-sss5b85re(%mvy5nz@8p&
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# Allow local development hosts
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+# Allowed hosts: read from env, with DO fallback
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+if not ALLOWED_HOSTS:
+    # Fallback for DigitalOcean App Platform and local dev
+    ALLOWED_HOSTS = ['.ondigitalocean.app', 'localhost', '127.0.0.1']
+
+# CSRF Trusted Origins for DigitalOcean
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.ondigitalocean.app',
+    'http://*.ondigitalocean.app',
+]
+
+# Optionally add a specific host from env (e.g., custom domain)
+if 'DJANGO_ALLOWED_HOST' in os.environ:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{os.environ['DJANGO_ALLOWED_HOST']}")
 
 
 # Application definition
@@ -170,3 +183,9 @@ if _env_flags:
             if k:
                 FEATURE_FLAGS[k] = v in ('1', 'true', 'yes', 'on')
 PL_BUDGET_PARALLEL = True
+
+# Security cookies and SSL in production
+if not DEBUG:
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
