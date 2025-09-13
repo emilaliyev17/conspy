@@ -283,6 +283,8 @@
         <div class="actions">
             <a href="{% url 'core:export_report_excel' %}?type=bs&from_month={{ request.GET.from_month }}&from_year={{ request.GET.from_year }}&to_month={{ request.GET.to_month }}&to_year={{ request.GET.to_year }}&data_type={{ request.GET.data_type }}" class="btn btn-success">Export to Excel</a>
             <button onclick="window.print()" class="btn btn-secondary">Print Report</button>
+            <button onclick="collapseAllPeriods()" class="btn btn-secondary">➖ Collapse All</button>
+            <button onclick="expandAllPeriods()" class="btn btn-secondary">➕ Expand All</button>
         </div>
         
         <!-- AG Grid Container -->
@@ -341,6 +343,104 @@
                 api.setColumnsVisible(['toggler'], true);
             }
             destroy() {}
+        }
+
+        // --- Custom Header for Period Toggle Buttons ---
+        class PeriodToggleHeader {
+            init(params) {
+                this.params = params;
+                
+                // Safety check for required methods
+                if (!params.column || !params.column.getUserProvidedColDef) {
+                    console.warn('PeriodToggleHeader: Missing required methods');
+                    this.eGui = document.createElement('div');
+                    this.eGui.textContent = params.displayName || '';
+                    return;
+                }
+                
+                const colDef = params.column.getUserProvidedColDef();
+                
+                // Check this is a TOTAL column with periodKey
+                if (!colDef.periodKey || colDef.colType !== 'total') {
+                    this.eGui = document.createElement('div');
+                    this.eGui.textContent = colDef.headerName || '';
+                    return;
+                }
+                
+                this.periodKey = colDef.periodKey;
+                this.collapsed = false;
+
+                // Listen for global collapse/expand events
+                this.globalListener = (event) => {
+                    if (event.detail && typeof event.detail.collapsed === 'boolean') {
+                        this.collapsed = event.detail.collapsed;
+                        this.updateDisplay();
+                    }
+                };
+                window.addEventListener('periodToggleAll', this.globalListener);
+                
+                this.eGui = document.createElement('div');
+                this.eGui.style.display = 'flex';
+                this.eGui.style.alignItems = 'center';
+                this.eGui.style.justifyContent = 'space-between';
+                this.eGui.style.width = '100%';
+                
+                this.updateDisplay();
+            }
+            
+            toggleColumns() {
+                try {
+                    const api = this.params.api;
+                    const allColumns = api.getColumnDefs();
+                    
+                    const companyFields = [];
+                    allColumns.forEach(col => {
+                        if (col.periodKey === this.periodKey && col.colType === 'company') {
+                            companyFields.push(col.field);
+                        }
+                    });
+                    
+                    if (companyFields.length === 0) {
+                        console.log('No company columns found for period', this.periodKey);
+                        return;
+                    }
+                    
+                    this.collapsed = !this.collapsed;
+                    api.setColumnsVisible(companyFields, !this.collapsed);
+                    this.updateDisplay();
+                    
+                } catch (error) {
+                    console.error('PeriodToggleHeader: Error toggling', error);
+                }
+            }
+            
+            updateDisplay() {
+                const colDef = this.params.column.getUserProvidedColDef();
+                const headerName = colDef.headerName || '';
+                this.eGui.innerHTML = `
+                    <span>${headerName}</span>
+                    <span class="period-toggle-btn" 
+                          style="cursor: pointer; font-weight: bold; margin-left: 5px;"
+                          title="${this.collapsed ? 'Expand company columns' : 'Collapse company columns'}">
+                        ${this.collapsed ? '[+]' : '[-]'}
+                    </span>
+                `;
+                
+                const btn = this.eGui.querySelector('.period-toggle-btn');
+                if (btn) {
+                    btn.onclick = () => this.toggleColumns();
+                }
+            }
+            
+            getGui() {
+                return this.eGui;
+            }
+            
+            destroy() {
+                if (this.globalListener) {
+                    window.removeEventListener('periodToggleAll', this.globalListener);
+                }
+            }
         }
 
         // Auto-submit form when filters change
@@ -448,7 +548,8 @@
                         // Register the new custom components
                         components: {
                             togglerHeader: TogglerHeader,
-                            hideableHeader: HideableHeader
+                            hideableHeader: HideableHeader,
+                            periodToggleHeader: PeriodToggleHeader
                         },
                         domLayout: 'normal',  // Enable internal scrolling like P&L
                         rowSelection: {
@@ -477,6 +578,13 @@
                         throw new Error('AG Grid initialization method not found');
                     }
                     console.log('AG Grid created successfully!');
+
+                    // Save grid API for global access
+                    if (typeof agGrid.createGrid === 'function') {
+                        window.bsGridApi = grid;
+                    } else {
+                        window.bsGridApi = gridOptions.api;
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading data:', error);
@@ -531,6 +639,39 @@
                 }, 100);
             });
         })();
+
+        // Global collapse/expand functions for Balance Sheet
+        window.collapseAllPeriods = function() {
+            if (window.bsGridApi) {
+                const allColumns = window.bsGridApi.getColumnDefs();
+                const companyFields = allColumns
+                    .filter(col => col.colType === 'company')
+                    .map(col => col.field);
+                
+                if (companyFields.length > 0) {
+                    window.bsGridApi.setColumnsVisible(companyFields, false);
+                    window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                        detail: { collapsed: true } 
+                    }));
+                }
+            }
+        };
+
+        window.expandAllPeriods = function() {
+            if (window.bsGridApi) {
+                const allColumns = window.bsGridApi.getColumnDefs();
+                const companyFields = allColumns
+                    .filter(col => col.colType === 'company')
+                    .map(col => col.field);
+                
+                if (companyFields.length > 0) {
+                    window.bsGridApi.setColumnsVisible(companyFields, true);
+                    window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                        detail: { collapsed: false } 
+                    }));
+                }
+            }
+        };
     </script>
 </body>
 </html>

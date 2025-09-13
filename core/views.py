@@ -2049,6 +2049,8 @@ def bs_report_data(request):
                 'headerName': f'{period.strftime("%b-%y")} {company.code}',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
+                'colType': 'company',
+                'periodKey': period.strftime('%Y-%m'),
                 'cellStyle': {
                     'textAlign': 'right',
                     # Styling based on company id instead of code prefix
@@ -2058,8 +2060,11 @@ def bs_report_data(request):
         column_defs.append({
             'field': f'{period.strftime("%b-%y")}_TOTAL',
             'headerName': f'{period.strftime("%b-%y")} TOTAL',
+            'headerComponent': 'periodToggleHeader',
             'width': 120,
             'type': 'numberColumnWithCommas',
+            'colType': 'total',
+            'periodKey': period.strftime('%Y-%m'),
             'cellStyle': {
                 'textAlign': 'right',
                 'backgroundColor': '#FFF9E6'
