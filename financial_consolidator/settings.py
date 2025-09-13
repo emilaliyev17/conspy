@@ -188,4 +188,6 @@ PL_BUDGET_PARALLEL = True
 if not DEBUG:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = True
+    # SECURE_SSL_REDIRECT = True  # Removed to prevent redirect loop behind DO proxy
+    # Use proxy header to detect HTTPS correctly on DigitalOcean
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
