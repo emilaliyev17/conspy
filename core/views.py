@@ -1677,9 +1677,9 @@ def pl_report_data(request):
                 if val is not None:
                     try:
                         total_budget_sum += float(val)
-                    if r['type'] in ['sub_total', 'total', 'net_income']:
-                        # print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
-                        pass
+                        if r['type'] in ['sub_total', 'total', 'net_income']:
+                            # print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
+                            pass
                     except Exception:
                         pass
                 else:
