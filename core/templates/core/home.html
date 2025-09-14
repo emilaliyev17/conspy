@@ -172,10 +172,10 @@
             .hero { animation: none; }
         }
         .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-        .hero p { font-size: 1.2rem; opacity: 0.9; margin: 0; }
+        .hero p { font-size: 1.2rem; opacity: 0.9; margin: 0; position: relative; z-index: 10; }
 
         /* Logo styles */
-        .logo-container { margin-bottom: 20px; }
+        .logo-container { margin-bottom: 20px; position: relative; z-index: 10; }
         .logo {
             font-family: Georgia, serif;
             font-style: italic;
@@ -251,11 +251,12 @@
 
         .cities-skyline {
             position: absolute;
-            bottom: 0;
+            bottom: 20px;
             left: 0;
             right: 0;
             width: 100%;
             text-align: center;
+            z-index: 1;  /* Behind text */
         }
         .cities-skyline img {
             width: 100%;
