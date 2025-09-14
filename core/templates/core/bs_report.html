@@ -75,6 +75,12 @@
             background-color: #007bff;
             color: white;
         }
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
         .filters {
             padding: 20px;
             background-color: #f8f9fa;
@@ -196,12 +202,12 @@
         </div>
         
         <div class="nav-menu">
-            <a href="{% url 'core:home' %}">🏠 Home</a>
-            <a href="{% url 'core:upload_chart_of_accounts' %}">📋 Chart of Accounts</a>
-            <a href="{% url 'core:upload_financial_data' %}">💰 Financial Data</a>
-            <a href="{% url 'core:pl_report' %}">📊 P&L Report</a>
-            <a href="{% url 'core:bs_report' %}" class="active">📈 Balance Sheet</a>
-            <a href="/admin/">⚙️ Admin</a>
+            <a href="{% url 'core:home' %}"><img src="{% static 'core/images/home.png' %}" alt="" class="nav-icon">Home</a>
+            <a href="{% url 'core:upload_chart_of_accounts' %}"><img src="{% static 'core/images/chart.png' %}" alt="" class="nav-icon">Chart of Accounts</a>
+            <a href="{% url 'core:upload_financial_data' %}"><img src="{% static 'core/images/data.png' %}" alt="" class="nav-icon">Financial Data</a>
+            <a href="{% url 'core:pl_report' %}"><img src="{% static 'core/images/pnl.png' %}" alt="" class="nav-icon">P&amp;L Report</a>
+            <a href="{% url 'core:bs_report' %}" class="active"><img src="{% static 'core/images/balance.png' %}" alt="" class="nav-icon">Balance Sheet</a>
+            <a href="/admin/"><img src="{% static 'core/images/admin.png' %}" alt="" class="nav-icon">Admin</a>
         </div>
         
         <div class="filters">
