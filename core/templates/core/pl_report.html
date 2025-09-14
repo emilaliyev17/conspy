@@ -445,20 +445,33 @@
             line-height: 1.5;
         }
 
-        /* Reduce row height for more compact view */
+        /* Make rows more compact - reduce height by ~15% */
         .ag-theme-alpine .ag-row {
-            min-height: 32px !important;  /* Reduced from default */
+            min-height: 28px !important;  /* Reduced from default ~33px */
         }
 
+        /* Center text vertically within cells */
         .ag-theme-alpine .ag-cell {
-            line-height: 1.2;  /* Reduce from 1.5 */
-            padding-top: 4px;
-            padding-bottom: 4px;
+            display: flex;
+            align-items: center;  /* Vertical center */
+            padding-top: 2px;
+            padding-bottom: 2px;
+            line-height: 1.2;
         }
 
-        /* Keep headers slightly taller */
+        /* Keep text left-aligned horizontally for account names */
+        .ag-cell[col-id="account_name"] {
+            justify-content: flex-start;  /* Keep left alignment */
+        }
+
+        /* Ensure header height is proportional */
         .ag-theme-alpine .ag-header-row {
-            height: 36px !important;
+            height: 32px !important;
+        }
+
+        /* Remove any extra padding that creates empty space */
+        .ag-theme-alpine .ag-cell-wrapper {
+            padding: 0;
         }
     </style>
 </head>
