@@ -247,6 +247,20 @@
         }
         .state.active:hover { fill: #06b6d4;  /* Teal on hover */ }
 
+        /* Cities banner */
+        .cities-banner {
+            position: relative;
+            margin-top: -100px;
+            z-index: 10;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .cities-banner img {
+            max-width: 100%;
+            height: auto;
+            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.1));
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .nav-container { flex-wrap: wrap; }
@@ -322,10 +336,14 @@
     <section class="hero">
         <div class="logo-container">
             <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" class="hero-logo">
-            <div class="subtitle">Financial Consolidator</div>
+            <div class="subtitle">FINANCIAL CONSOLIDATOR FOR FAES & CO GROUP COMPANIES</div>
         </div>
         <p>Manage consolidation across companies, upload data, and generate insights.</p>
     </section>
+
+    <div class="cities-banner">
+        <img src="{% static 'core/images/cities.png' %}" alt="Our Global Offices" />
+    </div>
 
     {{ active_states|json_script:"active-states" }}
 
