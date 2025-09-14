@@ -513,6 +513,39 @@
         .parent-total-row .ag-cell {
             border-bottom: 2px solid #666666 !important;
         }
+
+        /* Font size controls */
+        .font-size-controls {
+            display: inline-block;
+            margin-left: 20px;
+        }
+
+        .font-size-btn {
+            padding: 5px 10px;
+            margin: 0 2px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .font-size-btn.active {
+            background: #007bff;
+            color: white;
+        }
+
+        /* Font size classes - ONLY font size, no row height changes */
+        #plGrid.font-12 .ag-theme-alpine { 
+            font-size: 12px;
+        }
+
+        #plGrid.font-14 .ag-theme-alpine { 
+            font-size: 14px;
+        }
+
+        #plGrid.font-16 .ag-theme-alpine { 
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -613,6 +646,11 @@
             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
             <button onclick="collapseAllPeriods()" class="btn btn-secondary">➖ Collapse All</button>
             <button onclick="expandAllPeriods()" class="btn btn-secondary">➕ Expand All</button>
+            <div class="font-size-controls">
+                <button class="font-size-btn" data-size="12">A-</button>
+                <button class="font-size-btn active" data-size="14">A</button>
+                <button class="font-size-btn" data-size="16">A+</button>
+            </div>
         </div>
         
         <!-- AG Grid Container -->
@@ -1260,6 +1298,30 @@
             }
         }, 100);
     })();
+
+    // Font size controls
+    document.querySelectorAll('.font-size-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const size = this.dataset.size;
+            const grid = document.getElementById('plGrid');
+            
+            // Update class
+            grid.classList.remove('font-12', 'font-14', 'font-16');
+            grid.classList.add('font-' + size);
+            
+            // Update buttons
+            document.querySelectorAll('.font-size-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Save preference
+            localStorage.setItem('plFontSize', size);
+        });
+    });
+
+    // Load saved size
+    const savedSize = localStorage.getItem('plFontSize') || '14';
+    document.getElementById('plGrid').classList.add('font-' + savedSize);
+    document.querySelector(`.font-size-btn[data-size="${savedSize}"]`).classList.add('active');
     </script>
 </body>
 </html>
