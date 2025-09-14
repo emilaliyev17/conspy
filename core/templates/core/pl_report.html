@@ -486,6 +486,33 @@
         .ag-theme-alpine .ag-cell-wrapper {
             padding: 0;
         }
+
+        /* Add subtle grid lines for data rows only */
+        .ag-row:not(.parent-header-row):not(.sub-header-row) .ag-cell {
+            border-right: 1px solid #e0e0e0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        /* Stronger vertical lines between companies */
+        .ag-cell[col-id*="_F2FIN"] {
+            border-right: 1px solid #cccccc !important;
+        }
+        .ag-cell[col-id*="_GLOB"] {
+            border-right: 1px solid #cccccc !important;
+        }
+
+        /* Keep header rows without grid lines */
+        .parent-header-row .ag-cell,
+        .sub-header-row .ag-cell {
+            border-right: none;
+            border-bottom: 2px solid #999999;
+        }
+
+        /* Ensure totals have stronger bottom borders */
+        .sub-total-row .ag-cell,
+        .parent-total-row .ag-cell {
+            border-bottom: 2px solid #666666 !important;
+        }
     </style>
 </head>
 <body>
