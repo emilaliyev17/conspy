@@ -164,9 +164,13 @@
             position: relative;
         }
         .subtitle {
-            font-size: 1.5rem;
+            font-size: 2.5rem;  /* increase from 1.5rem */
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .hero p {
+            font-size: 1.8rem;  /* increase from current size */
+            opacity: 0.95;
         }
         .logo {
             font-family: Georgia, serif;
@@ -178,11 +182,12 @@
         }
         .logo-plus { font-size: 1.8rem; font-style: normal; margin: 0 2px; }
         .subtitle {
-            font-size: 1rem;
+            font-size: 2.5rem;  /* increased */
             text-transform: uppercase;
             letter-spacing: 3px;
             opacity: 0.8;
             margin-top: 10px;
+            margin-bottom: 15px;
         }
 
         /* Features */
@@ -240,6 +245,19 @@
             transform: translateY(-1px);
         }
         .state.active:hover { fill: #06b6d4;  /* Teal on hover */ }
+
+        /* Map with access keys layout */
+        .map-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 50px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .access-keys { text-align: center; }
+        .access-keys img { width: 150px; height: auto; }
+        .access-keys p { margin-top: 10px; color: #1e3a8a; font-weight: 600; }
 
         /* Cities skyline */
         
@@ -329,10 +347,14 @@
     {{ active_states|json_script:"active-states" }}
 
     <section class="usa-map-section">
-        <div class="map-container">
-            <h2>Our Presence Across the United States</h2>
+        <h2>Our Presence Across the United States</h2>
+        <div class="map-content">
+            <div class="access-keys">
+                <img src="{% static 'core/images/access-keys.png' %}" alt="Secure Access">
+                <p>Secure Access to All Locations</p>
+            </div>
             <div class="usa-map">
-                <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg" style="width: 100%; height: auto;"></object>
+                <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg"></object>
             </div>
         </div>
     </section>
