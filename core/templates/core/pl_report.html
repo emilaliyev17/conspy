@@ -444,6 +444,22 @@
         .ag-cell {
             line-height: 1.5;
         }
+
+        /* Reduce row height for more compact view */
+        .ag-theme-alpine .ag-row {
+            min-height: 32px !important;  /* Reduced from default */
+        }
+
+        .ag-theme-alpine .ag-cell {
+            line-height: 1.2;  /* Reduce from 1.5 */
+            padding-top: 4px;
+            padding-bottom: 4px;
+        }
+
+        /* Keep headers slightly taller */
+        .ag-theme-alpine .ag-header-row {
+            height: 36px !important;
+        }
     </style>
 </head>
 <body>
