@@ -246,18 +246,7 @@
         }
         .state.active:hover { fill: #06b6d4;  /* Teal on hover */ }
 
-        /* Map with access keys layout */
-        .map-content {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 50px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .access-keys { text-align: center; }
-        .access-keys img { width: 150px; height: auto; }
-        .access-keys p { margin-top: 10px; color: #1e3a8a; font-weight: 600; }
+        
 
         /* Cities skyline */
         
@@ -348,14 +337,8 @@
 
     <section class="usa-map-section">
         <h2>Our Presence Across the United States</h2>
-        <div class="map-content">
-            <div class="access-keys">
-                <img src="{% static 'core/images/access-keys.png' %}" alt="Secure Access">
-                <p>Secure Access to All Locations</p>
-            </div>
-            <div class="usa-map">
-                <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg"></object>
-            </div>
+        <div class="usa-map">
+            <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg"></object>
         </div>
     </section>
 
