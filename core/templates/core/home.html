@@ -262,7 +262,7 @@
             <div class="nav-menu">
                 <!-- Reports Dropdown -->
                 <div class="nav-dropdown">
-                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                    <button type="button" class="nav-dropdown-btn">
                         Reports
                         <span class="arrow">▼</span>
                     </button>
@@ -274,7 +274,7 @@
                 
                 <!-- Uploads Dropdown -->
                 <div class="nav-dropdown">
-                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                    <button type="button" class="nav-dropdown-btn">
                         Uploads
                         <span class="arrow">▼</span>
                     </button>
@@ -286,7 +286,7 @@
                 
                 <!-- Downloads Dropdown -->
                 <div class="nav-dropdown">
-                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                    <button type="button" class="nav-dropdown-btn">
                         Downloads
                         <span class="arrow">▼</span>
                     </button>
@@ -343,18 +343,21 @@
             closeAllDropdowns();
             if (!isOpen) dd.classList.add('open');
         }
-        // Attach click listeners instead of inline onclick
-        document.querySelectorAll('.nav-dropdown-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggleDropdown(btn);
+        // Attach click listeners after DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.nav-dropdown-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (btn.disabled) return;
+                    e.stopPropagation();
+                    toggleDropdown(btn);
+                });
             });
-        });
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.nav-dropdown')) closeAllDropdowns();
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeAllDropdowns();
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.nav-dropdown')) closeAllDropdowns();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeAllDropdowns();
+            });
         });
     </script>
     <script>
