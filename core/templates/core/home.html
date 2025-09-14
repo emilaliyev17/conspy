@@ -358,37 +358,26 @@
         });
     </script>
     <script>
-        // Highlight active states for either inline SVG include or external object embed
+        // Highlight active states in external SVG map
         document.addEventListener('DOMContentLoaded', function() {
-            const parseActive = () => {
-                try {
-                    return JSON.parse(document.getElementById('active-states').textContent || '[]');
-                } catch (e) { return []; }
-            };
-            const applyActive = (root, list) => {
-                if (!Array.isArray(list)) return;
-                list.forEach(code => {
-                    const el = root.getElementById ? root.getElementById(code) : null;
-                    if (el) {
-                        el.classList.add('active');
-                        try { el.style.fill = '#1e3a8a'; } catch (_) {}
+            const svgObject = document.getElementById('usa-svg');
+            if (svgObject) {
+                svgObject.addEventListener('load', function() {
+                    const svgDoc = svgObject.contentDocument;
+                    try {
+                        const activeStates = JSON.parse(document.getElementById('active-states').textContent || '[]');
+                        activeStates.forEach(stateCode => {
+                            const stateElement = svgDoc.getElementById(stateCode);
+                            if (stateElement) {
+                                stateElement.classList.add('active');
+                                stateElement.style.fill = '#1e3a8a';
+                                stateElement.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))';
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Error highlighting states:', e);
                     }
                 });
-            };
-
-            const activeStates = parseActive();
-            const svgObject = document.getElementById('usa-svg');
-
-            if (svgObject) {
-                const onLoad = () => {
-                    const svgDoc = svgObject.contentDocument;
-                    if (svgDoc) applyActive(svgDoc, activeStates);
-                };
-                if (svgObject.contentDocument) onLoad();
-                else svgObject.addEventListener('load', onLoad, { once: true });
-            } else {
-                // Fallback for inline-included SVG
-                applyActive(document, activeStates);
             }
         });
     </script>
