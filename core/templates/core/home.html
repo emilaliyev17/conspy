@@ -144,38 +144,30 @@
         }
 
         /* Hero */
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
         .hero {
-            background:
-                repeating-linear-gradient(
-                    45deg,
-                    rgba(255,255,255,0.03),
-                    rgba(255,255,255,0.03) 20px,
-                    transparent 20px,
-                    transparent 40px
-                ),
-                linear-gradient(135deg, #1e3a8a 0%, #06b6d4 100%);
-            color: var(--white);
-            padding: 60px 20px;
-            text-align: center;
-            background-size: 200% 200%;
-            animation: gradientShift 15s ease infinite;
             position: relative;
-            overflow: hidden;
+            width: 100%;
+            height: 500px;
+            background-image: url("{% static 'core/images/hero-animated.gif' %}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        /* Reduced motion for accessibility */
-        @media (prefers-reduced-motion: reduce) {
-            .hero { animation: none; }
+        .hero-content {
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+            position: relative;
         }
-        .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
-        .hero p { font-size: 1.2rem; opacity: 0.9; margin: 0; position: relative; z-index: 10; }
-
-        /* Logo styles */
-        .logo-container { margin-bottom: 20px; position: relative; z-index: 10; }
+        .subtitle {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
         .logo {
             font-family: Georgia, serif;
             font-style: italic;
@@ -249,22 +241,10 @@
         }
         .state.active:hover { fill: #06b6d4;  /* Teal on hover */ }
 
-        .cities-skyline {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            right: 0;
-            width: 100%;
-            text-align: center;
-            z-index: 1;  /* Behind text */
-        }
-        .cities-skyline img {
-            width: 100%;
-            height: auto;
-            max-height: 120px;
-            object-fit: cover;
-            object-position: center bottom;
-        }
+        /* Cities skyline */
+        
+
+        
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -339,13 +319,9 @@
     </nav>
 
     <section class="hero">
-        <div class="logo-container">
-            <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" class="hero-logo">
+        <div class="hero-content">
             <div class="subtitle">FINANCIAL CONSOLIDATOR FOR FAES & CO GROUP COMPANIES</div>
-        </div>
-        <p>Manage consolidation across companies, upload data, and generate insights.</p>
-        <div class="cities-skyline">
-            <img src="{% static 'core/images/cities-banner.png' %}" alt="Our Global Offices" />
+            <p>Manage consolidation across companies, upload data, and generate insights.</p>
         </div>
     </section>
 
