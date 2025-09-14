@@ -850,6 +850,7 @@ def pl_report_data(request):
             # print(f"DEBUG BUDGET_VALUES: Period {period}: {len(accounts)} accounts")
             for acc, amount in accounts.items():
                 # print(f"DEBUG BUDGET_VALUES:   {acc}: {amount}")
+                pass  # Ensure loop has a body to avoid IndentationError
     else:
         for fd in all_financial_data:
             p = fd.period
