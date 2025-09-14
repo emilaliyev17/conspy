@@ -1104,6 +1104,7 @@ def pl_report_data(request):
                     # print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = None (exception)")
             else:
                 # print(f"DEBUG TOTAL REVENUE: budget_total is 0, not setting Budget value")
+                pass
     # Grand totals for revenue
     for c in pl_companies:  # Используем только компании с данными
         gtot = sum(
@@ -1245,6 +1246,7 @@ def pl_report_data(request):
                         # print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = None (exception)")
                 else:
                     # print(f"DEBUG SUBTOTAL: budget_subtotal is 0, not setting Budget value")
+                    pass
 
         for c in pl_companies:
             gtot = sum(
@@ -1308,6 +1310,7 @@ def pl_report_data(request):
                     # print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = None (exception)")
             else:
                 # print(f"DEBUG TOTAL EXPENSES: budget_total is 0, not setting Budget value")
+                pass
     # Grand totals for expenses
     for c in pl_companies:
         gtot = sum(
@@ -1642,13 +1645,16 @@ def pl_report_data(request):
                     budget_amount = r['periods'].get(p, {}).get('Budget', 0)
                     if r['type'] == 'sub_total':
                         # print(f"DEBUG GRID: Processing sub_total row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
+                        pass
                     elif r['type'] in ['total', 'net_income']:
                         # print(f"DEBUG GRID: Processing {r['type']} row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
+                        pass
                 # For other row types, leave budget empty
                 grid_row[field_budget] = None if not budget_amount else float(budget_amount)
                 # Only show debug for subtotal and total rows, not individual accounts
                 if r['type'] in ['sub_total', 'total', 'net_income']:
                     # print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
+                    pass
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
@@ -1664,22 +1670,26 @@ def pl_report_data(request):
             # Only show debug for subtotal and total rows, not individual accounts
             if r['type'] in ['sub_total', 'total', 'net_income']:
                 # print(f"DEBUG GRAND TOTAL: Calculating for row '{r['account_name']}' (type: {r['type']})")
+                pass
             for p in periods:
                 key = f"{p.strftime('%b-%y')}_Budget"
                 val = grid_row.get(key)
                 if val is not None:
                     try:
                         total_budget_sum += float(val)
-                        if r['type'] in ['sub_total', 'total', 'net_income']:
-                            # print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
+                    if r['type'] in ['sub_total', 'total', 'net_income']:
+                        # print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
+                        pass
                     except Exception:
                         pass
                 else:
                     if r['type'] in ['sub_total', 'total', 'net_income']:
                         # print(f"DEBUG GRAND TOTAL:   {key} = None (skipped)")
+                        pass
             grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
             if r['type'] in ['sub_total', 'total', 'net_income']:
                 # print(f"DEBUG GRAND TOTAL: Final grand_total_Budget = {grid_row['grand_total_Budget']}")
+                pass
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':
