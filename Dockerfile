@@ -20,5 +20,8 @@ RUN which gunicorn
 # Copy project
 COPY . .
 
+# Collect static files during build
+RUN python manage.py collectstatic --noinput --clear
+
 # Run the application
 CMD ["gunicorn", "financial_consolidator.wsgi:application", "--workers", "2", "--bind", "0.0.0.0:8080"]
