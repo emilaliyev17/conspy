@@ -325,14 +325,7 @@
         <div class="map-container">
             <h2>Our Presence Across the United States</h2>
             <div class="usa-map">
-                <!-- Simplified USA SVG Map -->
-                <svg viewBox="0 0 959 593" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Example for Texas -->
-                    <path id="TX" class="state" d="M 420 400 L 520 400 L 520 480 L 420 480 Z" />
-                    <!-- Example for California -->
-                    <path id="CA" class="state" d="M 50 250 L 120 250 L 120 350 L 50 350 Z" />
-                    <!-- Add more states... -->
-                </svg>
+                <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg" style="width: 100%; height: auto;"></object>
             </div>
         </div>
     </section>
@@ -365,18 +358,37 @@
         });
     </script>
     <script>
-        // Highlight active states on the map
+        // Highlight active states for either inline SVG include or external object embed
         document.addEventListener('DOMContentLoaded', function() {
-            try {
-                const activeStates = JSON.parse(document.getElementById('active-states').textContent || '[]');
-                if (Array.isArray(activeStates)) {
-                    activeStates.forEach(stateCode => {
-                        const stateElement = document.getElementById(stateCode);
-                        if (stateElement) stateElement.classList.add('active');
-                    });
-                }
-            } catch (e) {
-                // ignore parsing errors
+            const parseActive = () => {
+                try {
+                    return JSON.parse(document.getElementById('active-states').textContent || '[]');
+                } catch (e) { return []; }
+            };
+            const applyActive = (root, list) => {
+                if (!Array.isArray(list)) return;
+                list.forEach(code => {
+                    const el = root.getElementById ? root.getElementById(code) : null;
+                    if (el) {
+                        el.classList.add('active');
+                        try { el.style.fill = '#1e3a8a'; } catch (_) {}
+                    }
+                });
+            };
+
+            const activeStates = parseActive();
+            const svgObject = document.getElementById('usa-svg');
+
+            if (svgObject) {
+                const onLoad = () => {
+                    const svgDoc = svgObject.contentDocument;
+                    if (svgDoc) applyActive(svgDoc, activeStates);
+                };
+                if (svgObject.contentDocument) onLoad();
+                else svgObject.addEventListener('load', onLoad, { once: true });
+            } else {
+                // Fallback for inline-included SVG
+                applyActive(document, activeStates);
             }
         });
     </script>
