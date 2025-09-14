@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget, ActiveState
 import json
 from datetime import datetime
 
@@ -163,3 +163,10 @@ class CFDashboardBudgetAdmin(admin.ModelAdmin):
     list_display = ['metric', 'period', 'value', 'data_type']
     list_filter = ['data_type', 'metric', 'period']
     ordering = ['-period', 'metric__display_order']
+
+
+@admin.register(ActiveState)
+class ActiveStateAdmin(admin.ModelAdmin):
+    list_display = ['state_code', 'state_name', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['state_name', 'state_code']

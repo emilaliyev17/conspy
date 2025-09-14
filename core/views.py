@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum
 from django.views.decorators.csrf import csrf_exempt
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState
 from .feature_flags import is_enabled
 import pandas as pd
 import csv
@@ -124,8 +124,11 @@ def convert_month_year_to_date_range(month, year):
 
 @login_required
 def home(request):
-    """Home page view with navigation to upload functionality."""
-    return render(request, 'core/home.html')
+    """Home page view with navigation and active states for the USA map."""
+    active_states = ActiveState.objects.filter(is_active=True).values_list('state_code', flat=True)
+    return render(request, 'core/home.html', {
+        'active_states': list(active_states)
+    })
 
 @login_required
 def chart_of_accounts_view(request):
@@ -839,14 +842,14 @@ def pl_report_data(request):
             # Sum if multiple entries per period/account
             prev = budget_values[p].get(acc, 0)
             budget_values[p][acc] = prev + (fd.amount or 0)
-            print(f"DEBUG: Added to budget_values - period: {p}, account: {acc}, amount: {fd.amount}")  # ДОБАВЬТЕ
+            # print(f"DEBUG: Added to budget_values - period: {p}, account: {acc}, amount: {fd.amount}")  # debug
         
         # Debug: Show what's in budget_values
-        print(f"DEBUG BUDGET_VALUES: Total periods with budget data: {len(budget_values)}")
+        # print(f"DEBUG BUDGET_VALUES: Total periods with budget data: {len(budget_values)}")
         for period, accounts in budget_values.items():
-            print(f"DEBUG BUDGET_VALUES: Period {period}: {len(accounts)} accounts")
+            # print(f"DEBUG BUDGET_VALUES: Period {period}: {len(accounts)} accounts")
             for acc, amount in accounts.items():
-                print(f"DEBUG BUDGET_VALUES:   {acc}: {amount}")
+                # print(f"DEBUG BUDGET_VALUES:   {acc}: {amount}")
     else:
         for fd in all_financial_data:
             p = fd.period
@@ -1081,25 +1084,25 @@ def pl_report_data(request):
         # Budget total revenue by period (Budget/Forecast only)
         if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
             budget_total = Decimal('0')
-            print(f"DEBUG TOTAL REVENUE: Calculating Budget for period {p}")
+            # print(f"DEBUG TOTAL REVENUE: Calculating Budget for period {p}")
             for a in income_accounts:
                 raw_budget = budget_values.get(p, {}).get(a.account_code)
                 if raw_budget is not None:
                     try:
                         budget_total += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                        print(f"DEBUG TOTAL REVENUE: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
+                        # print(f"DEBUG TOTAL REVENUE: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
                     except Exception:
                         pass
-            print(f"DEBUG TOTAL REVENUE: Final budget_total for period {p} = {budget_total}")
+            # print(f"DEBUG TOTAL REVENUE: Final budget_total for period {p} = {budget_total}")
             if budget_total != 0:
                 try:
                     total_revenue_row['periods'][p]['Budget'] = float(budget_total)
-                    print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = {float(budget_total)}")
+                    # print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = {float(budget_total)}")
                 except Exception:
                     total_revenue_row['periods'][p]['Budget'] = None
-                    print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = None (exception)")
+                    # print(f"DEBUG TOTAL REVENUE: Set total_revenue_row['periods'][{p}]['Budget'] = None (exception)")
             else:
-                print(f"DEBUG TOTAL REVENUE: budget_total is 0, not setting Budget value")
+                # print(f"DEBUG TOTAL REVENUE: budget_total is 0, not setting Budget value")
     # Grand totals for revenue
     for c in pl_companies:  # Используем только компании с данными
         gtot = sum(
@@ -1222,25 +1225,25 @@ def pl_report_data(request):
             # Budget subtotal per period (Budget/Forecast only)
             if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
                 budget_subtotal = Decimal('0')
-                print(f"DEBUG SUBTOTAL: Calculating Budget for {sub_category}, period {p}")
+                # print(f"DEBUG SUBTOTAL: Calculating Budget for {sub_category}, period {p}")
                 for acc in category_accounts:
                     raw_budget = budget_values.get(p, {}).get(acc.account_code)
                     if raw_budget is not None:
                         try:
                             budget_subtotal += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                            print(f"DEBUG SUBTOTAL: Added {acc.account_code} = {raw_budget}, running total = {budget_subtotal}")
+                            # print(f"DEBUG SUBTOTAL: Added {acc.account_code} = {raw_budget}, running total = {budget_subtotal}")
                         except Exception:
                             pass
-                print(f"DEBUG SUBTOTAL: Final budget_subtotal for {sub_category}, period {p} = {budget_subtotal}")
+                # print(f"DEBUG SUBTOTAL: Final budget_subtotal for {sub_category}, period {p} = {budget_subtotal}")
                 if budget_subtotal != 0:
                     try:
                         sub_total['periods'][p]['Budget'] = float(budget_subtotal)
-                        print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = {float(budget_subtotal)}")
+                        # print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = {float(budget_subtotal)}")
                     except Exception:
                         sub_total['periods'][p]['Budget'] = None
-                        print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = None (exception)")
+                        # print(f"DEBUG SUBTOTAL: Set sub_total['periods'][{p}]['Budget'] = None (exception)")
                 else:
-                    print(f"DEBUG SUBTOTAL: budget_subtotal is 0, not setting Budget value")
+                    # print(f"DEBUG SUBTOTAL: budget_subtotal is 0, not setting Budget value")
 
         for c in pl_companies:
             gtot = sum(
@@ -1255,10 +1258,10 @@ def pl_report_data(request):
         sub_total['grand_totals']['TOTAL'] = float(overall or 0)
         
         # Debug: Show what's in the subtotal row before adding to report_data
-        print(f"DEBUG SUBTOTAL ROW: Final subtotal for '{sub_total['account_name']}':")
+        # print(f"DEBUG SUBTOTAL ROW: Final subtotal for '{sub_total['account_name']}':")
         for p in periods:
             budget_val = sub_total['periods'][p].get('Budget')
-            print(f"DEBUG SUBTOTAL ROW:   Period {p}: Budget = {budget_val}")
+            # print(f"DEBUG SUBTOTAL ROW:   Period {p}: Budget = {budget_val}")
         
         report_data.append(sub_total)
 
@@ -1282,28 +1285,28 @@ def pl_report_data(request):
             period_total += company_total or 0
         total_expense_row['periods'][p]['TOTAL'] = float(period_total or 0)
         # Budget total expenses by period (Budget/Forecast only)
-        print(f"DEBUG TOTAL EXPENSES: Feature flag check - is_enabled('PL_BUDGET_PARALLEL')={is_enabled('PL_BUDGET_PARALLEL')}, data_type='{data_type}', data_type.lower() in ['budget', 'forecast']={data_type.lower() in ['budget', 'forecast']}")
+        # print(f"DEBUG TOTAL EXPENSES: Feature flag check - is_enabled('PL_BUDGET_PARALLEL')={is_enabled('PL_BUDGET_PARALLEL')}, data_type='{data_type}', data_type.lower() in ['budget', 'forecast']={data_type.lower() in ['budget', 'forecast']}")
         if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
             budget_total = Decimal('0')
-            print(f"DEBUG TOTAL EXPENSES: Calculating Budget for period {p}")
+            # print(f"DEBUG TOTAL EXPENSES: Calculating Budget for period {p}")
             for a in expense_accounts:
                 raw_budget = budget_values.get(p, {}).get(a.account_code)
                 if raw_budget is not None:
                     try:
                         budget_total += (raw_budget if isinstance(raw_budget, Decimal) else Decimal(str(raw_budget)))
-                        print(f"DEBUG TOTAL EXPENSES: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
+                        # print(f"DEBUG TOTAL EXPENSES: Added {a.account_code} = {raw_budget}, running total = {budget_total}")
                     except Exception:
                         pass
-            print(f"DEBUG TOTAL EXPENSES: Final budget_total for period {p} = {budget_total}")
+            # print(f"DEBUG TOTAL EXPENSES: Final budget_total for period {p} = {budget_total}")
             if budget_total != 0:
                 try:
                     total_expense_row['periods'][p]['Budget'] = float(budget_total)
-                    print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = {float(budget_total)}")
+                    # print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = {float(budget_total)}")
                 except Exception:
                     total_expense_row['periods'][p]['Budget'] = None
-                    print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = None (exception)")
+                    # print(f"DEBUG TOTAL EXPENSES: Set total_expense_row['periods'][{p}]['Budget'] = None (exception)")
             else:
-                print(f"DEBUG TOTAL EXPENSES: budget_total is 0, not setting Budget value")
+                # print(f"DEBUG TOTAL EXPENSES: budget_total is 0, not setting Budget value")
     # Grand totals for expenses
     for c in pl_companies:
         gtot = sum(
@@ -1345,7 +1348,7 @@ def pl_report_data(request):
             if revenue_budget or expense_budget:
                 net_income_budget = revenue_budget - expense_budget
                 net_income_row['periods'][p]['Budget'] = net_income_budget
-                print(f"DEBUG NET INCOME: Period {p}: Revenue {revenue_budget} - Expenses {expense_budget} = {net_income_budget}")
+                # print(f"DEBUG NET INCOME: Period {p}: Revenue {revenue_budget} - Expenses {expense_budget} = {net_income_budget}")
     # Grand totals for net income
     for c in pl_companies:
         revenue = Decimal(str(total_revenue_row['grand_totals'][c.code]))
@@ -1637,14 +1640,14 @@ def pl_report_data(request):
                     # For subtotal, total, and net_income rows, get the Budget value from the row data
                     budget_amount = r['periods'].get(p, {}).get('Budget', 0)
                     if r['type'] == 'sub_total':
-                        print(f"DEBUG GRID: Processing sub_total row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
+                        # print(f"DEBUG GRID: Processing sub_total row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
                     elif r['type'] in ['total', 'net_income']:
-                        print(f"DEBUG GRID: Processing {r['type']} row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
+                        # print(f"DEBUG GRID: Processing {r['type']} row '{r['account_name']}', period {p}, Budget value = {budget_amount}")
                 # For other row types, leave budget empty
                 grid_row[field_budget] = None if not budget_amount else float(budget_amount)
                 # Only show debug for subtotal and total rows, not individual accounts
                 if r['type'] in ['sub_total', 'total', 'net_income']:
-                    print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
+                    # print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
         for c in companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
@@ -1659,7 +1662,7 @@ def pl_report_data(request):
             total_budget_sum = 0
             # Only show debug for subtotal and total rows, not individual accounts
             if r['type'] in ['sub_total', 'total', 'net_income']:
-                print(f"DEBUG GRAND TOTAL: Calculating for row '{r['account_name']}' (type: {r['type']})")
+                # print(f"DEBUG GRAND TOTAL: Calculating for row '{r['account_name']}' (type: {r['type']})")
             for p in periods:
                 key = f"{p.strftime('%b-%y')}_Budget"
                 val = grid_row.get(key)
@@ -1667,15 +1670,15 @@ def pl_report_data(request):
                     try:
                         total_budget_sum += float(val)
                         if r['type'] in ['sub_total', 'total', 'net_income']:
-                            print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
+                            # print(f"DEBUG GRAND TOTAL:   Added {key} = {val}, running total = {total_budget_sum}")
                     except Exception:
                         pass
                 else:
                     if r['type'] in ['sub_total', 'total', 'net_income']:
-                        print(f"DEBUG GRAND TOTAL:   {key} = None (skipped)")
+                        # print(f"DEBUG GRAND TOTAL:   {key} = None (skipped)")
             grid_row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
             if r['type'] in ['sub_total', 'total', 'net_income']:
-                print(f"DEBUG GRAND TOTAL: Final grand_total_Budget = {grid_row['grand_total_Budget']}")
+                # print(f"DEBUG GRAND TOTAL: Final grand_total_Budget = {grid_row['grand_total_Budget']}")
 
         # Стили для разных типов строк
         if r['type'] == 'section_header':

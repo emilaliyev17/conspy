@@ -127,3 +127,18 @@ class CFDashboardBudget(models.Model):
     
     def __str__(self):
         return f"{self.metric.metric_name} - {self.period.strftime('%b-%y')} - {self.data_type}"
+
+
+class ActiveState(models.Model):
+    state_code = models.CharField(max_length=2, unique=True)  # TX, CA, NY
+    state_name = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['state_name']
+        verbose_name = 'Active State'
+        verbose_name_plural = 'Active States'
+
+    def __str__(self):
+        return f"{self.state_name} ({self.state_code})"

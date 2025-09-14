@@ -157,6 +157,10 @@
             background-size: 200% 200%;
             animation: gradientShift 15s ease infinite;
         }
+        /* Reduced motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            .hero { animation: none; }
+        }
         .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
         .hero p { font-size: 1.2rem; opacity: 0.9; margin: 0; }
 
@@ -211,6 +215,30 @@
         .navbar-logo { height: 40px; width: auto; }
         .hero-logo { max-width: 300px; width: 100%; height: auto; margin-bottom: 20px; }
 
+        /* USA Map */
+        .usa-map-section {
+            padding: 60px 20px;
+            background: #f8fafc;
+            text-align: center;
+        }
+        .map-container { max-width: 1200px; margin: 0 auto; }
+        .usa-map-section h2 { color: #1e3a8a; margin-bottom: 40px; font-size: 2rem; }
+        .usa-map { max-width: 900px; margin: 0 auto; }
+        .usa-map svg { width: 100%; height: auto; }
+        .state {
+            fill: #e0e7ff;  /* Light blue for inactive states */
+            stroke: #fff;
+            stroke-width: 1;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .state.active {
+            fill: #1e3a8a;  /* Dark blue for active states */
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            transform: translateY(-1px);
+        }
+        .state.active:hover { fill: #06b6d4;  /* Teal on hover */ }
+
         /* Responsive */
         @media (max-width: 768px) {
             .nav-container { flex-wrap: wrap; }
@@ -228,7 +256,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="/" class="navbar-brand">
-                <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" style="height: 35px;">
+                <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" class="navbar-logo">
             </a>
             
             <div class="nav-menu">
@@ -285,60 +313,31 @@
 
     <section class="hero">
         <div class="logo-container">
-            <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" style="max-width: 250px; margin-bottom: 15px;">
+            <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" class="hero-logo">
             <div class="subtitle">Financial Consolidator</div>
         </div>
         <p>Manage consolidation across companies, upload data, and generate insights.</p>
     </section>
 
-    <div class="features">
-        <div class="feature-grid">
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3 13h2v8H3zm4-8h2v16H7zm4-2h2v18h-2zm4 4h2v14h-2zm4-2h2v16h-2z"/>
-                    </svg>
-                </div>
-                <h3>Reports</h3>
-                <p>Generate P&L and Balance Sheet reports with multi-company consolidation</p>
-                <a href="{% url 'core:pl_report' %}" class="feature-link">View Reports →</a>
-            </div>
+    {{ active_states|json_script:"active-states" }}
 
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.42-1.41z"/>
-                        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-2 9V3.5L18.5 10H12z"/>
-                    </svg>
-                </div>
-                <h3>Data Upload</h3>
-                <p>Import Chart of Accounts and financial data seamlessly</p>
-                <a href="{% url 'core:upload_chart_of_accounts' %}" class="feature-link">Upload Now →</a>
-            </div>
-
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                    </svg>
-                </div>
-                <h3>Templates</h3>
-                <p>Download templates to ensure correct data formatting</p>
-                <a href="{% url 'core:download_template' %}" class="feature-link">Get Templates →</a>
-            </div>
-
-            <div class="feature-card disabled">
-                <div class="feature-icon">
-                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M3.5 18.5l6-6 4 4L22 8M22 8v6M22 8h-6"/>
-                    </svg>
-                </div>
-                <h3>FP&A Tools</h3>
-                <p>Advanced forecasting and analytics coming soon</p>
-                <span class="feature-badge">Coming Soon</span>
+    <section class="usa-map-section">
+        <div class="map-container">
+            <h2>Our Presence Across the United States</h2>
+            <div class="usa-map">
+                <!-- Simplified USA SVG Map -->
+                <svg viewBox="0 0 959 593" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Example for Texas -->
+                    <path id="TX" class="state" d="M 420 400 L 520 400 L 520 480 L 420 480 Z" />
+                    <!-- Example for California -->
+                    <path id="CA" class="state" d="M 50 250 L 120 250 L 120 350 L 50 350 Z" />
+                    <!-- Add more states... -->
+                </svg>
             </div>
         </div>
-    </div>
+    </section>
+
+    
 
     <script>
         // Dropdown toggle on click, close on outside click/Escape
@@ -351,11 +350,34 @@
             closeAllDropdowns();
             if (!isOpen) dd.classList.add('open');
         }
+        // Attach click listeners instead of inline onclick
+        document.querySelectorAll('.nav-dropdown-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDropdown(btn);
+            });
+        });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.nav-dropdown')) closeAllDropdowns();
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeAllDropdowns();
+        });
+    </script>
+    <script>
+        // Highlight active states on the map
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const activeStates = JSON.parse(document.getElementById('active-states').textContent || '[]');
+                if (Array.isArray(activeStates)) {
+                    activeStates.forEach(stateCode => {
+                        const stateElement = document.getElementById(stateCode);
+                        if (stateElement) stateElement.classList.add('active');
+                    });
+                }
+            } catch (e) {
+                // ignore parsing errors
+            }
         });
     </script>
 </body>
