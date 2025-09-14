@@ -1,126 +1,362 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Financial Consolidator</title>
+    <link rel="stylesheet" href="{% static 'core/css/logo.css' %}">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+        :root {
+            --primary: #1e3a8a;   /* Primary blue */
+            --teal: #06b6d4;      /* Teal accent */
+            --light: #f8fafc;     /* Light gray */
+            --white: #ffffff;     /* White */
+            --badge: #fbbf24;     /* Soon badge (yellow) */
+            --text: #0f172a;      /* Neutral dark for body text */
+        }
+
+        /* Global */
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: var(--light);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        /* Navbar */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--primary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25);
+        }
+        .nav-container {
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .nav-buttons {
+            padding: 12px 20px;
             display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 30px;
+            align-items: center;
+            gap: 16px;
         }
-        .btn {
-            background-color: #007bff;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 4px;
+        .navbar-brand {
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            color: var(--white);
+            white-space: nowrap;
+        }
+        .nav-menu {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+        }
+        .nav-actions { display: flex; align-items: center; gap: 10px; }
+        .nav-link {
+            color: rgba(255,255,255,0.9);
+            padding: 8px 10px;
+            border-radius: 8px;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+        .nav-link:hover { color: var(--white); background: rgba(255,255,255,0.12); }
+
+        .nav-dropdown { position: relative; }
+        .nav-dropdown-btn {
+            color: rgba(255,255,255,0.9);
+            background: transparent;
+            border: 1px solid transparent;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 14px;
             cursor: pointer;
-            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .nav-dropdown-btn:hover { color: var(--white); background: rgba(255,255,255,0.12); }
+        .nav-dropdown-btn .arrow { font-size: 11px; opacity: 0.9; }
+        .nav-dropdown.open .nav-dropdown-btn {
+            border-color: rgba(255,255,255,0.28);
+            background: rgba(255,255,255,0.12);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+        }
+        .nav-dropdown-btn.disabled { opacity: 0.7; cursor: not-allowed; }
+        .badge {
             display: inline-block;
+            font-size: 11px;
+            color: #1f2937;
+            background: var(--badge);
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 0;
+            min-width: 220px;
+            background: var(--white);
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 16px 40px rgba(2, 6, 23, 0.2);
+            transition: opacity 0.3s, transform 0.3s;
+            opacity: 0;
+            transform: translateY(6px);
+            visibility: hidden;
+            pointer-events: none;
+            z-index: 1100;
+        }
+        .nav-dropdown.open .dropdown-menu {
+            opacity: 1;
+            transform: translateY(0);
+            visibility: visible;
+            pointer-events: auto;
+        }
+        .dropdown-menu a {
+            display: block;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--primary);
+            transition: background 0.18s ease, color 0.18s ease, padding-left 0.18s ease;
+        }
+        .dropdown-menu a:hover {
+            background: var(--light);
+            color: var(--primary);
+            padding-left: 14px;
+            box-shadow: inset 3px 0 0 0 var(--teal);
+        }
+
+        /* Hero */
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .hero {
+            background:
+                repeating-linear-gradient(
+                    45deg,
+                    rgba(255,255,255,0.03),
+                    rgba(255,255,255,0.03) 20px,
+                    transparent 20px,
+                    transparent 40px
+                ),
+                linear-gradient(135deg, #1e3a8a 0%, #06b6d4 100%);
+            color: var(--white);
+            padding: 60px 20px;
             text-align: center;
-            font-size: 16px;
-            transition: background-color 0.3s;
+            background-size: 200% 200%;
+            animation: gradientShift 15s ease infinite;
         }
-        .btn:hover {
-            background-color: #0056b3;
+        .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .hero p { font-size: 1.2rem; opacity: 0.9; margin: 0; }
+
+        /* Logo styles */
+        .logo-container { margin-bottom: 20px; }
+        .logo {
+            font-family: Georgia, serif;
+            font-style: italic;
+            font-size: 3rem;
+            font-weight: 300;
+            letter-spacing: -3px;
+            color: var(--white);
         }
-        .btn-secondary {
-            background-color: #6c757d;
+        .logo-plus { font-size: 1.8rem; font-style: normal; margin: 0 2px; }
+        .subtitle {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            opacity: 0.8;
+            margin-top: 10px;
         }
-        .btn-secondary:hover {
-            background-color: #545b62;
+
+        /* Features */
+        .features { max-width: 1100px; margin: 24px auto 40px; padding: 0 20px; }
+        .feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+        .feature-card {
+            background: var(--white);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: 0 8px 24px rgba(2, 6, 23, 0.06);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-        .btn-success {
-            background-color: #28a745;
+        .feature-card:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(2, 6, 23, 0.12); }
+        .feature-card h3 { color: var(--primary); margin-top: 0; margin-bottom: 8px; }
+        .feature-card ol { margin: 10px 0 0 18px; color: #334155; }
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #1e3a8a, #06b6d4);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
         }
-        .btn-success:hover {
-            background-color: #1e7e34;
-        }
-        .description {
-            background-color: #e9ecef;
-            padding: 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .description h3 {
-            margin-top: 0;
-            color: #495057;
+        .feature-icon svg { color: var(--white); }
+        .feature-link { color: var(--teal); text-decoration: none; font-weight: 500; margin-top: 10px; display: inline-block; }
+        .feature-link:hover { text-decoration: underline; }
+        .feature-card.disabled { opacity: 0.6; cursor: not-allowed; }
+        .feature-badge { background: #fbbf24; color: #1e3a8a; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; margin-top: 8px; }
+        .navbar-logo { height: 40px; width: auto; }
+        .hero-logo { max-width: 300px; width: 100%; height: auto; margin-bottom: 20px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-container { flex-wrap: wrap; }
+            .navbar-brand { font-size: 1rem; }
+            .nav-menu { order: 3; width: 100%; justify-content: space-between; gap: 10px; padding-top: 8px; }
+            .nav-actions { order: 2; margin-left: auto; }
+            .feature-grid { grid-template-columns: 1fr; }
+            .hero { padding: 40px 16px; }
+            .hero h1 { font-size: 2rem; }
+            .hero p { font-size: 1rem; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Financial Consolidator</h1>
-        
-        <div class="description">
-            <h3>Welcome to Financial Consolidator</h3>
-            <p>This application helps you manage financial data consolidation across multiple companies and accounts. You can upload Chart of Accounts, manage companies, and track financial data.</p>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="navbar-brand">
+                <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" style="height: 35px;">
+            </a>
+            
+            <div class="nav-menu">
+                <!-- Reports Dropdown -->
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                        Reports
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="{% url 'core:pl_report' %}">P&L Report</a>
+                        <a href="{% url 'core:bs_report' %}">Balance Sheet</a>
+                    </div>
+                </div>
+                
+                <!-- Uploads Dropdown -->
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                        Uploads
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="{% url 'core:upload_chart_of_accounts' %}">Chart of Accounts</a>
+                        <a href="{% url 'core:upload_financial_data' %}">Financial Data</a>
+                    </div>
+                </div>
+                
+                <!-- Downloads Dropdown -->
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn" onclick="toggleDropdown(this)">
+                        Downloads
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="{% url 'core:download_template' %}">Chart Template</a>
+                        <a href="{% url 'core:download_financial_data_template' %}">Data Template</a>
+                    </div>
+                </div>
+                
+                <!-- FP&A Dropdown (disabled) -->
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn disabled" disabled>
+                        FP&A
+                        <span class="badge">Soon</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="nav-actions">
+                <a href="/admin/" class="nav-link">Admin</a>
+            </div>
         </div>
-        
-        <div class="nav-buttons">
-            <a href="{% url 'core:chart_of_accounts' %}" class="btn">
-                📋 View Chart of Accounts
-            </a>
-            
-            <a href="{% url 'core:upload_chart_of_accounts' %}" class="btn btn-success">
-                📊 Upload Chart of Accounts
-            </a>
-            
-            <a href="{% url 'core:upload_financial_data' %}" class="btn btn-success">
-                💰 Upload Financial Data
-            </a>
-            
-            <a href="{% url 'core:pl_report' %}" class="btn">
-                📊 P&L Report
-            </a>
-            
-            <a href="{% url 'core:bs_report' %}" class="btn">
-                📈 Balance Sheet Report
-            </a>
-            
-            <a href="{% url 'core:download_template' %}" class="btn btn-secondary">
-                📥 Download Chart Template
-            </a>
-            
-            <a href="{% url 'core:download_financial_data_template' %}" class="btn btn-secondary">
-                📥 Download Financial Data Template
-            </a>
-            
-            <a href="/admin/" class="btn">
-                ⚙️ Admin Interface
-            </a>
+    </nav>
+
+    <section class="hero">
+        <div class="logo-container">
+            <img src="{% static 'core/images/faes-logo.png' %}" alt="FAES+CO" style="max-width: 250px; margin-bottom: 15px;">
+            <div class="subtitle">Financial Consolidator</div>
         </div>
-        
-        <div style="margin-top: 30px; text-align: center; color: #666;">
-            <p><strong>Quick Start:</strong></p>
-            <ol style="text-align: left; display: inline-block;">
-                <li>Download the templates to see the correct formats</li>
-                <li>Fill in your Chart of Accounts data and upload</li>
-                <li>Fill in your Financial Data and upload (select company, type, year)</li>
-                <li>Use the admin interface to manage your data</li>
-            </ol>
+        <p>Manage consolidation across companies, upload data, and generate insights.</p>
+    </section>
+
+    <div class="features">
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3 13h2v8H3zm4-8h2v16H7zm4-2h2v18h-2zm4 4h2v14h-2zm4-2h2v16h-2z"/>
+                    </svg>
+                </div>
+                <h3>Reports</h3>
+                <p>Generate P&L and Balance Sheet reports with multi-company consolidation</p>
+                <a href="{% url 'core:pl_report' %}" class="feature-link">View Reports →</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.42-1.41z"/>
+                        <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-2 9V3.5L18.5 10H12z"/>
+                    </svg>
+                </div>
+                <h3>Data Upload</h3>
+                <p>Import Chart of Accounts and financial data seamlessly</p>
+                <a href="{% url 'core:upload_chart_of_accounts' %}" class="feature-link">Upload Now →</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </div>
+                <h3>Templates</h3>
+                <p>Download templates to ensure correct data formatting</p>
+                <a href="{% url 'core:download_template' %}" class="feature-link">Get Templates →</a>
+            </div>
+
+            <div class="feature-card disabled">
+                <div class="feature-icon">
+                    <svg width="32" height="32" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M3.5 18.5l6-6 4 4L22 8M22 8v6M22 8h-6"/>
+                    </svg>
+                </div>
+                <h3>FP&A Tools</h3>
+                <p>Advanced forecasting and analytics coming soon</p>
+                <span class="feature-badge">Coming Soon</span>
+            </div>
         </div>
     </div>
+
+    <script>
+        // Dropdown toggle on click, close on outside click/Escape
+        function closeAllDropdowns() {
+            document.querySelectorAll('.nav-dropdown.open').forEach(el => el.classList.remove('open'));
+        }
+        function toggleDropdown(btn) {
+            const dd = btn.closest('.nav-dropdown');
+            const isOpen = dd.classList.contains('open');
+            closeAllDropdowns();
+            if (!isOpen) dd.classList.add('open');
+        }
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.nav-dropdown')) closeAllDropdowns();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAllDropdowns();
+        });
+    </script>
 </body>
 </html>

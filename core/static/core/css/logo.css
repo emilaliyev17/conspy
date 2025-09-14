@@ -1,0 +1,21 @@
+/* FAES+CO Logo Styles */
+.faes-logo {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-weight: 300;
+    letter-spacing: -0.08em;
+    line-height: 1;
+}
+
+.faes-logo .plus {
+    font-size: 0.6em;
+    vertical-align: super;
+    font-style: normal;
+    margin: 0 0.1em;
+}
+
+.faes-logo.logo-white { color: white; }
+.faes-logo.logo-dark { color: #1e3a8a; }
+.faes-logo.logo-large { font-size: 3rem; }
+.faes-logo.logo-medium { font-size: 1.5rem; }
+
