@@ -678,6 +678,94 @@
             }
         }
 
+        // Grand Totals Toggle Header Component - mirrors PeriodToggleHeader but for Grand Total columns
+        class GrandTotalsToggleHeader {
+            init(params) {
+                this.params = params;
+                
+                // Safety checks like PeriodToggleHeader
+                if (!params.column || !params.column.getUserProvidedColDef || !params.api) {
+                    console.warn('GrandTotalsToggleHeader: Missing required methods');
+                    this.eGui = document.createElement('div');
+                    this.eGui.textContent = 'Grand Total';
+                    return;
+                }
+                
+                this.collapsed = false;
+                
+                // Listen for global collapse/expand events
+                this.globalListener = (event) => {
+                    if (event.detail && typeof event.detail.collapsed === 'boolean') {
+                        this.collapsed = event.detail.collapsed;
+                        this.updateDisplay();
+                    }
+                };
+                window.addEventListener('grandTotalsToggleAll', this.globalListener);
+                
+                this.eGui = document.createElement('div');
+                this.eGui.style.display = 'flex';
+                this.eGui.style.alignItems = 'center';
+                this.eGui.style.justifyContent = 'space-between';
+                this.eGui.style.width = '100%';
+                
+                this.updateDisplay();
+            }
+            
+            toggleColumns() {
+                try {
+                    const api = this.params.api;
+                    const allColumns = api.getColumnDefs();
+                    
+                    // Find ALL grand total company columns dynamically by colType
+                    // No hardcoding of company names - uses colType: 'grand_company'
+                    const grandCompanyFields = [];
+                    allColumns.forEach(col => {
+                        if (col.colType === 'grand_company') {
+                            grandCompanyFields.push(col.field);
+                        }
+                    });
+                    
+                    if (grandCompanyFields.length === 0) {
+                        console.log('No grand company columns found');
+                        return;
+                    }
+                    
+                    this.collapsed = !this.collapsed;
+                    api.setColumnsVisible(grandCompanyFields, !this.collapsed);
+                    this.updateDisplay();
+                    
+                } catch (error) {
+                    console.error('GrandTotalsToggleHeader: Error toggling', error);
+                }
+            }
+            
+            updateDisplay() {
+                this.eGui.innerHTML = `
+                    <span>Grand Total</span>
+                    <span class="grand-toggle-btn" 
+                          style="cursor: pointer; font-weight: bold; margin-left: 5px;"
+                          title="${this.collapsed ? 'Expand company columns' : 'Collapse company columns'}">
+                        ${this.collapsed ? '[+]' : '[-]'}
+                    </span>
+                `;
+                
+                const btn = this.eGui.querySelector('.grand-toggle-btn');
+                if (btn) {
+                    btn.onclick = () => this.toggleColumns();
+                }
+            }
+            
+            getGui() {
+                return this.eGui;
+            }
+            
+            destroy() {
+                if (this.globalListener) {
+                    window.removeEventListener('grandTotalsToggleAll', this.globalListener);
+                }
+            }
+        }
+
         // Temporarily disabled auto-submit to fix Budget selection issue
         // document.getElementById('data_type').addEventListener('change', function() {
         //     document.getElementById('filterForm').submit();
@@ -877,7 +965,8 @@
                         components: {
                             togglerHeader: TogglerHeader,
                             hideableHeader: HideableHeader,
-                            periodToggleHeader: PeriodToggleHeader
+                            periodToggleHeader: PeriodToggleHeader,
+                            grandTotalsToggleHeader: GrandTotalsToggleHeader
                         },
                         domLayout: 'normal',  // Это включит скролл при фиксированной высоте
                         rowSelection: {
@@ -994,13 +1083,27 @@
     window.collapseAllPeriods = function() {
         if (window.plGridApi) {
             const allColumns = window.plGridApi.getColumnDefs();
+            
+            // Collapse company columns for periods
             const companyFields = allColumns
                 .filter(col => col.colType === 'company')
+                .map(col => col.field);
+
+            // Collapse grand total company columns - NO HARDCODING
+            const grandCompanyFields = allColumns
+                .filter(col => col.colType === 'grand_company')
                 .map(col => col.field);
             
             if (companyFields.length > 0) {
                 window.plGridApi.setColumnsVisible(companyFields, false);
                 window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                    detail: { collapsed: true } 
+                }));
+            }
+
+            if (grandCompanyFields.length > 0) {
+                window.plGridApi.setColumnsVisible(grandCompanyFields, false);
+                window.dispatchEvent(new CustomEvent('grandTotalsToggleAll', { 
                     detail: { collapsed: true } 
                 }));
             }
@@ -1010,13 +1113,27 @@
     window.expandAllPeriods = function() {
         if (window.plGridApi) {
             const allColumns = window.plGridApi.getColumnDefs();
+
+            // Expand company columns for periods
             const companyFields = allColumns
                 .filter(col => col.colType === 'company')
                 .map(col => col.field);
-            
+
+            // Expand grand total company columns - NO HARDCODING
+            const grandCompanyFields = allColumns
+                .filter(col => col.colType === 'grand_company')
+                .map(col => col.field);
+
             if (companyFields.length > 0) {
                 window.plGridApi.setColumnsVisible(companyFields, true);
                 window.dispatchEvent(new CustomEvent('periodToggleAll', { 
+                    detail: { collapsed: false } 
+                }));
+            }
+
+            if (grandCompanyFields.length > 0) {
+                window.plGridApi.setColumnsVisible(grandCompanyFields, true);
+                window.dispatchEvent(new CustomEvent('grandTotalsToggleAll', { 
                     detail: { collapsed: false } 
                 }));
             }

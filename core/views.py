@@ -1434,6 +1434,7 @@ def pl_report_data(request):
         column_defs.append({
             'field': f'grand_total_{c.code}',
             'headerName': f'Grand Total {c.code}',
+            'colType': 'grand_company',
             'width': 120,
             'type': 'numberColumnWithCommas',
             'cellStyle': {
@@ -1446,6 +1447,8 @@ def pl_report_data(request):
     column_defs.append({
         'field': 'grand_total_TOTAL',
         'headerName': 'Grand Total',
+        'colType': 'grand_overall',
+        'headerComponent': 'grandTotalsToggleHeader',
         'width': 120,
         'type': 'numberColumnWithCommas',
         'cellStyle': {
@@ -1460,6 +1463,7 @@ def pl_report_data(request):
             column_defs.append({
                 'field': 'grand_total_Budget',
                 'headerName': 'Grand Total Budget',
+                'colType': 'grand_budget',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
                 'cellStyle': {
