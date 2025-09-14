@@ -33,7 +33,15 @@
             position: sticky;
             top: 0;
             z-index: 1000;
-            background: var(--primary);
+            background:
+                repeating-linear-gradient(
+                    45deg,
+                    rgba(255,255,255,0.03),
+                    rgba(255,255,255,0.03) 20px,
+                    transparent 20px,
+                    transparent 40px
+                ),
+                linear-gradient(135deg, #1e3a8a 0%, #06b6d4 100%);
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25);
         }
