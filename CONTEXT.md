@@ -180,3 +180,80 @@ Implemented by: Claude AI Assistant with Emil
 - Budget-only company grand total intentionally removed (was empty/unused)
 - All changes preserve existing functionality
 - No performance impact observed
+
+---
+
+## UPDATE: Changes in Last 5 Days (2025-09-10 → 2025-09-15)
+Implemented by: Codex CLI with Emil
+
+### P&L Report (PL)
+- Export Options
+  - Added export dropdown (no Bootstrap) with two options: Formatted (with totals) and Raw Data.
+  - File: `core/templates/core/pl_report.html`
+  - Backend now supports `export_type` query param in `export_report_excel`.
+  - For `export_type=formatted` and `type=pl`, export reuses `pl_report_data` to build hierarchical data (subtotals, totals, net income) and writes an Excel aligned to on-screen columns, with bold styling on subtotal/total rows and a light fill for totals.
+  - File: `core/views.py` (updated `export_report_excel`)
+
+- Font Size Controls
+  - Added A-/A/A+ controls with localStorage persistence to adjust font size of numeric data cells only (headers and account names remain unchanged).
+  - CSS targets only `.ag-cell[col-id*="_"]` to scale per-company, TOTAL, Budget, and grand total numeric columns.
+  - After font changes, the grid triggers `resetRowHeights`, `refreshHeader`, and `refreshCells` for clean layout.
+  - File: `core/templates/core/pl_report.html`
+
+- Grid Readability and Layout
+  - Added subtle grid lines for data cells, professional font stack with tabular numbers, reduced row height, and vertically centered cell content to increase data density and readability.
+  - File: `core/templates/core/pl_report.html`
+
+- Grand Totals Toggle Enhancements
+  - Introduced `GrandTotalsToggleHeader` to toggle grand total company columns; extended global collapse/expand logic accordingly. Annotated grand total `columnDefs` with `colType` and header component for consistent control.
+  - Files: `core/templates/core/pl_report.html`, `core/views.py`
+
+- Version Pin
+  - Pinned AG Grid to `31.3.2` in PL template to prevent API drift.
+  - File: `core/templates/core/pl_report.html`
+
+### Balance Sheet (BS)
+- Collapse/Expand Feature
+  - Added collapse/expand functionality for Balance Sheet columns; UI parity improvements with P&L.
+  - File: `core/templates/core/bs_report.html`, `core/views.py`
+
+- Version Pin
+  - Pinned AG Grid to `31.3.2` in BS template to keep consistent behavior.
+  - File: `core/templates/core/bs_report.html`
+
+### Home/UI Redesign
+- Major UI updates: FAES+CO branding, hero/skyline imagery, higher-quality assets, navigation icons, real USA map with active states.
+- Files: `core/templates/core/home.html`, `core/static/core/images/*`
+
+### Backend/Settings/Deployment
+- Deployment pipeline
+  - Added Dockerfile and configured collectstatic at build time; Procfile and runtime.txt for process management.
+  - Ensured `gunicorn` present in final image and used in Procfile.
+  - Files: `Dockerfile`, `Procfile`, `runtime.txt`, `requirements.txt`
+
+- Static files
+  - Migrated to Django 5.x `STORAGES` config with WhiteNoise compressed manifest storage; added a non-strict storage class for flexibility.
+  - Files: `financial_consolidator/settings.py`, `core/storage.py`
+
+- Security and Prod Config
+  - Fixed redirect loop via `SECURE_PROXY_SSL_HEADER`; removed `SECURE_SSL_REDIRECT` for DigitalOcean proxy setup.
+  - Dynamic `ALLOWED_HOSTS`, added `CSRF_TRUSTED_ORIGINS` for ondigitalocean.app and optional host; enabled secure cookies/SSL settings for production.
+  - Added `DATABASE_URL` support for production.
+  - Files: `financial_consolidator/settings.py`
+
+- Authentication/Admin
+  - Enforced authentication to protect financial data; added login template and routes.
+  - Introduced `django-admin-interface` with dark theme; registered `admin_interface` and `colorfield`; set `X_FRAME_OPTIONS=SAMEORIGIN`.
+  - Files: `financial_consolidator/settings.py`, `financial_consolidator/urls.py`, `core/templates/core/login.html`, `requirements.txt`
+
+### Models & Data
+- Added `ActiveState` model and migration to track active US states for the home page map; integrated in `home` view.
+- Files: `core/migrations/0014_activestate.py`, `core/models.py`, `core/views.py`
+
+### Fixes & Hygiene
+- Resolved Python syntax/indentation errors in `core/views.py` found during cleanup.
+- Removed debug logs and refined UI layers across templates.
+
+### Notes
+- Formatted P&L export uses the same data logic as the on-screen grid, including section headers, subtotals, and totals. Budget columns appear only for Budget/Forecast data types and follow the same order as the grid (Company → TOTAL → Budget). Grand total columns match the grid order as well.
+- The raw P&L export remains unchanged (direct `FinancialData` aggregation per account) and is offered as a separate option in the dropdown.
