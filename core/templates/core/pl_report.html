@@ -534,10 +534,16 @@
             color: white;
         }
 
-        /* Font size classes */
-        #plGrid.font-12 { font-size: 12px !important; }
-        #plGrid.font-14 { font-size: 14px !important; }
-        #plGrid.font-16 { font-size: 16px !important; }
+        /* Target ONLY numerical data cells - cells with underscore in col-id */
+        #plGrid.font-12 .ag-cell[col-id*="_"] { font-size: 12px !important; }
+        #plGrid.font-14 .ag-cell[col-id*="_"] { font-size: 14px !important; }
+        #plGrid.font-16 .ag-cell[col-id*="_"] { font-size: 16px !important; }
+
+        /* Keep headers at original size */
+        #plGrid .ag-header-cell-label { font-size: 14px !important; }
+
+        /* Keep account names at original size */
+        #plGrid .ag-cell[col-id="account_name"] { font-size: 13px !important; }
 
         /* Adjust row heights for each font size */
         #plGrid.font-12 .ag-row { min-height: 26px !important; }
