@@ -534,18 +534,15 @@
             color: white;
         }
 
-        /* Font size classes - ONLY font size, no row height changes */
-        #plGrid.font-12 .ag-theme-alpine { 
-            font-size: 12px;
-        }
+        /* Font size classes */
+        #plGrid.font-12 { font-size: 12px !important; }
+        #plGrid.font-14 { font-size: 14px !important; }
+        #plGrid.font-16 { font-size: 16px !important; }
 
-        #plGrid.font-14 .ag-theme-alpine { 
-            font-size: 14px;
-        }
-
-        #plGrid.font-16 .ag-theme-alpine { 
-            font-size: 16px;
-        }
+        /* Adjust row heights for each font size */
+        #plGrid.font-12 .ag-row { min-height: 26px !important; }
+        #plGrid.font-14 .ag-row { min-height: 28px !important; }
+        #plGrid.font-16 .ag-row { min-height: 32px !important; }
 
         /* Custom dropdown styles */
         .export-dropdown {
@@ -1384,6 +1381,12 @@
             
             // Save preference
             localStorage.setItem('plFontSize', size);
+
+            // Refresh AG Grid after font change
+            const api = (window.plGridApi && window.plGridApi.api) ? window.plGridApi.api : window.plGridApi;
+            if (api && api.resetRowHeights) api.resetRowHeights();
+            if (api && api.refreshHeader) api.refreshHeader();
+            if (api && api.refreshCells) api.refreshCells({ force: true });
         });
     });
 
