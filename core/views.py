@@ -16,6 +16,7 @@ from decimal import Decimal, InvalidOperation
 import logging
 from dateutil.relativedelta import relativedelta
 import calendar
+import openpyxl.styles
 
 logger = logging.getLogger(__name__)
 
@@ -2184,7 +2185,7 @@ def pl_report(request):
     data_type_raw = request.GET.get('data_type', 'actual')
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
-    year_range = range(2023, 2031)
+    year_range = range(2024, 2031)
     
     context = {
         'from_month': from_month,
@@ -2225,6 +2226,7 @@ def bs_report(request):
 @login_required
 def export_report_excel(request):
     """Export report data to Excel."""
+    export_type = request.GET.get('export_type', 'raw')  # formatted | raw
     report_type = request.GET.get('type', 'pl')
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
@@ -2237,6 +2239,98 @@ def export_report_excel(request):
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
     companies = Company.objects.all().order_by('name')
+
+    # Formatted export for P&L: reuse the same data structure as the screen
+    if export_type == 'formatted' and report_type == 'pl':
+        # Call pl_report_data to assemble hierarchical data
+        screen_response = pl_report_data(request)
+        try:
+            screen_json = json.loads(screen_response.content.decode('utf-8'))
+        except Exception:
+            # Fallback: return empty workbook with a note
+            df = pd.DataFrame([["No data"]], columns=["P&L Report"])
+            response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="pl_report_formatted.xlsx"'
+            with pd.ExcelWriter(response, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='P&L Report', index=False)
+            return response
+
+        row_data = screen_json.get('rowData', [])
+        column_defs = screen_json.get('columnDefs', [])
+
+        # Build header: Account Name | Type | period columns (company, TOTAL, Budget) in the same order as the grid
+        header = ['Account Name', 'Type']
+        period_fields = []
+        for col in column_defs:
+            field = col.get('field')
+            col_type = col.get('colType')
+            if not field:
+                continue
+            # skip non-data fields
+            if field in ('toggler', 'account_code', 'account_name'):
+                continue
+            # include only period data columns (company, total, budget)
+            if col_type in ('company', 'total', 'budget'):
+                header.append(col.get('headerName', field))
+                period_fields.append(field)
+
+        # Fallback if no column defs were found (use keys from first row excluding meta keys)
+        if not period_fields and row_data:
+            meta_keys = {'account_name', 'account_code', 'rowType', 'cellStyle'}
+            first_row = row_data[0]
+            for k in first_row.keys():
+                if k not in meta_keys:
+                    header.append(k)
+                    period_fields.append(k)
+
+        # Assemble rows
+        excel_rows = []
+        for r in row_data:
+            name = r.get('account_name', '')
+            rtype = r.get('rowType', '')
+            values = []
+            for f in period_fields:
+                v = r.get(f, 0)
+                if v == '-':
+                    v = 0
+                try:
+                    v = float(v)
+                except Exception:
+                    v = 0
+                values.append(v)
+            excel_rows.append([name, rtype] + values)
+
+        # Create DataFrame and export
+        df = pd.DataFrame(excel_rows, columns=header)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="pl_report_formatted.xlsx"'
+
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            sheet_name = 'P&L Report'
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            # Apply basic formatting: bold for subtotal/total/header rows, light fill for totals
+            ws = writer.sheets.get(sheet_name)
+            if ws is not None:
+                # Map row types we want bolded/fill
+                bold_types = {'sub_total', 'parent_total', 'total', 'section_header', 'parent_header', 'net_income'}
+                total_fill = openpyxl.styles.PatternFill(start_color='E8F4FD', end_color='E8F4FD', fill_type='solid')
+                bold_font = openpyxl.styles.Font(bold=True)
+
+                # Iterate DataFrame rows (1-based Excel, header at row 1)
+                type_col_idx = header.index('Type') + 1  # 1-based
+                max_col = ws.max_column
+                for row_idx in range(2, ws.max_row + 1):
+                    row_type_val = ws.cell(row=row_idx, column=type_col_idx).value
+                    if row_type_val in bold_types:
+                        for col_idx in range(1, max_col + 1):
+                            cell = ws.cell(row=row_idx, column=col_idx)
+                            cell.font = bold_font
+                            if row_type_val == 'total':
+                                cell.fill = total_fill
+
+        return response
     
     if report_type == 'pl':
         accounts = ChartOfAccounts.objects.filter(
