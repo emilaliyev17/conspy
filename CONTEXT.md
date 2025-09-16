@@ -257,3 +257,13 @@ Implemented by: Codex CLI with Emil
 ### Notes
 - Formatted P&L export uses the same data logic as the on-screen grid, including section headers, subtotals, and totals. Budget columns appear only for Budget/Forecast data types and follow the same order as the grid (Company → TOTAL → Budget). Grand total columns match the grid order as well.
 - The raw P&L export remains unchanged (direct `FinancialData` aggregation per account) and is offered as a separate option in the dropdown.
+
+---
+
+## ROLLBACK: Deal Tracking Feature Fully Reverted
+Date: 2025-09-16
+
+- Restored repository to pre-deal-tracking state by hard-resetting to commit `e08583f` ("Docs: Add last 5 days of updates...").
+- All changes related to ActiveState deal fields, homepage deals table, and associated view/template/admin edits have been removed.
+- Force-pushed `main` to ensure production matches the last known working version prior to today’s changes.
+- Follow-up: Re-introduce the feature behind a branch/PR with a staging validation plan before production deployment.
