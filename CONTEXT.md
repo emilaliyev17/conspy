@@ -267,3 +267,37 @@ Date: 2025-09-16
 - All changes related to ActiveState deal fields, homepage deals table, and associated view/template/admin edits have been removed.
 - Force-pushed `main` to ensure production matches the last known working version prior to today’s changes.
 - Follow-up: Re-introduce the feature behind a branch/PR with a staging validation plan before production deployment.
+
+---
+
+## Recent Major Refactoring (December 2024)
+
+### Removed All Hardcoded Subcategory Names
+**Problem:** P&L report had hardcoded subcategory names throughout the codebase, making it impossible to work with different Chart of Accounts.
+
+**Changes Made:**
+1. **Backend (core/views.py):**
+   - Removed hardcoded `correct_order` array
+   - Replaced with dynamic sorting based on `sort_order` field from database
+   - Added metadata to each row: `rowType`, `section`, `level`, `styleToken`
+
+2. **Frontend (pl_report.html):**
+   - Removed all name-based checks in `getRowClass` function
+   - Replaced with metadata-driven CSS classes
+   - CSS now uses generic classes instead of specific category names
+
+3. **Database:**
+   - Updated all `sort_order` values to control display order:
+     - P&L Income: 100-300
+     - P&L Expenses: 1100-1700
+     - Balance Sheet Assets: 5100-5300
+     - Balance Sheet Liabilities: 6100-6900
+     - Balance Sheet Equity: 7100-7900
+
+**Result:** System now works with ANY Chart of Accounts. Categories can be renamed, added, or reordered without any code changes.
+
+### Important Notes:
+- Sort order controls display sequence (lower numbers appear first)
+- All styling is metadata-driven, not name-dependent
+- CF Dashboard integration preserved
+- Excel export functionality maintained
