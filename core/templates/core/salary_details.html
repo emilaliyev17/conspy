@@ -1,0 +1,47 @@
+{% extends "core/base.html" %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Salary Details: {{ company_label }} - {{ month_name }} {{ year }}</h2>
+    
+    <div class="mb-3">
+        <a href="/reports/pl/" class="btn btn-secondary">← Back to P&L Report</a>
+    </div>
+    
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                {% if show_all_companies %}
+                <th>Company</th>
+                {% endif %}
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th class="text-end">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for salary in salaries %}
+            <tr>
+                {% if show_all_companies %}
+                <td>{{ salary.company.code }}</td>
+                {% endif %}
+                <td>{{ salary.employee_id }}</td>
+                <td>{{ salary.employee_name }}</td>
+                <td class="text-end">${{ salary.amount|thousands_separator }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{% if show_all_companies %}4{% else %}3{% endif %}" class="text-center">No salary data uploaded for this period</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="fw-bold">
+                <td colspan="{% if show_all_companies %}3{% else %}2{% endif %}">Total</td>
+                <td class="text-end">${{ total|thousands_separator }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

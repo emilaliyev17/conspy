@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget, ActiveState
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget, ActiveState, SalaryData
 import json
 from datetime import datetime
 
@@ -33,6 +33,13 @@ class ChartOfAccountsAdmin(admin.ModelAdmin):
     ordering = ['sort_order']
     list_editable = ['sort_order']
     list_display_links = ['account_name']
+
+@admin.register(SalaryData)
+class SalaryDataAdmin(admin.ModelAdmin):
+    list_display = ['employee_id', 'employee_name', 'amount', 'company', 'month', 'year', 'uploaded_by', 'uploaded_at']
+    list_filter = ['company', 'year', 'month']
+    search_fields = ['employee_id', 'employee_name', 'company__name']
+    ordering = ['company', 'year', 'month', 'employee_name']
 
 @admin.register(DataBackup)
 class DataBackupAdmin(admin.ModelAdmin):

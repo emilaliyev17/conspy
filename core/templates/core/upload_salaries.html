@@ -1,0 +1,40 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Upload Salary Data</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            <h5>CSV Format Requirements:</h5>
+            <p>The CSV file should have the following columns:</p>
+            <ul>
+                <li>Ent (Company Code)</li>
+                <li>Employee ID</li>
+                <li>Employee Name</li>
+                <li>Jan-25, Feb-25, Mar-25... (month columns with amounts)</li>
+            </ul>
+            
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="file" class="form-label">Select CSV File</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                </div>
+                <a href="/salaries/template/" class="btn btn-info">Download Template</a>
+                <button type="submit" class="btn btn-primary">Upload Salaries</button>
+                <a href="/admin/core/salarydata/" class="btn btn-secondary">View Uploaded Data</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

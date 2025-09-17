@@ -1130,6 +1130,36 @@
                                 // Display numbers with thousand separators and 2 decimals
                                 cellRenderer: function(params) {
                                     if (params.value == null || params.value === '') return '';
+                                    
+                                    if (params.data && params.data.is_salary && params.data.can_view_details) {
+                                        // Extract month and year from column header
+                                        const colId = params.colDef.field;
+                                        if (colId && colId.includes('_')) {
+                                            const [monthYear, companyCode] = colId.split('_');
+                                            const [monthAbbr, yearShort] = monthYear.split('-');
+                                            const monthMap = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+                                            const month = monthMap[monthAbbr];
+                                            const year = 2000 + parseInt(yearShort);
+
+                                            if (params.value && month && year) {
+                                                const num = typeof params.value === 'number' ? params.value : Number(params.value);
+                                                if (isNaN(num)) return params.value;
+                                                const formattedValue = num.toLocaleString('en-US', {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2
+                                                });
+                                                const isTotalColumn = companyCode && companyCode.toUpperCase() === 'TOTAL';
+                                                const salaryUrl = isTotalColumn
+                                                    ? '/salaries/?company=ALL&year=' + year + '&month=' + month
+                                                    : '/salaries/?company=' + companyCode + '&year=' + year + '&month=' + month;
+                                                if (companyCode) {
+                                                    return '<a href="' + salaryUrl + '" target="_blank" style="text-decoration: underline dotted;">' + formattedValue + '</a>';
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Default rendering for non-salary cells
                                     const num = typeof params.value === 'number' ? params.value : Number(params.value);
                                     if (isNaN(num)) return params.value;
                                     return num.toLocaleString('en-US', {

@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+from decouple import config
 
 from pathlib import Path
 import os
@@ -214,3 +215,22 @@ if not DEBUG:
     # SECURE_SSL_REDIRECT = True  # Removed to prevent redirect loop behind DO proxy
     # Use proxy header to detect HTTPS correctly on DigitalOcean
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
+# Salaries Module Feature Flag
+ENABLE_SALARY_MODULE = config('ENABLE_SALARY_MODULE', default=False, cast=bool)

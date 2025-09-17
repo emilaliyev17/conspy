@@ -17,4 +17,7 @@ urlpatterns = [
     path('reports/bs/data/', views.bs_report_data, name='bs_report_data'),
     path('reports/export/', views.export_report_excel, name='export_report_excel'),
     path('api/cf-dashboard/update/', views.update_cf_dashboard, name='update_cf_dashboard'),
+    path('salaries/', views.salary_details, name='salary_details'),
+    path('salaries/upload/', views.upload_salaries, name='upload_salaries'),
+    path('salaries/template/', views.download_salary_template, name='download_salary_template'),
 ]

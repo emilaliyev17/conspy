@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum, Min
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.text import slugify
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState, SalaryData
 from .feature_flags import is_enabled
 import pandas as pd
 import csv
@@ -574,6 +574,11 @@ def download_template(request):
 @login_required
 def pl_report_data(request):
     """P&L Report data in JSON format for AG Grid, с нормализацией месяцев и фильтром по диапазону."""
+    from django.conf import settings
+
+    # Get feature flag status
+    salary_module_enabled = getattr(settings, 'ENABLE_SALARY_MODULE', False)
+    print(f"DEBUG: salary_module_enabled = {salary_module_enabled}")
     logger.info("--- P&L Report Data Generation Started ---")
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
@@ -1689,6 +1694,48 @@ def pl_report_data(request):
             'level': r.get('level', 0),
             'styleToken': r.get('styleToken', '')
         }
+
+        sort_order_str = str(grid_row.get('sort_order'))
+        row_type = grid_row.get('rowType')
+        account_name = grid_row.get('account_name')
+
+        if sort_order_str == '1100':
+            logger.info(
+                "SALARY DEBUG: sort_order=1100 row=%s rowType=%s salary_module_enabled=%s",
+                account_name,
+                row_type,
+                salary_module_enabled,
+            )
+        if account_name and 'TOTAL' in account_name.upper():
+            logger.info(
+                "SALARY DEBUG: TOTAL row detected name=%s rowType=%s sort_order=%s",
+                account_name,
+                row_type,
+                sort_order_str,
+            )
+
+        condition_met = (
+            salary_module_enabled
+            and sort_order_str == '1100'
+            and row_type == 'account'
+        )
+        if condition_met:
+            grid_row['is_salary'] = True
+            grid_row['can_view_details'] = request.user.has_perm('core.view_salary_details')
+            logger.info(
+                "SALARY DEBUG: Flagged row for salary link name=%s rowType=%s sort_order=%s can_view_details=%s",
+                account_name,
+                row_type,
+                sort_order_str,
+                grid_row['can_view_details'],
+            )
+        elif sort_order_str == '1100':
+            logger.info(
+                "SALARY DEBUG: Row matched sort_order but was NOT flagged name=%s rowType=%s salary_module_enabled=%s",
+                account_name,
+                row_type,
+                salary_module_enabled,
+            )
         for p in periods:
             for c in companies:
                 field = f'{p.strftime("%b-%y")}_{c.code}'
@@ -2557,3 +2604,141 @@ def update_cf_dashboard(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
     
     return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+
+@login_required
+@permission_required('core.view_salary_details')  
+def salary_details(request):
+    from django.db.models import Sum
+    from django.shortcuts import get_object_or_404
+    from django.http import HttpResponse
+    import calendar
+
+    company_code = request.GET.get('company')
+    year = request.GET.get('year')
+    month = request.GET.get('month')
+
+    if not all([company_code, year, month]):
+        return HttpResponse("Missing parameters", status=400)
+
+    try:
+        year_int = int(year)
+        month_int = int(month)
+    except (TypeError, ValueError):
+        return HttpResponse("Invalid year or month", status=400)
+
+    show_all_companies = company_code.upper() == 'ALL'
+
+    base_queryset = SalaryData.objects.select_related('company').filter(
+        year=year_int,
+        month=month_int
+    )
+
+    if show_all_companies:
+        salaries = base_queryset.order_by('company__code', 'employee_name')
+        company = None
+        company_label = "All Companies"
+    else:
+        company = get_object_or_404(Company, code=company_code)
+        salaries = base_queryset.filter(company=company).order_by('employee_name')
+        company_label = company.name
+
+    month_name = calendar.month_name[month_int] if 1 <= month_int <= 12 else str(month_int)
+
+    context = {
+        'company': company,
+        'company_label': company_label,
+        'company_code': company_code,
+        'year': year_int,
+        'month': month_int,
+        'month_name': month_name,
+        'salaries': salaries,
+        'total': salaries.aggregate(Sum('amount'))['amount__sum'] or 0,
+        'show_all_companies': show_all_companies
+    }
+
+    return render(request, 'core/salary_details.html', context)
+
+
+@login_required
+@permission_required('core.upload_salary_data')
+def upload_salaries(request):
+    import calendar
+    from decimal import Decimal
+    from django.db import transaction
+    
+    if request.method == 'POST' and request.FILES.get('file'):
+        file = request.FILES['file']
+        
+        try:
+            df = pd.read_csv(file)
+            
+            # Check all companies exist first
+            company_codes = df['Ent'].unique()
+            missing = []
+            for code in company_codes:
+                if not Company.objects.filter(code=code).exists():
+                    missing.append(code)
+            
+            if missing:
+                messages.error(request, f"Companies not found: {', '.join(missing)}")
+                return redirect('/salaries/upload/')
+            
+            # Process in transaction
+            with transaction.atomic():
+                # Get month columns (Jan-25, Feb-25, etc)
+                month_cols = [col for col in df.columns if '-' in col]
+                
+                for _, row in df.iterrows():
+                    company = Company.objects.get(code=row['Ent'])
+                    
+                    for month_col in month_cols:
+                        if pd.notna(row[month_col]) and row[month_col]:
+                            # Parse month and year
+                            month_str, year_str = month_col.split('-')
+                            month_num = list(calendar.month_abbr).index(month_str)
+                            year = 2000 + int(year_str)
+                            
+                            # Clean amount
+                            amount_str = str(row[month_col]).replace('$', '').replace(',', '')
+                            amount = Decimal(amount_str)
+                            
+                            # Create or update
+                            SalaryData.objects.update_or_create(
+                                employee_id=row['Employee ID'],
+                                company=company,
+                                month=month_num,
+                                year=year,
+                                defaults={
+                                    'employee_name': row['Employee Name'],
+                                    'amount': amount,
+                                    'uploaded_by': request.user
+                                }
+                            )
+            
+            messages.success(request, 'Salaries uploaded successfully')
+            return redirect('upload_salaries')
+            
+        except Exception as e:
+            messages.error(request, f'Error: {str(e)}')
+            return redirect('/salaries/upload/')
+    
+    return render(request, 'core/upload_salaries.html')
+
+
+@login_required
+def download_salary_template(request):
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="salary_template.csv"'
+    
+    writer = csv.writer(response)
+    # Header row
+    writer.writerow(['Ent', 'Employee ID', 'Employee Name', 'Jan-25', 'Feb-25', 'Mar-25', 'Apr-25', 'May-25', 'Jun-25', 'Jul-25', 'Aug-25', 'Sep-25', 'Oct-25', 'Nov-25', 'Dec-25'])
+    # Example rows
+    writer.writerow(['FG', 'EMP001', 'John Doe', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00'])
+    writer.writerow(['F2', 'EMP002', 'Jane Smith', '$4500.00', '$4500.00', '$4500.00', '', '', '', '', '', '', '', '', ''])
+    
+    return response

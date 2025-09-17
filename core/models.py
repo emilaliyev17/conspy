@@ -1,4 +1,6 @@
 from django.db import models
+import calendar
+from django.contrib.auth.models import User
 
 # Create your models here.
 
@@ -60,6 +62,26 @@ class ChartOfAccounts(models.Model):
     class Meta:
         verbose_name_plural = "Chart of Accounts"
         ordering = ['sort_order']
+
+class SalaryData(models.Model):
+    employee_id = models.CharField(max_length=50)
+    employee_name = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    month = models.IntegerField(choices=[(i, calendar.month_abbr[i]) for i in range(1, 13)])
+    year = models.IntegerField()
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['employee_id', 'company', 'month', 'year']
+        permissions = [
+            ("view_salary_details", "Can view salary breakdown"),
+        ]
+        ordering = ['company', 'year', 'month', 'employee_name']
+        
+    def __str__(self):
+        return f"{self.employee_name} - {self.company.code} - {self.month}/{self.year}"
 
 class DataBackup(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='data_backups')
