@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-from decouple import config
 
 from pathlib import Path
 import os
@@ -233,4 +232,6 @@ LOGGING = {
 }
 
 # Salaries Module Feature Flag
-ENABLE_SALARY_MODULE = config('ENABLE_SALARY_MODULE', default=False, cast=bool)
+ENABLE_SALARY_MODULE = os.environ.get('ENABLE_SALARY_MODULE', 'False').lower() in (
+    '1', 'true', 'yes', 'on'
+)
