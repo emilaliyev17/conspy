@@ -3,8 +3,9 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils.timezone import make_naive
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Min
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.text import slugify
 from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState
 from .feature_flags import is_enabled
 import pandas as pd
@@ -893,26 +894,25 @@ def pl_report_data(request):
         grouped_data.setdefault(sub_category, []).append(acc)
     logger.info(f"Grouped P&L sub_categories: {list(grouped_data.keys())[:10]}")
 
-    # Порядок разделов для P&L
-    correct_order = [
-        # Revenue sections
-        'INTEREST + DEFAULT',
-        'Other Income',
-        # Expense sections  
-        'COST OF FUNDS AND FEES',
-        'Salaries',
-        'Fund related',
-        'Triple Point funding line related',
-        'OakNorth funding line related',
-        'Marketing',
-        'Administration',
-        'Other Expenses'
-    ]
+    # Get P&L subcategories ordered by sort_order from database
+    pl_subcategories = ChartOfAccounts.objects.filter(
+        account_type__in=['INCOME', 'EXPENSE'],
+        sub_category__isnull=False
+    ).values('sub_category').annotate(
+        min_sort_order=Min('sort_order')
+    ).order_by('min_sort_order')
+
+    # Build the ordered list of subcategories
+    correct_order = [item['sub_category'] for item in pl_subcategories]
     all_sub = list(grouped_data.keys())
     pl_structure = [c for c in correct_order if c in all_sub] + [c for c in all_sub if c not in correct_order]
     logger.info(f"Ordered P&L sub categories: {pl_structure}")
 
     # Сборка отчета
+    def build_style_token(source_text, fallback=''):
+        base = source_text or fallback or ''
+        return slugify(base) if base else ''
+
     report_data = []
     debug_info = {
         'periods_count': len(periods),
@@ -953,12 +953,23 @@ def pl_report_data(request):
             continue
 
         # Подзаголовок
+        # Get sort_order for this subcategory
+        subcategory_sort_order = ChartOfAccounts.objects.filter(
+            sub_category=sub_category,
+            account_type='INCOME'
+        ).aggregate(min_sort=Min('sort_order'))['min_sort'] or 0
+        style_token = build_style_token(sub_category)
+        
         report_data.append({
             'type': 'sub_header',
             'account_name': sub_category,
             'account_code': '',
             'periods': {},
-            'grand_totals': {}
+            'grand_totals': {},
+            'section': 'income',
+            'sort_order': subcategory_sort_order,
+            'level': 1,
+            'styleToken': style_token
         })
 
         # Счета
@@ -968,7 +979,11 @@ def pl_report_data(request):
                 'account_name': acc.account_name,
                 'account_code': acc.account_code,
                 'periods': {},
-                'grand_totals': {}
+                'grand_totals': {},
+                'section': 'income',
+                'sort_order': acc.sort_order,
+                'level': 2,
+                'styleToken': style_token
             }
             has_non_zero_value = False
             # Помесячно
@@ -1022,7 +1037,11 @@ def pl_report_data(request):
             'account_name': f'Total {sub_category}',
             'account_code': '',
             'periods': {},
-            'grand_totals': {}
+            'grand_totals': {},
+            'section': 'income',
+            'sort_order': subcategory_sort_order,
+            'level': 1,
+            'styleToken': style_token
         }
         for p in periods:
             sub_total['periods'][p] = {}
@@ -1070,7 +1089,11 @@ def pl_report_data(request):
         'account_name': 'TOTAL REVENUE',
         'account_code': '',
         'periods': {},
-        'grand_totals': {}
+        'grand_totals': {},
+        'section': 'income',
+        'level': 0,
+        'sort_order': 0,
+        'styleToken': build_style_token('TOTAL REVENUE')
     }
     for p in periods:
         total_revenue_row['periods'][p] = {}
@@ -1126,10 +1149,14 @@ def pl_report_data(request):
         'account_name': 'EXPENSES',
         'account_code': '',
         'periods': {},
-        'grand_totals': {}
+        'grand_totals': {},
+        'section': 'expense',
+        'level': 0,
+        'sort_order': 0,
+        'styleToken': build_style_token('EXPENSES')
     }
     report_data.append(expense_total_row)
-    
+
     # Обрабатываем Expense счета
     expense_accounts = [a for a in chart_accounts if a.account_type == 'EXPENSE']
     for sub_category in pl_structure:
@@ -1142,12 +1169,23 @@ def pl_report_data(request):
             continue
 
         # Подзаголовок
+        # Get sort_order for this subcategory
+        subcategory_sort_order = ChartOfAccounts.objects.filter(
+            sub_category=sub_category,
+            account_type='EXPENSE'
+        ).aggregate(min_sort=Min('sort_order'))['min_sort'] or 0
+        style_token = build_style_token(sub_category)
+        
         report_data.append({
             'type': 'sub_header',
             'account_name': sub_category,
             'account_code': '',
             'periods': {},
-            'grand_totals': {}
+            'grand_totals': {},
+            'section': 'expense',
+            'sort_order': subcategory_sort_order,
+            'level': 1,
+            'styleToken': style_token
         })
 
         # Счета (аналогично Income)
@@ -1157,7 +1195,11 @@ def pl_report_data(request):
                 'account_name': acc.account_name,
                 'account_code': acc.account_code,
                 'periods': {},
-                'grand_totals': {}
+                'grand_totals': {},
+                'section': 'expense',
+                'sort_order': acc.sort_order,
+                'level': 2,
+                'styleToken': style_token
             }
             has_non_zero_value = False
             # Помесячно
@@ -1210,7 +1252,11 @@ def pl_report_data(request):
             'account_name': f'Total {sub_category}',
             'account_code': '',
             'periods': {},
-            'grand_totals': {}
+            'grand_totals': {},
+            'section': 'expense',
+            'sort_order': subcategory_sort_order,
+            'level': 1,
+            'styleToken': style_token
         }
         for p in periods:
             sub_total['periods'][p] = {}
@@ -1275,7 +1321,11 @@ def pl_report_data(request):
         'account_name': 'TOTAL EXPENSES',
         'account_code': '',
         'periods': {},
-        'grand_totals': {}
+        'grand_totals': {},
+        'section': 'expense',
+        'level': 0,
+        'sort_order': 0,
+        'styleToken': build_style_token('TOTAL EXPENSES')
     }
     for p in periods:
         total_expense_row['periods'][p] = {}
@@ -1332,7 +1382,11 @@ def pl_report_data(request):
         'account_name': 'NET INCOME',
         'account_code': '',
         'periods': {},
-        'grand_totals': {}
+        'grand_totals': {},
+        'section': 'summary',
+        'level': 0,
+        'sort_order': 0,
+        'styleToken': build_style_token('NET INCOME')
     }
     for p in periods:
         net_income_row['periods'][p] = {}
@@ -1606,6 +1660,10 @@ def pl_report_data(request):
     
     # Add CF Dashboard rows at the top
     for cf_row in cf_rows:
+        cf_row.setdefault('rowType', 'cf_metric')
+        cf_row.setdefault('section', 'cf_dashboard')
+        cf_row.setdefault('level', 0)
+        cf_row.setdefault('styleToken', build_style_token(cf_row.get('account_name')))
         row_data.append(cf_row)
     
     # Add visual separator after CF Dashboard
@@ -1613,7 +1671,11 @@ def pl_report_data(request):
         row_data.append({
             'account_code': '',
             'account_name': '━' * 30 + ' P&L REPORT ' + '━' * 30,
-            'is_separator': True
+            'is_separator': True,
+            'rowType': 'separator',
+            'section': 'pnl_report',
+            'level': 0,
+            'styleToken': build_style_token('P&L REPORT separator')
         })
     
     # Then add regular P&L rows
@@ -1621,7 +1683,11 @@ def pl_report_data(request):
         grid_row = {
             'account_code': r['account_code'],
             'account_name': r['account_name'],
-            'rowType': r['type']
+            'rowType': r['type'],
+            'section': r.get('section', ''),
+            'sort_order': r.get('sort_order', 0),
+            'level': r.get('level', 0),
+            'styleToken': r.get('styleToken', '')
         }
         for p in periods:
             for c in companies:
