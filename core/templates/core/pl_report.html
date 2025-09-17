@@ -168,105 +168,87 @@
             border-bottom: 1px solid #dee2e6 !important;
         }
 
-        /* Administration parent header row styling - black border below */
-        .administration-parent-row {
-            background-color: #f8f9fa !important;
-            border-top: 2px solid #dee2e6 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-        
+        /*
+         * Legacy name-based styling (kept for reference during transition)
+         * .administration-parent-row { ... }
+         * .marketing-header-row { ... }
+         * .employee-related-row { ... }
+         * .administration-row { ... }
+         * .marketing-total-row { ... }
+         * .oaknorth-total-row { ... }
+         * .triple-point-total-row { ... }
+         * .fund-related-total-row { ... }
+         * .salaries-total-row { ... }
+         * .cost-of-funds-total-row { ... }
+         * .total-revenue-row { ... }
+         * .other-income-total-row { ... }
+         * .interest-default-total-row { ... }
+         */
+
         .sub-header-row {
             background-color: #f1f3f4 !important;
             border-bottom: 1px solid #dee2e6 !important;
             font-weight: bold !important; /* Make sub_category headers bold; do not change size */
         }
 
-        /* Marketing sub-header row styling - black border above */
-        .marketing-header-row {
-            background-color: #f1f3f4 !important;
-            border-top: 1px solid #000000 !important;
+        .sub-total-row {
+            background-color: #e8f4fd !important;
+            border-top: 1px solid #cbd7e3 !important;
+            border-bottom: 1px solid #dee2e6 !important;
+        }
+
+        /* Metadata-driven styling hooks */
+        .ag-row.rowType-parent_header,
+        .ag-row.rowType-section_header {
+            background-color: #f8f9fa !important;
+            border-top: 2px solid #dee2e6 !important;
             border-bottom: 1px solid #dee2e6 !important;
             font-weight: bold !important;
         }
-        
-        .sub-total-row {
-            background-color: #e8f4fd !important;
-            border-bottom: 1px solid #dee2e6 !important;
+
+        .ag-row.rowType-sub_header {
+            font-weight: bold !important;
         }
 
-        /* Total Employee related row styling - black border below */
-        .employee-related-row {
-            background-color: #e8f4fd !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* Total Administration row styling - black border below and above */
-        .administration-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* Total Marketing row styling - black border below and above */
-        .marketing-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* Total OakNorth funding line related row styling - black border above */
-        .oaknorth-total-row {
-            background-color: #e8f4fd !important;
+        .ag-row.rowType-sub_total.section-expense {
             border-top: 1px solid #000000 !important;
         }
 
-        /* Total Triple Point funding line related row styling - borders above and below with spacing */
-        .triple-point-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-            margin-bottom: 12px !important;
-        }
-
-        /* Total Fund related row styling - borders above and below */
-        .fund-related-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* Total Salaries row styling - borders above and below */
-        .salaries-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* Total COST OF FUNDS AND FEES row styling - borders above and below */
-        .cost-of-funds-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
-        }
-
-        /* TOTAL REVENUE row styling - borders above and below */
-        .total-revenue-row {
+        .ag-row.rowType-total.section-income {
             background-color: #d4edda !important;
             border-top: 1px solid #000000 !important;
             border-bottom: 1px solid #000000 !important;
         }
 
-        /* Total Other Income row styling - black border above */
-        .other-income-total-row {
-            background-color: #e8f4fd !important;
+        .ag-row.rowType-total.section-expense {
+            background-color: #d4edda !important;
             border-top: 1px solid #000000 !important;
+            border-bottom: 2px solid #000000 !important;
         }
 
-        /* Total INTEREST + DEFAULT row styling - borders above and below */
-        .interest-default-total-row {
-            background-color: #e8f4fd !important;
-            border-top: 1px solid #000000 !important;
-            border-bottom: 1px solid #000000 !important;
+        .ag-row.rowType-net_income {
+            background-color: #fff3cd !important;
+            border-bottom: 2px solid #ffc107 !important;
+            font-weight: bold !important;
+        }
+
+        .ag-row.rowType-account {
+            border-bottom: 1px solid #f0f0f0 !important;
+        }
+
+        .ag-row.level-1 .ag-cell[col-id="account_name"] {
+            padding-left: 16px !important;
+        }
+
+        .ag-row.level-2 .ag-cell[col-id="account_name"] {
+            padding-left: 32px !important;
+        }
+
+        .ag-row.separator-row .ag-cell {
+            border: none !important;
+            background-color: transparent !important;
+            font-weight: bold !important;
+            text-align: center !important;
         }
         
         .parent-total-row {
@@ -274,11 +256,7 @@
             border-bottom: 2px solid #28a745 !important;
         }
 
-        /* TOTAL EXPENSES row styling - thick black border below */
-        .total-expenses-row {
-            background-color: #d4edda !important;
-            border-bottom: 2px solid #000000 !important;
-        }
+        /* Legacy: .total-expenses-row { ... } */
         
         .calculated-total-row {
             background-color: #fff3cd !important;
@@ -1178,72 +1156,47 @@
                         suppressRowHoverHighlight: true,
                         getRowClass: function(params) {
                             const classes = [];
-                            const rt = params && params.data ? params.data.rowType : null;
-                            if (rt === 'parent_header') {
-                                // Check if this is "Administration" specifically
-                                if (params && params.data && params.data.account_name === 'Administration') {
-                                    classes.push('administration-parent-row');
-                                } else {
-                                    classes.push('parent-header-row');
-                                }
-                            }
-                            else if (rt === 'sub_header') {
-                                // Check if this is "Marketing" specifically
-                                if (params && params.data && params.data.account_name === 'Marketing') {
-                                    classes.push('marketing-header-row');
-                                } else {
-                                    classes.push('sub-header-row');
-                                }
-                            }
-                            else if (rt === 'sub_total') {
-                                // Check for specific subtotal rows that need black borders
-                                if (params && params.data && params.data.account_name === 'Total Employee related') {
-                                    classes.push('employee-related-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Administration') {
-                                    classes.push('administration-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Marketing') {
-                                    classes.push('marketing-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total OakNorth funding line related') {
-                                    classes.push('oaknorth-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Triple Point funding line related') {
-                                    classes.push('triple-point-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Fund related') {
-                                    classes.push('fund-related-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Salaries') {
-                                    classes.push('salaries-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total COST OF FUNDS AND FEES') {
-                                    classes.push('cost-of-funds-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total Other Income') {
-                                    classes.push('other-income-total-row');
-                                } else if (params && params.data && params.data.account_name === 'Total INTEREST + DEFAULT') {
-                                    classes.push('interest-default-total-row');
-                                } else {
-                                    classes.push('sub-total-row');
-                                }
-                            }
-                            else if (rt === 'parent_total') classes.push('parent-total-row');
-                            else if (rt === 'total') {
-                                // Check for specific total rows that need black borders
-                                if (params && params.data && params.data.account_name === 'TOTAL REVENUE') {
-                                    classes.push('total-revenue-row');
-                                } else if (params && params.data && params.data.account_name === 'TOTAL EXPENSES') {
-                                    classes.push('total-expenses-row');
-                                } else {
-                                    classes.push('parent-total-row');
-                                }
-                            }
-                            else if (rt === 'calculated_total') classes.push('calculated-total-row');
-                            else if (rt === 'net_income') {
-                                classes.push('calculated-total-row');
-                                classes.push('net-income-row');
-                            }
+                            const data = (params && params.data) || {};
+                            const rt = data.rowType || null;
+                            const section = data.section || null;
+                            const level = Number.isInteger(data.level) ? data.level : null;
+                            const styleToken = data.styleToken || null;
 
-                            // Bold rows where account_name contains 'Total' or 'TOTAL'
-                            if (params && params.data && params.data.account_name) {
-                                const name = params.data.account_name;
-                                if (name.includes('Total') || name.includes('TOTAL')) {
+                            const typeClassMap = {
+                                parent_header: ['parent-header-row'],
+                                section_header: ['parent-header-row'],
+                                sub_header: ['sub-header-row'],
+                                account: ['account-row'],
+                                sub_total: ['sub-total-row'],
+                                total: ['parent-total-row'],
+                                parent_total: ['parent-total-row'],
+                                calculated_total: ['calculated-total-row'],
+                                net_income: ['calculated-total-row', 'net-income-row']
+                            };
+
+                            if (rt) {
+                                classes.push(`rowType-${rt}`);
+                                (typeClassMap[rt] || []).forEach(cls => classes.push(cls));
+
+                                if (['sub_total', 'total', 'parent_total', 'calculated_total', 'net_income'].includes(rt)) {
                                     classes.push('total-row-bold');
                                 }
+                            }
+
+                            if (section) {
+                                classes.push(`section-${section}`);
+                            }
+
+                            if (level !== null) {
+                                classes.push(`level-${level}`);
+                            }
+
+                            if (styleToken) {
+                                classes.push(`style-${styleToken}`);
+                            }
+
+                            if (data.is_separator) {
+                                classes.push('separator-row');
                             }
 
                             return classes.join(' ');
