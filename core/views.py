@@ -127,9 +127,18 @@ def convert_month_year_to_date_range(month, year):
 @login_required
 def home(request):
     """Home page view with navigation and active states for the USA map."""
-    active_states = ActiveState.objects.filter(is_active=True).values_list('state_code', flat=True)
+    active_state_qs = ActiveState.objects.filter(is_active=True).order_by('state_name')
+    active_state_codes = list(active_state_qs.values_list('state_code', flat=True))
+    total_deal_count = sum(state.deal_count for state in active_state_qs)
+    total_deal_volume = sum(state.deal_volume for state in active_state_qs)
+
     return render(request, 'core/home.html', {
-        'active_states': list(active_states)
+        'active_states': active_state_codes,
+        'state_deal_rows': active_state_qs,
+        'state_deal_totals': {
+            'deal_count': total_deal_count,
+            'deal_volume': total_deal_volume,
+        },
     })
 
 @login_required

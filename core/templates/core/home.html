@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
+{% load custom_filters %}
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -224,13 +225,74 @@
 
         /* USA Map */
         .usa-map-section {
-            padding: 60px 20px;
+            padding: 60px 20px 80px;
             background: #f8fafc;
             text-align: center;
+            position: relative;
         }
-        .map-container { max-width: 1200px; margin: 0 auto; }
-        .usa-map-section h2 { color: #1e3a8a; margin-bottom: 40px; font-size: 2rem; }
-        .usa-map { max-width: 900px; margin: 0 auto; }
+        .usa-map-section h2 {
+            color: #1e3a8a;
+            margin-bottom: 32px;
+            font-size: 2rem;
+        }
+        .usa-map-wrapper {
+            display: inline-block;
+            position: relative;
+            max-width: 900px;
+            width: 100%;
+        }
+        .presence-table-wrapper {
+            position: absolute;
+            right: calc(100% - 10px);
+            top: 35%;
+            transform: translate(10px, -35%);
+            margin-right: 0;
+            width: 260px;
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            padding: 20px 22px;
+            text-align: left;
+        }
+        .presence-table-wrapper h3 {
+            margin: 0 0 16px;
+            font-size: 1.25rem;
+            color: var(--primary);
+        }
+        .presence-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        .presence-table th,
+        .presence-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            text-align: left;
+        }
+        .presence-table th {
+            color: var(--primary);
+            font-weight: 600;
+            background: rgba(30, 58, 138, 0.06);
+        }
+        .presence-table tr:last-child td {
+            border-bottom: none;
+        }
+        .presence-table .amount {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .presence-table .count {
+            text-align: center;
+        }
+        .presence-table tfoot td {
+            font-weight: 700;
+            background: rgba(15, 23, 42, 0.05);
+        }
+        .usa-map {
+            width: 100%;
+        }
         .usa-map svg { width: 100%; height: auto; }
         .state {
             fill: #e0e7ff;  /* Light blue for inactive states */
@@ -254,6 +316,18 @@
         
 
         /* Responsive */
+        @media (max-width: 1200px) {
+            .presence-table-wrapper {
+                position: static;
+                transform: none;
+                margin: 0 auto 30px;
+                width: min(320px, 90%);
+            }
+            .usa-map-wrapper {
+                display: block;
+            }
+        }
+
         @media (max-width: 768px) {
             .nav-container { flex-wrap: wrap; }
             .navbar-brand { font-size: 1rem; }
@@ -338,8 +412,44 @@
 
     <section class="usa-map-section">
         <h2>Our Presence Across the United States</h2>
-        <div class="usa-map">
-            <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg"></object>
+        <div class="usa-map-wrapper">
+            <div class="presence-table-wrapper">
+                <h3>Active States</h3>
+                <table class="presence-table">
+                    <thead>
+                        <tr>
+                            <th>State</th>
+                            <th class="count">Deals</th>
+                            <th class="amount">Total Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for state in state_deal_rows %}
+                        <tr>
+                            <td>{{ state.state_code }}</td>
+                            <td class="count">{{ state.deal_count }}</td>
+                            <td class="amount">${{ state.deal_volume|thousands_separator }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3">No active states tracked yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if state_deal_rows %}
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td class="count">{{ state_deal_totals.deal_count }}</td>
+                            <td class="amount">${{ state_deal_totals.deal_volume|thousands_separator }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+            <div class="usa-map">
+                <object data="{% static 'core/images/us.svg' %}" type="image/svg+xml" id="usa-svg"></object>
+            </div>
         </div>
     </section>
 

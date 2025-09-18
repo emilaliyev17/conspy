@@ -174,6 +174,7 @@ class CFDashboardBudgetAdmin(admin.ModelAdmin):
 
 @admin.register(ActiveState)
 class ActiveStateAdmin(admin.ModelAdmin):
-    list_display = ['state_code', 'state_name', 'is_active']
+    list_display = ['state_code', 'state_name', 'deal_count', 'deal_volume', 'is_active']
     list_filter = ['is_active']
     search_fields = ['state_name', 'state_code']
+    list_editable = ['deal_count', 'deal_volume', 'is_active']

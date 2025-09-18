@@ -156,6 +156,8 @@ class ActiveState(models.Model):
     state_name = models.CharField(max_length=50)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    deal_count = models.PositiveIntegerField(default=0)
+    deal_volume = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
     class Meta:
         ordering = ['state_name']
