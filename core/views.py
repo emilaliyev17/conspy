@@ -2686,35 +2686,91 @@ def upload_salaries(request):
             
             # Process in transaction
             with transaction.atomic():
+                # Month header helpers so we support "Jan-25" AND "25-Jan" formats
+                month_abbr_map = {
+                    abbr.lower(): idx for idx, abbr in enumerate(calendar.month_abbr) if abbr
+                }
+                month_name_map = {
+                    name.lower(): idx for idx, name in enumerate(calendar.month_name) if name
+                }
+
+                def parse_month_year(raw_header: str) -> tuple[int, int]:
+                    parts = [p.strip() for p in raw_header.split('-') if p.strip()]
+                    if len(parts) != 2:
+                        raise ValueError(f"Column '{raw_header}' does not look like a month header")
+
+                    def detect_month(token: str) -> int | None:
+                        key = token.lower()
+                        if key in month_abbr_map:
+                            return month_abbr_map[key]
+                        if key in month_name_map:
+                            return month_name_map[key]
+                        return None
+
+                    def detect_year(token: str) -> int | None:
+                        if not token or not token.replace(' ', '').replace("'", '').replace('`', '').isdigit():
+                            return None
+                        cleaned = ''.join(ch for ch in token if ch.isdigit())
+                        if len(cleaned) == 2:
+                            return 2000 + int(cleaned)
+                        return int(cleaned)
+
+                    month_val = detect_month(parts[0])
+                    year_val = detect_year(parts[1])
+                    if month_val and year_val:
+                        return month_val, year_val
+
+                    # Try reversed order (e.g. "25-Jan")
+                    month_val = detect_month(parts[1])
+                    year_val = detect_year(parts[0])
+                    if month_val and year_val:
+                        return month_val, year_val
+
+                    raise ValueError(f"Could not parse month/year from header '{raw_header}'")
+
                 # Get month columns (Jan-25, Feb-25, etc)
-                month_cols = [col for col in df.columns if '-' in col]
-                
+                month_cols = [col for col in df.columns if '-' in str(col)]
+
                 for _, row in df.iterrows():
-                    company = Company.objects.get(code=row['Ent'])
-                    
+                    company_code = str(row['Ent']).strip()
+                    company = Company.objects.get(code=company_code)
+
                     for month_col in month_cols:
-                        if pd.notna(row[month_col]) and row[month_col]:
-                            # Parse month and year
-                            month_str, year_str = month_col.split('-')
-                            month_num = list(calendar.month_abbr).index(month_str)
-                            year = 2000 + int(year_str)
-                            
-                            # Clean amount
-                            amount_str = str(row[month_col]).replace('$', '').replace(',', '')
+                        cell_value = row[month_col]
+                        if pd.isna(cell_value) or str(cell_value).strip() == '':
+                            continue
+
+                        try:
+                            month_num, year = parse_month_year(str(month_col))
+                        except ValueError as exc:
+                            raise ValueError(f"{exc} for employee '{row['Employee Name']}'") from exc
+
+                        # Clean amount (keep digits, dot and minus)
+                        amount_str = ''.join(ch for ch in str(cell_value) if ch.isdigit() or ch in ['.', '-', ','])
+                        amount_str = amount_str.replace(',', '')
+                        if amount_str in ['', '-', '.']:
+                            continue
+                        try:
                             amount = Decimal(amount_str)
-                            
-                            # Create or update
-                            SalaryData.objects.update_or_create(
-                                employee_id=row['Employee ID'],
-                                company=company,
-                                month=month_num,
-                                year=year,
-                                defaults={
-                                    'employee_name': row['Employee Name'],
-                                    'amount': amount,
-                                    'uploaded_by': request.user
-                                }
-                            )
+                        except Exception as exc:
+                            raise ValueError(
+                                f"Unable to parse amount '{cell_value}' for {month_col} ({row['Employee Name']})"
+                            ) from exc
+
+                        employee_id = str(row['Employee ID']).strip() if pd.notna(row['Employee ID']) else ''
+
+                        # Create or update
+                        SalaryData.objects.update_or_create(
+                            employee_id=employee_id,
+                            company=company,
+                            month=month_num,
+                            year=year,
+                            defaults={
+                                'employee_name': str(row['Employee Name']).strip(),
+                                'amount': amount,
+                                'uploaded_by': request.user
+                            }
+                        )
             
             messages.success(request, 'Salaries uploaded successfully')
             return redirect('upload_salaries')
