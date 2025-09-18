@@ -6,7 +6,7 @@ from django.utils.timezone import make_naive
 from django.db.models import Q, Sum, Min
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.text import slugify
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState, SalaryData
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState, SalaryData, PLComment
 from .feature_flags import is_enabled
 import pandas as pd
 import csv
@@ -1670,6 +1670,13 @@ def pl_report_data(request):
         cf_rows.append(row)
 
     # Данные строк для AG Grid
+    def make_row_key(row_dict):
+        """Generate a stable identifier for a P&L row for comment mapping."""
+        sort_part = row_dict.get('sort_order', 0)
+        type_part = row_dict.get('type') or row_dict.get('rowType') or 'row'
+        code_part = row_dict.get('account_code') or row_dict.get('styleToken') or slugify(row_dict.get('account_name', 'row'))
+        return f"{type_part}__{code_part}__{sort_part}"
+
     row_data = []
     
     # Add CF Dashboard rows at the top
@@ -1678,6 +1685,7 @@ def pl_report_data(request):
         cf_row.setdefault('section', 'cf_dashboard')
         cf_row.setdefault('level', 0)
         cf_row.setdefault('styleToken', build_style_token(cf_row.get('account_name')))
+        cf_row.setdefault('rowKey', f"cf__{cf_row.get('styleToken') or slugify(cf_row.get('account_name', 'metric'))}")
         row_data.append(cf_row)
     
     # Add visual separator after CF Dashboard
@@ -1703,6 +1711,8 @@ def pl_report_data(request):
             'level': r.get('level', 0),
             'styleToken': r.get('styleToken', '')
         }
+
+        grid_row['rowKey'] = make_row_key(r)
 
         sort_order_str = str(grid_row.get('sort_order'))
         row_type = grid_row.get('rowType')
@@ -1828,6 +1838,31 @@ def pl_report_data(request):
 
         row_data.append(grid_row)
 
+    # Build comment summary for visible rows/columns
+    comment_summary = {}
+    if row_data:
+        row_keys_for_comments = {row.get('rowKey') for row in row_data if row.get('rowKey')}
+        if row_keys_for_comments:
+            column_fields = [col.get('field') for col in column_defs if isinstance(col.get('field'), str)]
+            if column_fields:
+                comment_qs = PLComment.objects.filter(row_key__in=row_keys_for_comments, column_key__in=column_fields)
+            else:
+                comment_qs = PLComment.objects.filter(row_key__in=row_keys_for_comments)
+
+            for comment in comment_qs.select_related('created_by'):
+                key = f"{comment.row_key}||{comment.column_key}"
+                entry = comment_summary.setdefault(key, {
+                    'total': 0,
+                    'open': 0,
+                    'latest': None,
+                })
+                entry['total'] += 1
+                if not comment.resolved:
+                    entry['open'] += 1
+                updated_iso = comment.updated_at.isoformat()
+                if not entry['latest'] or updated_iso > entry['latest']:
+                    entry['latest'] = updated_iso
+
     logger.info(f"Final P&L report data count: {len(report_data)}")
     logger.info("--- P&L Report Data Generation Finished ---")
 
@@ -1836,8 +1871,143 @@ def pl_report_data(request):
     return JsonResponse({
         'columnDefs': column_defs,
         'rowData': row_data,
-        'debug_info': debug_info
+        'debug_info': debug_info,
+        'commentSummary': comment_summary,
     })
+
+
+def _serialize_pl_comment(comment, current_user=None):
+    creator = comment.created_by
+    display_name = creator.get_full_name() or creator.get_username()
+    initials = ''.join([part[0] for part in (creator.get_full_name() or creator.get_username()).split() if part])[:2].upper()
+    return {
+        'id': comment.id,
+        'parent_id': comment.parent_id,
+        'row_key': comment.row_key,
+        'column_key': comment.column_key,
+        'row_label': comment.row_label,
+        'column_label': comment.column_label,
+        'message': comment.message,
+        'resolved': comment.resolved,
+        'created_at': comment.created_at.isoformat(),
+        'updated_at': comment.updated_at.isoformat(),
+        'created_by': {
+            'id': creator.id,
+            'name': display_name,
+            'initials': initials or display_name[:2].upper(),
+        },
+        'can_edit': bool(current_user and (current_user.is_staff or creator_id_matches(current_user, creator))),
+    }
+
+
+def creator_id_matches(current_user, creator):
+    try:
+        return current_user.id == creator.id
+    except Exception:
+        return False
+
+
+def _comment_summary_for_cell(row_key, column_key):
+    qs = PLComment.objects.filter(row_key=row_key, column_key=column_key)
+    total = qs.count()
+    open_count = qs.filter(resolved=False).count()
+    latest = qs.order_by('-updated_at').values_list('updated_at', flat=True).first()
+    return {
+        'total': total,
+        'open': open_count,
+        'latest': latest.isoformat() if latest else None,
+    }
+
+
+@login_required
+def pl_comment_list(request):
+    if request.method == 'GET':
+        row_key = request.GET.get('row_key')
+        column_key = request.GET.get('column_key')
+        if not row_key or not column_key:
+            return JsonResponse({'error': 'row_key and column_key are required'}, status=400)
+        comments = PLComment.objects.filter(row_key=row_key, column_key=column_key).select_related('created_by').order_by('created_at')
+        data = [_serialize_pl_comment(comment, request.user) for comment in comments]
+        summary = _comment_summary_for_cell(row_key, column_key) if comments else {'total': 0, 'open': 0, 'latest': None}
+        return JsonResponse({'comments': data, 'summary': summary})
+
+    if request.method == 'POST':
+        try:
+            payload = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+        message = (payload.get('message') or '').strip()
+        row_key = payload.get('row_key')
+        column_key = payload.get('column_key')
+        if not message:
+            return JsonResponse({'error': 'message is required'}, status=400)
+        if not row_key or not column_key:
+            return JsonResponse({'error': 'row_key and column_key are required'}, status=400)
+
+        parent = None
+        parent_id = payload.get('parent_id')
+        if parent_id:
+            parent = get_object_or_404(PLComment, pk=parent_id)
+
+        comment = PLComment.objects.create(
+            row_key=row_key,
+            column_key=column_key,
+            row_label=payload.get('row_label', ''),
+            column_label=payload.get('column_label', ''),
+            message=message,
+            created_by=request.user,
+            parent=parent,
+        )
+
+        summary = _comment_summary_for_cell(row_key, column_key)
+        return JsonResponse({
+            'comment': _serialize_pl_comment(comment, request.user),
+            'summary': summary,
+        }, status=201)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@login_required
+def pl_comment_detail(request, pk):
+    comment = get_object_or_404(PLComment, pk=pk)
+    if request.method == 'PATCH':
+        if not (request.user.is_staff or request.user == comment.created_by):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        try:
+            payload = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+        fields_to_update = []
+        if 'message' in payload and isinstance(payload['message'], str):
+            comment.message = payload['message'].strip()
+            fields_to_update.append('message')
+        if 'resolved' in payload:
+            comment.resolved = bool(payload['resolved'])
+            fields_to_update.append('resolved')
+
+        if fields_to_update:
+            fields_to_update.append('updated_at')
+            comment.save(update_fields=fields_to_update)
+
+        summary = _comment_summary_for_cell(comment.row_key, comment.column_key)
+        return JsonResponse({
+            'comment': _serialize_pl_comment(comment, request.user),
+            'summary': summary,
+        })
+
+    if request.method == 'DELETE':
+        if not (request.user.is_staff or request.user == comment.created_by):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        row_key = comment.row_key
+        column_key = comment.column_key
+        comment.delete()
+        summary = _comment_summary_for_cell(row_key, column_key)
+        return JsonResponse({'status': 'deleted', 'summary': summary})
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @login_required
 def bs_report_data(request):

@@ -1,6 +1,7 @@
 from django.db import models
 import calendar
 from django.contrib.auth.models import User
+from django.conf import settings
 
 # Create your models here.
 
@@ -166,3 +167,33 @@ class ActiveState(models.Model):
 
     def __str__(self):
         return f"{self.state_name} ({self.state_code})"
+
+
+class PLComment(models.Model):
+    """Threaded comments for P&L report cells."""
+
+    row_key = models.CharField(max_length=160, db_index=True)
+    column_key = models.CharField(max_length=160, db_index=True)
+    row_label = models.CharField(max_length=255, blank=True)
+    column_label = models.CharField(max_length=255, blank=True)
+    message = models.TextField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pl_comments')
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='replies')
+    resolved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['row_key', 'column_key']),
+        ]
+
+    def __str__(self):
+        preview = (self.message[:30] + '...') if len(self.message) > 30 else self.message
+        return f"Comment {self.id} on {self.row_key}/{self.column_key}: {preview}"
+
+    @property
+    def root(self):
+        """Return the top-level comment in the thread."""
+        return self.parent.root if self.parent else self

@@ -120,6 +120,231 @@
             border: 1px solid #e0e0e0;
             padding: 8px;
         }
+
+        /* Comment indicator styles */
+        .cell-comment-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            width: 100%;
+        }
+        .cell-comment-wrapper .cell-value {
+            flex: 1 1 auto;
+            display: inline-flex;
+            justify-content: flex-end;
+        }
+        .comment-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.12);
+            color: #1e3a8a;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            visibility: hidden;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .comment-indicator.comment-indicator-empty {
+            color: rgba(30, 64, 175, 0.65);
+            background: rgba(191, 219, 254, 0.5);
+        }
+        .comment-indicator.has-comments {
+            visibility: visible;
+        }
+        .comment-indicator.has-open {
+            background: #facc15;
+            color: #1f2937;
+        }
+        .cell-comment-wrapper:hover .comment-indicator {
+            visibility: visible;
+        }
+        .comment-indicator:focus {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+        .comment-indicator:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(15, 23, 42, 0.15);
+        }
+
+        /* Comment modal */
+        .comment-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 20px;
+        }
+        .comment-modal-backdrop.active {
+            display: flex;
+        }
+        .comment-modal {
+            background: #ffffff;
+            border-radius: 14px;
+            width: min(480px, 100%);
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .comment-modal-header {
+            padding: 18px 22px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            box-sizing: border-box;
+        }
+        .comment-modal-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #1e3a8a;
+        }
+        .comment-modal-subtitle {
+            font-size: 0.85rem;
+            color: #475569;
+            margin-top: 2px;
+        }
+        .comment-close-btn {
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            color: #64748b;
+        }
+        .comment-close-btn:hover {
+            color: #334155;
+        }
+        .comment-modal-body {
+            padding: 10px 22px 10px;
+            overflow-y: auto;
+            flex: 1 1 auto;
+            box-sizing: border-box;
+        }
+        .comment-modal-footer {
+            padding: 14px 22px 20px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            box-sizing: border-box;
+        }
+        .comment-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #eef2f7;
+            position: relative;
+        }
+        .comment-item:last-child {
+            border-bottom: none;
+        }
+        .comment-item.resolved {
+            opacity: 0.75;
+        }
+        .comment-author {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 0.92rem;
+        }
+        .comment-meta {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .comment-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(16, 185, 129, 0.18);
+            color: #047857;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            margin-left: 8px;
+        }
+        .comment-message {
+            margin-top: 6px;
+            white-space: pre-wrap;
+            color: #1f2937;
+            font-size: 0.92rem;
+        }
+        .comment-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .comment-actions button {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #1f2937;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+        .comment-actions button:hover {
+            background: #cbd5f5;
+        }
+        .comment-actions button.comment-delete {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .comment-actions button.comment-delete:hover {
+            background: #fecaca;
+        }
+        .comment-empty-state {
+            text-align: center;
+            color: #64748b;
+            padding: 24px 0;
+            font-size: 0.9rem;
+        }
+        .comment-form textarea {
+            width: 100%;
+            max-width: 100%;
+            min-height: 90px;
+            border: 1px solid #d0d7e2;
+            border-radius: 10px;
+            padding: 10px 12px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        .comment-form textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
+        .comment-form button {
+            margin-top: 10px;
+            background: #1e3a8a;
+            color: #ffffff;
+            border: none;
+            border-radius: 999px;
+            padding: 8px 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .comment-form button:hover {
+            background: #1b3184;
+        }
+        .comment-form button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         
         /* Thicker borders for TOTAL columns */
         .total-column {
@@ -678,8 +903,258 @@
             </div>
         </div>
     </div>
+
+    <!-- Comment modal -->
+    <div id="commentModalBackdrop" class="comment-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="comment-modal">
+            <div class="comment-modal-header">
+                <div>
+                    <div class="comment-modal-title">Cell Comments</div>
+                    <div class="comment-modal-subtitle" id="commentModalSubtitle"></div>
+                </div>
+                <button type="button" class="comment-close-btn" id="commentModalClose" aria-label="Close comments">&times;</button>
+            </div>
+            <div class="comment-modal-body" id="commentList"></div>
+            <div class="comment-modal-footer">
+                <form id="commentForm" class="comment-form">
+                    <textarea id="commentMessage" placeholder="Add a comment..." required></textarea>
+                    <button type="submit" id="commentSubmitBtn" disabled>Post Comment</button>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <script>
+        let commentSummaryMap = {};
+        const commentState = {
+            rowKey: null,
+            columnKey: null,
+            rowLabel: '',
+            columnLabel: ''
+        };
+        let commentModalBackdrop = null;
+        let commentModalSubtitleEl = null;
+        let commentListEl = null;
+        let commentFormEl = null;
+        let commentMessageEl = null;
+        let commentSubmitBtn = null;
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function updateCommentSummary(rowKey, columnKey, summary) {
+            if (!rowKey || !columnKey) return;
+            const key = `${rowKey}||${columnKey}`;
+            if (!summary || !summary.total) {
+                delete commentSummaryMap[key];
+            } else {
+                commentSummaryMap[key] = summary;
+            }
+            const apiCandidate = window.plGridApi && window.plGridApi.api ? window.plGridApi.api : window.plGridApi;
+            if (apiCandidate && apiCandidate.refreshCells) {
+                apiCandidate.refreshCells({ force: true });
+            }
+        }
+
+        function renderCommentList(comments) {
+            if (!commentListEl) return;
+            commentListEl.innerHTML = '';
+            if (!comments || comments.length === 0) {
+                commentListEl.innerHTML = '<div class="comment-empty-state">No comments yet. Start the discussion below.</div>';
+                return;
+            }
+            comments.forEach(comment => {
+                const item = document.createElement('div');
+                item.className = 'comment-item';
+                if (comment.resolved) item.classList.add('resolved');
+
+                const author = document.createElement('div');
+                author.className = 'comment-author';
+                author.textContent = (comment.created_by && comment.created_by.name) ? comment.created_by.name : 'User';
+
+                const meta = document.createElement('div');
+                meta.className = 'comment-meta';
+                const createdAt = comment.created_at ? new Date(comment.created_at) : null;
+                meta.textContent = createdAt ? createdAt.toLocaleString() : '';
+                if (comment.resolved) {
+                    const badge = document.createElement('span');
+                    badge.className = 'comment-status-badge';
+                    badge.textContent = 'Resolved';
+                    meta.appendChild(badge);
+                }
+
+                const message = document.createElement('div');
+                message.className = 'comment-message';
+                message.textContent = comment.message || '';
+
+                item.appendChild(author);
+                item.appendChild(meta);
+                item.appendChild(message);
+
+                if (comment.can_edit) {
+                    const actions = document.createElement('div');
+                    actions.className = 'comment-actions';
+
+                    const resolveBtn = document.createElement('button');
+                    resolveBtn.type = 'button';
+                    resolveBtn.className = 'comment-action comment-resolve';
+                    resolveBtn.dataset.action = 'toggle-resolve';
+                    resolveBtn.dataset.commentId = comment.id;
+                    resolveBtn.dataset.resolve = comment.resolved ? '0' : '1';
+                    resolveBtn.textContent = comment.resolved ? 'Reopen' : 'Mark resolved';
+                    actions.appendChild(resolveBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'comment-action comment-delete';
+                    deleteBtn.dataset.action = 'delete';
+                    deleteBtn.dataset.commentId = comment.id;
+                    deleteBtn.textContent = 'Delete';
+                    actions.appendChild(deleteBtn);
+
+                    item.appendChild(actions);
+                }
+                commentListEl.appendChild(item);
+            });
+        }
+
+        function closeCommentModal() {
+            if (!commentModalBackdrop) return;
+            commentModalBackdrop.classList.remove('active');
+            commentModalBackdrop.setAttribute('aria-hidden', 'true');
+            commentState.rowKey = null;
+            commentState.columnKey = null;
+            if (commentMessageEl) {
+                commentMessageEl.value = '';
+                commentSubmitBtn && (commentSubmitBtn.disabled = true);
+            }
+        }
+
+        function loadCommentsForCurrentCell() {
+            if (!commentState.rowKey || !commentState.columnKey) return;
+            if (commentListEl) {
+                commentListEl.innerHTML = '<div class="comment-empty-state">Loading comments...</div>';
+            }
+            const url = `/reports/pl/comments/?row_key=${encodeURIComponent(commentState.rowKey)}&column_key=${encodeURIComponent(commentState.columnKey)}`;
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load comments');
+                    return response.json();
+                })
+                .then(data => {
+                    renderCommentList(data.comments || []);
+                    if (data.summary) {
+                        updateCommentSummary(commentState.rowKey, commentState.columnKey, data.summary);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching comments:', err);
+                    if (commentListEl) {
+                        commentListEl.innerHTML = '<div class="comment-empty-state">Unable to load comments right now.</div>';
+                    }
+                });
+        }
+
+        function openCommentModal(cellInfo) {
+            if (!commentModalBackdrop) return;
+            commentState.rowKey = cellInfo.rowKey;
+            commentState.columnKey = cellInfo.columnKey;
+            commentState.rowLabel = cellInfo.rowLabel || '';
+            commentState.columnLabel = cellInfo.columnLabel || '';
+
+            if (commentModalSubtitleEl) {
+                const parts = [];
+                if (commentState.rowLabel) parts.push(commentState.rowLabel);
+                if (commentState.columnLabel) parts.push(commentState.columnLabel);
+                commentModalSubtitleEl.textContent = parts.join(' • ');
+            }
+
+            commentModalBackdrop.classList.add('active');
+            commentModalBackdrop.setAttribute('aria-hidden', 'false');
+
+            if (commentMessageEl) {
+                commentMessageEl.value = '';
+                commentMessageEl.focus();
+            }
+            if (commentSubmitBtn) commentSubmitBtn.disabled = true;
+
+            loadCommentsForCurrentCell();
+        }
+
+        function handleCommentListClick(event) {
+            const actionBtn = event.target.closest ? event.target.closest('.comment-action') : null;
+            if (!actionBtn) return;
+            event.preventDefault();
+            const commentId = actionBtn.getAttribute('data-comment-id');
+            const action = actionBtn.getAttribute('data-action');
+            if (!commentId || !action) return;
+
+            if (action === 'toggle-resolve') {
+                const shouldResolve = actionBtn.getAttribute('data-resolve') === '1';
+                actionBtn.disabled = true;
+                fetch(`/reports/pl/comments/${commentId}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ resolved: shouldResolve })
+                }).then(response => {
+                    if (!response.ok) throw new Error('Failed to update comment');
+                    return response.json();
+                }).then(data => {
+                    if (data && data.comment && data.summary) {
+                        updateCommentSummary(data.comment.row_key, data.comment.column_key, data.summary);
+                    }
+                    loadCommentsForCurrentCell();
+                }).catch(error => {
+                    console.error('Error updating comment:', error);
+                    alert('Could not update comment.');
+                }).finally(() => {
+                    actionBtn.disabled = false;
+                });
+                return;
+            }
+
+            if (action === 'delete') {
+                if (!confirm('Delete this comment?')) {
+                    return;
+                }
+                actionBtn.disabled = true;
+                fetch(`/reports/pl/comments/${commentId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                }).then(response => {
+                    if (!response.ok) throw new Error('Failed to delete comment');
+                    return response.json();
+                }).then(data => {
+                    if (data && data.summary && commentState.rowKey && commentState.columnKey) {
+                        updateCommentSummary(commentState.rowKey, commentState.columnKey, data.summary);
+                    }
+                    loadCommentsForCurrentCell();
+                }).catch(error => {
+                    console.error('Error deleting comment:', error);
+                    alert('Could not delete comment.');
+                }).finally(() => {
+                    actionBtn.disabled = false;
+                });
+            }
+        }
+
         // --- Export dropdown helpers ---
         function toggleExportDropdown(event) {
             event.stopPropagation();
@@ -964,7 +1439,95 @@
             
             const gridDiv = document.querySelector('#plGrid');
             const loadingDiv = document.querySelector('#loadingMessage');
-            
+
+            commentModalBackdrop = document.getElementById('commentModalBackdrop');
+            commentModalSubtitleEl = document.getElementById('commentModalSubtitle');
+            commentListEl = document.getElementById('commentList');
+            commentFormEl = document.getElementById('commentForm');
+            commentMessageEl = document.getElementById('commentMessage');
+            commentSubmitBtn = document.getElementById('commentSubmitBtn');
+            const commentCloseBtn = document.getElementById('commentModalClose');
+
+            if (commentListEl && !commentListEl.dataset.listenerAttached) {
+                commentListEl.addEventListener('click', handleCommentListClick);
+                commentListEl.dataset.listenerAttached = '1';
+            }
+
+            if (commentFormEl && commentMessageEl && commentSubmitBtn) {
+                commentFormEl.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    if (!commentState.rowKey || !commentState.columnKey) return;
+                    const message = commentMessageEl.value.trim();
+                    if (!message) return;
+                    commentSubmitBtn.disabled = true;
+                    fetch('/reports/pl/comments/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({
+                            row_key: commentState.rowKey,
+                            column_key: commentState.columnKey,
+                            row_label: commentState.rowLabel,
+                            column_label: commentState.columnLabel,
+                            message: message
+                        })
+                    }).then(response => {
+                        if (!response.ok) throw new Error('Failed to save comment');
+                        return response.json();
+                    }).then(data => {
+                        if (data && data.summary) {
+                            updateCommentSummary(commentState.rowKey, commentState.columnKey, data.summary);
+                        }
+                        commentMessageEl.value = '';
+                        commentSubmitBtn.disabled = true;
+                        loadCommentsForCurrentCell();
+                    }).catch(error => {
+                        console.error('Error saving comment:', error);
+                        alert('Failed to post comment. Please try again.');
+                        commentSubmitBtn.disabled = false;
+                    });
+                });
+
+                commentMessageEl.addEventListener('input', function() {
+                    commentSubmitBtn.disabled = !commentMessageEl.value.trim();
+                });
+            }
+
+            if (commentCloseBtn) {
+                commentCloseBtn.addEventListener('click', function() {
+                    closeCommentModal();
+                });
+            }
+
+            if (commentModalBackdrop) {
+                commentModalBackdrop.addEventListener('click', function(event) {
+                    if (event.target === commentModalBackdrop) {
+                        closeCommentModal();
+                    }
+                });
+            }
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && commentModalBackdrop && commentModalBackdrop.classList.contains('active')) {
+                    closeCommentModal();
+                }
+            });
+
+            document.addEventListener('click', function(event) {
+                const indicator = event.target.closest ? event.target.closest('.comment-indicator') : null;
+                if (!indicator) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const rowKey = indicator.getAttribute('data-row-key');
+                const columnKey = indicator.getAttribute('data-column-key');
+                if (!rowKey || !columnKey) return;
+                const rowLabel = decodeURIComponent(indicator.getAttribute('data-row-label') || '');
+                const columnLabel = decodeURIComponent(indicator.getAttribute('data-column-label') || '');
+                openCommentModal({ rowKey, columnKey, rowLabel, columnLabel });
+            }, true);
+
             if (!gridDiv) {
                 console.error('Grid div not found!');
                 return;
@@ -998,28 +1561,13 @@
                     console.log('Data received:', data);
                     console.log('Column definitions:', data.columnDefs);
                     console.log('Row data count:', data.rowData.length);
+                    commentSummaryMap = data.commentSummary || {};
+                    window.plCommentSummary = commentSummaryMap;
                     
                     // Hide loading message
                     if (loadingDiv) {
                         loadingDiv.style.display = 'none';
                     }
-                    
-                    // Function to get CSRF token from cookies
-                    function getCookie(name) {
-                        let cookieValue = null;
-                        if (document.cookie && document.cookie !== '') {
-                            const cookies = document.cookie.split(';');
-                            for (let i = 0; i < cookies.length; i++) {
-                                const cookie = cookies[i].trim();
-                                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                                    break;
-                                }
-                            }
-                        }
-                        return cookieValue;
-                    }
-
                     // Ensure Account Name cell for P&L sub_total rows is white and bold only in that cell
                     try {
                         const acctCol = data.columnDefs && data.columnDefs.find(c => c.field === 'account_name');
@@ -1129,10 +1677,13 @@
                             numberColumnWithCommas: {
                                 // Display numbers with thousand separators and 2 decimals
                                 cellRenderer: function(params) {
-                                    if (params.value == null || params.value === '') return '';
-                                    
+                                    if (params.value == null || params.value === '') {
+                                        return '';
+                                    }
+
+                                    let formattedValue = '';
+
                                     if (params.data && params.data.is_salary && params.data.can_view_details) {
-                                        // Extract month and year from column header
                                         const colId = params.colDef.field;
                                         if (colId && colId.includes('_')) {
                                             const [monthYear, companyCode] = colId.split('_');
@@ -1143,29 +1694,59 @@
 
                                             if (params.value && month && year) {
                                                 const num = typeof params.value === 'number' ? params.value : Number(params.value);
-                                                if (isNaN(num)) return params.value;
-                                                const formattedValue = num.toLocaleString('en-US', {
-                                                    minimumFractionDigits: 2,
-                                                    maximumFractionDigits: 2
-                                                });
-                                                const isTotalColumn = companyCode && companyCode.toUpperCase() === 'TOTAL';
-                                                const salaryUrl = isTotalColumn
-                                                    ? '/salaries/?company=ALL&year=' + year + '&month=' + month
-                                                    : '/salaries/?company=' + companyCode + '&year=' + year + '&month=' + month;
-                                                if (companyCode) {
-                                                    return '<a href="' + salaryUrl + '" target="_blank" style="text-decoration: underline dotted;">' + formattedValue + '</a>';
+                                                if (!Number.isNaN(num)) {
+                                                    const salaryFormatted = num.toLocaleString('en-US', {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2
+                                                    });
+                                                    const isTotalColumn = companyCode && companyCode.toUpperCase() === 'TOTAL';
+                                                    const salaryUrl = isTotalColumn
+                                                        ? '/salaries/?company=ALL&year=' + year + '&month=' + month
+                                                        : '/salaries/?company=' + companyCode + '&year=' + year + '&month=' + month;
+                                                    if (companyCode) {
+                                                        formattedValue = '<a href="' + salaryUrl + '" target="_blank" style="text-decoration: underline dotted;">' + salaryFormatted + '</a>';
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                    
-                                    // Default rendering for non-salary cells
-                                    const num = typeof params.value === 'number' ? params.value : Number(params.value);
-                                    if (isNaN(num)) return params.value;
-                                    return num.toLocaleString('en-US', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    });
+
+                                    if (!formattedValue) {
+                                        const num = typeof params.value === 'number' ? params.value : Number(params.value);
+                                        if (Number.isNaN(num)) return params.value;
+                                        formattedValue = num.toLocaleString('en-US', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        });
+                                    }
+
+                                    const rowKey = params.data && params.data.rowKey;
+                                    const columnField = params.colDef && params.colDef.field;
+                                    let commentHtml = '';
+
+                                    if (rowKey && columnField) {
+                                        const commentKey = `${rowKey}||${columnField}`;
+                                        const info = commentSummaryMap[commentKey];
+                                        let indicatorClass = 'comment-indicator comment-indicator-empty';
+                                        let indicatorText = '+';
+                                        if (info && info.total > 0) {
+                                            indicatorClass = 'comment-indicator has-comments';
+                                            if (info.open && info.open > 0) {
+                                                indicatorClass += ' has-open';
+                                                indicatorText = String(info.open);
+                                            } else {
+                                                indicatorText = String(info.total);
+                                            }
+                                        }
+                                        const rowLabel = encodeURIComponent(params.data.account_name || params.data.account_code || '');
+                                        const columnLabel = encodeURIComponent(params.colDef.headerName || params.colDef.headerTooltip || params.colDef.field || '');
+                                        const titleText = info
+                                            ? ((info.open && info.open > 0) ? `${info.open} open comment(s)` : `${info.total} comment(s)`)
+                                            : 'Add comment';
+                                        commentHtml = `<span class="${indicatorClass}" data-row-key="${rowKey}" data-column-key="${columnField}" data-row-label="${rowLabel}" data-column-label="${columnLabel}" title="${titleText}">${indicatorText}</span>`;
+                                    }
+
+                                    return `<div class="cell-comment-wrapper"><span class="cell-value">${formattedValue}</span>${commentHtml}</div>`;
                                 },
                                 // Align numbers to the right for better readability
                                 cellStyle: { 'textAlign': 'right' }
@@ -1238,19 +1819,15 @@
                     let grid;
                     if (typeof agGrid.createGrid === 'function') {
                         grid = agGrid.createGrid(gridDiv, gridOptions);
+                        window.plGridApi = grid;
                     } else if (typeof agGrid.Grid === 'function') {
                         grid = new agGrid.Grid(gridDiv, gridOptions);
+                        window.plGridApi = gridOptions.api;
                     } else {
                         throw new Error('AG Grid initialization method not found');
                     }
+                    window.plGridOptions = gridOptions;
                     console.log('AG Grid created successfully!');
-
-                    // Save grid API for global access
-                    if (typeof agGrid.createGrid === 'function') {
-                        window.plGridApi = grid;
-                    } else {
-                        window.plGridApi = gridOptions.api;
-                    }
                 })
                 .catch(error => {
                     console.error('Error loading data:', error);

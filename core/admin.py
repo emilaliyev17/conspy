@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import path
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget, ActiveState, SalaryData
+from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, CFDashboardBudget, ActiveState, SalaryData, PLComment
 import json
 from datetime import datetime
 
@@ -178,3 +178,15 @@ class ActiveStateAdmin(admin.ModelAdmin):
     list_filter = ['is_active']
     search_fields = ['state_name', 'state_code']
     list_editable = ['deal_count', 'deal_volume', 'is_active']
+
+
+@admin.register(PLComment)
+class PLCommentAdmin(admin.ModelAdmin):
+    list_display = ['row_key', 'column_key', 'message_preview', 'created_by', 'resolved', 'created_at']
+    list_filter = ['resolved', 'created_at', 'created_by']
+    search_fields = ['row_key', 'column_key', 'message', 'created_by__username', 'created_by__first_name', 'created_by__last_name']
+    ordering = ['-created_at']
+
+    def message_preview(self, obj):
+        return (obj.message[:50] + '...') if len(obj.message) > 50 else obj.message
+    message_preview.short_description = 'Message'
