@@ -34,6 +34,7 @@ import logging
 from dateutil.relativedelta import relativedelta
 import calendar
 import openpyxl.styles
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -1034,6 +1035,8 @@ def pl_report_data(request):
     
     # Обрабатываем Income счета
     income_accounts = [a for a in chart_accounts if a.account_type == 'INCOME']
+    total_revenue_snapshot = None
+    gross_profit_inserted = False
     for sub_category in pl_structure:
         if sub_category not in grouped_data:
             continue
@@ -1042,6 +1045,8 @@ def pl_report_data(request):
         category_accounts = [a for a in grouped_data[sub_category] if a.account_type == 'INCOME' and a.account_code]
         if not category_accounts:
             continue
+
+        normalized_sub_category = (sub_category or '').strip().upper()
 
         # Подзаголовок
         # Get sort_order for this subcategory
@@ -1172,6 +1177,7 @@ def pl_report_data(request):
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
+
         report_data.append(sub_total)
 
     # Total Revenue
@@ -1232,6 +1238,8 @@ def pl_report_data(request):
         for p in periods
     )
     total_revenue_row['grand_totals']['TOTAL'] = float(overall_revenue or Decimal('0'))
+    total_revenue_snapshot = copy.deepcopy(total_revenue_row)
+
     report_data.append(total_revenue_row)
     
     # Добавляем раздел EXPENSES
@@ -1405,6 +1413,72 @@ def pl_report_data(request):
             # print(f"DEBUG SUBTOTAL ROW:   Period {p}: Budget = {budget_val}")
         
         report_data.append(sub_total)
+
+        normalized_sub_category = (sub_category or '').strip().upper()
+        if (
+            not gross_profit_inserted
+            and normalized_sub_category == 'COST OF FUNDS AND FEES'
+            and total_revenue_snapshot is not None
+        ):
+            def to_decimal(value):
+                if value in (None, ''):
+                    return Decimal('0')
+                try:
+                    return Decimal(str(value))
+                except (InvalidOperation, TypeError):
+                    return Decimal('0')
+
+            gross_profit_row = {
+                'type': 'total',
+                'account_name': 'Gross Profit',
+                'account_code': '',
+                'periods': {},
+                'grand_totals': {},
+                'section': 'summary',
+                'level': 0,
+                'sort_order': (sub_total.get('sort_order') or 0) + 1,
+                'styleToken': build_style_token('Gross Profit')
+            }
+
+            for p in periods:
+                gross_profit_row['periods'][p] = {}
+                period_total = Decimal('0')
+                for c in pl_companies:
+                    revenue_val = to_decimal(total_revenue_snapshot['periods'][p].get(c.code))
+                    cost_val = to_decimal(sub_total['periods'][p].get(c.code))
+                    gross_val = revenue_val - cost_val
+                    gross_profit_row['periods'][p][c.code] = float(gross_val)
+                    period_total += gross_val
+                gross_profit_row['periods'][p]['TOTAL'] = float(period_total)
+
+                if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
+                    revenue_budget = to_decimal(total_revenue_snapshot['periods'][p].get('Budget'))
+                    cost_budget = to_decimal(sub_total['periods'][p].get('Budget'))
+                    budget_val = revenue_budget - cost_budget
+                    gross_profit_row['periods'][p]['Budget'] = float(budget_val) if budget_val != 0 else None
+
+            for c in pl_companies:
+                revenue_total = to_decimal(total_revenue_snapshot['grand_totals'].get(c.code))
+                cost_total = to_decimal(sub_total['grand_totals'].get(c.code))
+                gross_profit_row['grand_totals'][c.code] = float(revenue_total - cost_total)
+
+            overall_gross = (
+                to_decimal(total_revenue_snapshot['grand_totals'].get('TOTAL'))
+                - to_decimal(sub_total['grand_totals'].get('TOTAL'))
+            )
+            gross_profit_row['grand_totals']['TOTAL'] = float(overall_gross)
+
+            if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
+                revenue_budget_total = to_decimal(total_revenue_snapshot['grand_totals'].get('Budget'))
+                cost_budget_total = to_decimal(sub_total['grand_totals'].get('Budget'))
+                gross_budget_total = revenue_budget_total - cost_budget_total
+                gross_profit_row['grand_totals']['Budget'] = (
+                    float(gross_budget_total) if gross_budget_total != 0 else None
+                )
+
+            insert_index = len(report_data)
+            report_data.insert(insert_index, gross_profit_row)
+            gross_profit_inserted = True
 
     # Total Expenses
     total_expense_row = {
@@ -1860,15 +1934,15 @@ def pl_report_data(request):
                 salary_module_enabled,
             )
         for p in periods:
-            for c in companies:
+            for c in non_budget_companies:
                 field = f'{p.strftime("%b-%y")}_{c.code}'
                 value = r['periods'].get(p, {}).get(c.code, 0)
                 # Send None for zero values so grid shows empty cells
-                grid_row[field] = None if value == 0 else float(value)
+                grid_row[field] = None if value == 0 or value is None else float(value)
             field_total = f'{p.strftime("%b-%y")}_TOTAL'
             total_value = r['periods'].get(p, {}).get('TOTAL', 0)
             # Hide zeros in TOTAL columns as well
-            grid_row[field_total] = None if total_value == 0 else float(total_value)
+            grid_row[field_total] = None if total_value == 0 or total_value is None else float(total_value)
             # Populate consolidated Budget for P&L rows under feature flag using dual stream budget_values
             if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
                 field_budget = f'{p.strftime("%b-%y")}_Budget'
@@ -1892,14 +1966,14 @@ def pl_report_data(request):
                 if r['type'] in ['sub_total', 'total', 'net_income']:
                     # print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
                     pass
-        for c in companies:
+        for c in non_budget_companies:
             field = f'grand_total_{c.code}'
             gt_val = r['grand_totals'].get(c.code, 0)
             # Hide zero company grand totals by sending None
-            grid_row[field] = None if gt_val == 0 else float(gt_val)
+            grid_row[field] = None if gt_val == 0 or gt_val is None else float(gt_val)
         # Overall grand total: hide zero as empty
         overall_total_value = r['grand_totals'].get('TOTAL', 0)
-        grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 else float(overall_total_value)
+        grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 or overall_total_value is None else float(overall_total_value)
 
         # P&L: Sum per-period Budget values into grand_total_Budget for all row types (Budget/Forecast only)
         if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
@@ -1941,6 +2015,23 @@ def pl_report_data(request):
             grid_row['cellStyle'] = {'backgroundColor': '#ffeaa7', 'fontWeight': 'bold', 'fontSize': '15px'}
 
         row_data.append(grid_row)
+
+        account_name_upper = (grid_row.get('account_name') or '').strip().upper()
+        if account_name_upper == 'TOTAL COST OF FUNDS AND FEES':
+            spacer_row = {
+                'account_code': '',
+                'account_name': '',
+                'rowType': 'spacer',
+                'section': 'spacer',
+                'level': 0,
+                'styleToken': 'spacer-row',
+                'rowKey': f"spacer__gross_profit__{len(row_data)}",
+            }
+            for col in column_defs:
+                field_name = col.get('field')
+                if field_name:
+                    spacer_row[field_name] = None
+            row_data.append(spacer_row)
 
     # Build comment summary for visible rows/columns
     comment_summary = {}
