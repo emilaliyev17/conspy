@@ -2,12 +2,27 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.timezone import make_naive
 from django.db.models import Q, Sum, Min
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.utils.text import slugify
-from .models import Company, FinancialData, ChartOfAccounts, DataBackup, CFDashboardMetric, CFDashboardData, ActiveState, SalaryData, PLComment
+from .models import (
+    Company,
+    FinancialData,
+    ChartOfAccounts,
+    DataBackup,
+    CFDashboardMetric,
+    CFDashboardData,
+    ActiveState,
+    SalaryData,
+    PLComment,
+    HubSpotData,
+    HubSpotSyncLog,
+)
 from .feature_flags import is_enabled
+from .services.hubspot_service import HubSpotService
 import pandas as pd
 import csv
 from datetime import datetime, date
@@ -638,6 +653,7 @@ def pl_report_data(request):
         display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     else:
         display_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+    display_company_codes = {c.code for c in display_companies}
     logger.info(f"Found {len(companies)} companies.")
 
     # ВАЖНОЕ ИЗМЕНЕНИЕ: Фильтруем только P&L счета (INCOME и EXPENSE)
@@ -877,6 +893,16 @@ def pl_report_data(request):
             else:
                 logger.warning(f"Failed to add: period={p}, company={ccode} not found in financial_data structure")
     
+    # Track which company-period columns actually carry data
+    non_zero_company_periods = set()
+    for period, company_map in financial_data.items():
+        period_key = period.strftime('%Y-%m')
+        for company_code, accounts_map in company_map.items():
+            if company_code not in display_company_codes:
+                continue
+            if any(amount for amount in accounts_map.values()):
+                non_zero_company_periods.add((period_key, company_code))
+
     # Проверяем что получилось в financial_data
     if periods:
         p0 = periods[0]
@@ -1600,7 +1626,7 @@ def pl_report_data(request):
         # Process each period
         for period in periods:
             period_total = 0
-            
+
             # Get values for each company
             for company in display_companies:  # Use filtered list
                 period_key = f"{period.strftime('%b-%y')}_{company.code}"
@@ -1634,6 +1660,11 @@ def pl_report_data(request):
                     value = cf_value or 0
                 
                 row[period_key] = value
+                if (
+                    company.code in display_company_codes
+                    and value not in (None, 0, 0.0)
+                ):
+                    non_zero_company_periods.add((period.strftime('%Y-%m'), company.code))
                 period_total += value
             
             # Calculate TOTAL column
@@ -1668,6 +1699,28 @@ def pl_report_data(request):
             row['grand_total_Budget'] = None if total_budget_sum == 0 else float(total_budget_sum)
 
         cf_rows.append(row)
+
+    # Apply visibility to company-period columns after incorporating CF data
+    for col in column_defs:
+        if col.get('colType') != 'company':
+            continue
+        period_key = col.get('periodKey')
+        company_code = col.get('companyCode')
+        if not period_key or not company_code:
+            continue
+        col['hide'] = (period_key, company_code) not in non_zero_company_periods
+
+    active_company_codes = {company_code for _, company_code in non_zero_company_periods}
+    for col in column_defs:
+        if col.get('colType') != 'grand_company':
+            continue
+        field_name = col.get('field') or ''
+        if not isinstance(field_name, str) or not field_name.startswith('grand_total_'):
+            continue
+        company_code = field_name.replace('grand_total_', '', 1)
+        if not company_code:
+            continue
+        col['hide'] = company_code not in active_company_codes
 
     # Данные строк для AG Grid
     def make_row_key(row_dict):
@@ -2024,6 +2077,7 @@ def bs_report_data(request):
     
     # Get all companies (exclude pseudo-companies like Budget)
     companies = list(Company.objects.filter(is_budget_only=False).order_by('name'))
+    company_codes = {c.code for c in companies}
     
     # Get ASSET, LIABILITY, EQUITY accounts from ChartOfAccounts
     bs_types = [
@@ -2082,7 +2136,17 @@ def bs_report_data(request):
     for fd in all_financial_data:
         if fd.period in financial_data and fd.company.code in financial_data[fd.period]:
             financial_data[fd.period][fd.company.code][fd.account_code] = fd.amount
-    
+
+    # Track which company-period combinations have non-zero data
+    non_zero_company_periods = set()
+    for period, company_map in financial_data.items():
+        period_key = period.strftime('%Y-%m')
+        for company_code, accounts_map in company_map.items():
+            if company_code not in company_codes:
+                continue
+            if any(amount for amount in accounts_map.values()):
+                non_zero_company_periods.add((period_key, company_code))
+
     # Get companies that actually have data (same logic as P&L report)
     companies_with_data = list(set(fd.company for fd in all_financial_data))
     if not companies_with_data:
@@ -2372,6 +2436,7 @@ def bs_report_data(request):
                 'type': 'numberColumnWithCommas',
                 'colType': 'company',
                 'periodKey': period.strftime('%Y-%m'),
+                'companyCode': company.code,
                 'cellStyle': {
                     'textAlign': 'right',
                     # Styling based on company id instead of code prefix
@@ -2391,7 +2456,16 @@ def bs_report_data(request):
                 'backgroundColor': '#FFF9E6'
             }
         })
-    
+
+    for col in column_defs:
+        if col.get('colType') != 'company':
+            continue
+        period_key = col.get('periodKey')
+        company_code = col.get('companyCode')
+        if not period_key or not company_code:
+            continue
+        col['hide'] = (period_key, company_code) not in non_zero_company_periods
+
     
     # Prepare row data for AG Grid
     row_data = []
@@ -2965,15 +3039,146 @@ def upload_salaries(request):
 def download_salary_template(request):
     import csv
     from django.http import HttpResponse
-    
+
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="salary_template.csv"'
-    
+
     writer = csv.writer(response)
     # Header row
     writer.writerow(['Ent', 'Employee ID', 'Employee Name', 'Jan-25', 'Feb-25', 'Mar-25', 'Apr-25', 'May-25', 'Jun-25', 'Jul-25', 'Aug-25', 'Sep-25', 'Oct-25', 'Nov-25', 'Dec-25'])
     # Example rows
     writer.writerow(['FG', 'EMP001', 'John Doe', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00', '$5000.00'])
     writer.writerow(['F2', 'EMP002', 'Jane Smith', '$4500.00', '$4500.00', '$4500.00', '', '', '', '', '', '', '', '', ''])
-    
+
     return response
+
+
+@login_required
+@require_http_methods(["POST"])
+def hubspot_sync(request):
+    """Trigger HubSpot CRM synchronization for the requested object types."""
+
+    raw_objects = request.POST.get('objects') or request.GET.get('objects')
+    requested = [item.strip().lower() for item in raw_objects.split(',')] if raw_objects else []
+
+    allowed = {'deals', 'companies', 'contacts', 'all'}
+    invalid = [item for item in requested if item and item not in allowed]
+    if invalid:
+        return JsonResponse({'error': f"Unsupported object types requested: {', '.join(invalid)}"}, status=400)
+
+    objects_to_sync = ['deals', 'companies', 'contacts'] if not requested or 'all' in requested else []
+    if not objects_to_sync:
+        for item in requested:
+            if item not in objects_to_sync and item in allowed:
+                objects_to_sync.append(item)
+
+    try:
+        service = HubSpotService()
+    except ImproperlyConfigured as exc:
+        logger.warning("HubSpot sync attempted without access token configured")
+        return JsonResponse({'error': str(exc)}, status=500)
+
+    action_map = {
+        'deals': service.sync_deals,
+        'companies': service.sync_companies,
+        'contacts': service.sync_contacts,
+    }
+
+    results = {}
+    for object_type in objects_to_sync:
+        try:
+            results[object_type] = action_map[object_type]()
+        except Exception as exc:  # noqa: BLE001 - we want full traceback logged
+            logger.exception("HubSpot %s sync failed", object_type)
+            results[object_type] = {
+                'status': HubSpotSyncLog.Status.FAILURE.value,
+                'error': str(exc),
+            }
+
+    statuses = {result.get('status') for result in results.values()}
+    if HubSpotSyncLog.Status.FAILURE.value in statuses:
+        status_code = 500
+    elif HubSpotSyncLog.Status.PARTIAL.value in statuses:
+        status_code = 207
+    else:
+        status_code = 200
+
+    metrics = service.get_financial_metrics()
+
+    return JsonResponse(
+        {
+            'objects': objects_to_sync,
+            'results': results,
+            'metrics': metrics,
+        },
+        status=status_code,
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def hubspot_data(request):
+    """Return synchronized HubSpot data stored locally along with basic metrics."""
+
+    record_type = request.GET.get('record_type')
+    if record_type:
+        record_type = record_type.strip().lower()
+        if record_type not in HubSpotData.RecordType.values:
+            return JsonResponse({'error': 'Invalid record_type provided.'}, status=400)
+
+    limit_param = request.GET.get('limit')
+    try:
+        limit = int(limit_param) if limit_param else 100
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'limit parameter must be an integer.'}, status=400)
+
+    limit = max(1, min(limit, 500))
+
+    queryset = HubSpotData.objects.all()
+    if record_type:
+        queryset = queryset.filter(record_type=record_type)
+
+    queryset = queryset.order_by('-synced_at')
+    total_count = queryset.count()
+
+    entries = [
+        {
+            'hubspot_id': item.hubspot_id,
+            'record_type': item.record_type,
+            'created_at': item.created_at.isoformat(),
+            'synced_at': item.synced_at.isoformat(),
+            'data': item.data,
+        }
+        for item in queryset[:limit]
+    ]
+
+    recent_logs = [
+        {
+            'id': log.id,
+            'sync_type': log.sync_type,
+            'status': log.status,
+            'started_at': log.started_at.isoformat() if log.started_at else None,
+            'finished_at': log.finished_at.isoformat() if log.finished_at else None,
+            'details': log.details,
+            'error_message': log.error_message,
+        }
+        for log in HubSpotSyncLog.objects.order_by('-started_at')[:10]
+    ]
+
+    try:
+        metrics = HubSpotService().get_financial_metrics()
+    except Exception as exc:  # noqa: BLE001 - ensure API errors are surfaced gracefully
+        logger.exception("Failed to compute HubSpot financial metrics")
+        metrics = {'error': str(exc)}
+
+    return JsonResponse(
+        {
+            'record_type': record_type,
+            'limit': limit,
+            'total_count': total_count,
+            'returned': len(entries),
+            'results': entries,
+            'recent_logs': recent_logs,
+            'metrics': metrics,
+        }
+    )

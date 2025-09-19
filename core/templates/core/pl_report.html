@@ -1258,7 +1258,8 @@
                 }
                 
                 this.periodKey = colDef.periodKey;
-                this.collapsed = false;
+                this.companyFields = this._resolveCompanyFields();
+                this.collapsed = this._computeInitialCollapsed();
 
                 // Listen for global collapse/expand events
                 this.globalListener = (event) => {
@@ -1277,33 +1278,27 @@
                 
                 this.updateDisplay();
             }
-            
+
             toggleColumns() {
                 try {
                     const api = this.params.api;
-                    const allColumns = api.getColumnDefs();
-                    
-                    const companyFields = [];
-                    allColumns.forEach(col => {
-                        if (col.periodKey === this.periodKey && col.colType === 'company') {
-                            companyFields.push(col.field);
-                        }
-                    });
-                    
-                    if (companyFields.length === 0) {
+                    if (!api) return;
+
+                    this._ensureCompanyFields();
+                    if (!this.companyFields || this.companyFields.length === 0) {
                         console.log('No company columns found for period', this.periodKey);
                         return;
                     }
                     
                     this.collapsed = !this.collapsed;
-                    api.setColumnsVisible(companyFields, !this.collapsed);
+                    api.setColumnsVisible(this.companyFields, !this.collapsed);
                     this.updateDisplay();
                     
                 } catch (error) {
                     console.error('PeriodToggleHeader: Error toggling', error);
                 }
             }
-            
+
             updateDisplay() {
                 const colDef = this.params.column.getUserProvidedColDef();
                 const headerName = colDef.headerName || '';
@@ -1330,6 +1325,39 @@
                 if (this.globalListener) {
                     window.removeEventListener('periodToggleAll', this.globalListener);
                 }
+            }
+
+            _resolveCompanyFields() {
+                if (!this.params || !this.params.api || !this.periodKey) {
+                    return [];
+                }
+                const defs = typeof this.params.api.getColumnDefs === 'function'
+                    ? this.params.api.getColumnDefs()
+                    : [];
+                return defs
+                    .filter(col => col.periodKey === this.periodKey && col.colType === 'company')
+                    .map(col => col.field);
+            }
+
+            _ensureCompanyFields() {
+                if (!this.companyFields || this.companyFields.length === 0) {
+                    this.companyFields = this._resolveCompanyFields();
+                }
+            }
+
+            _computeInitialCollapsed() {
+                this._ensureCompanyFields();
+                if (!this.companyFields || this.companyFields.length === 0) {
+                    return false;
+                }
+                const columnApi = this.params && this.params.columnApi;
+                if (!columnApi || typeof columnApi.getColumn !== 'function') {
+                    return false;
+                }
+                return this.companyFields.every(field => {
+                    const column = columnApi.getColumn(field);
+                    return !column || !column.isVisible();
+                });
             }
         }
 

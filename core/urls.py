@@ -22,4 +22,6 @@ urlpatterns = [
     path('salaries/', views.salary_details, name='salary_details'),
     path('salaries/upload/', views.upload_salaries, name='upload_salaries'),
     path('salaries/template/', views.download_salary_template, name='download_salary_template'),
+    path('hubspot/sync/', views.hubspot_sync, name='hubspot_sync'),
+    path('api/hubspot/data/', views.hubspot_data, name='hubspot_data'),
 ]

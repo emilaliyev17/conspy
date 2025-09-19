@@ -197,3 +197,51 @@ class PLComment(models.Model):
     def root(self):
         """Return the top-level comment in the thread."""
         return self.parent.root if self.parent else self
+
+
+class HubSpotData(models.Model):
+    """Stores HubSpot CRM objects that have been synced into the platform."""
+
+    class RecordType(models.TextChoices):
+        DEAL = 'deal', 'Deal'
+        COMPANY = 'company', 'Company'
+        CONTACT = 'contact', 'Contact'
+
+    record_type = models.CharField(max_length=20, choices=RecordType.choices)
+    hubspot_id = models.CharField(max_length=128)
+    data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('record_type', 'hubspot_id')
+        ordering = ['record_type', 'hubspot_id']
+        verbose_name = 'HubSpot Data Record'
+        verbose_name_plural = 'HubSpot Data Records'
+
+    def __str__(self):
+        return f"{self.record_type}:{self.hubspot_id}"
+
+
+class HubSpotSyncLog(models.Model):
+    """Captures the status of HubSpot synchronization runs."""
+
+    class Status(models.TextChoices):
+        SUCCESS = 'success', 'Success'
+        FAILURE = 'failure', 'Failure'
+        PARTIAL = 'partial', 'Partial'
+
+    sync_type = models.CharField(max_length=50, help_text='Scope of the sync (deals, contacts, companies, full, etc.)')
+    status = models.CharField(max_length=20, choices=Status.choices)
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        verbose_name = 'HubSpot Sync Log'
+        verbose_name_plural = 'HubSpot Sync Logs'
+
+    def __str__(self):
+        return f"{self.sync_type} [{self.status}] @ {self.started_at.strftime('%Y-%m-%d %H:%M:%S')}"
