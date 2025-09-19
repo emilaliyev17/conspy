@@ -11,6 +11,7 @@ urlpatterns = [
     path('upload/financial-data/', views.upload_financial_data, name='upload_financial_data'),
     path('download/template/', views.download_template, name='download_template'),
     path('download/financial-data-template/', views.download_financial_data_template, name='download_financial_data_template'),
+    path('states/manage/', views.manage_active_states, name='manage_active_states'),
     path('reports/pl/', views.pl_report, name='pl_report'),
     path('reports/pl/data/', views.pl_report_data, name='pl_report_data'),
         path('reports/bs/', views.bs_report, name='bs_report'),

@@ -21,6 +21,7 @@ from .models import (
     HubSpotData,
     HubSpotSyncLog,
 )
+from .forms import ActiveStateForm
 from .feature_flags import is_enabled
 from .services.hubspot_service import HubSpotService
 import pandas as pd
@@ -155,6 +156,56 @@ def home(request):
             'deal_volume': total_deal_volume,
         },
     })
+
+
+@login_required
+def manage_active_states(request):
+    """Simple UI for maintaining ActiveState rows used by the home page map."""
+
+    states = list(ActiveState.objects.order_by('state_name'))
+    totals = {
+        'deal_count': sum(state.deal_count for state in states),
+        'deal_volume': sum(state.deal_volume for state in states),
+    }
+
+    edit_state = None
+    form = None
+
+    if request.method == 'POST':
+        if 'delete_id' in request.POST:
+            state_to_delete = get_object_or_404(ActiveState, pk=request.POST['delete_id'])
+            state_to_delete.delete()
+            messages.success(request, f"Removed {state_to_delete.state_code} from Active States.")
+            return redirect('core:manage_active_states')
+
+        state_id = request.POST.get('state_id')
+        instance = None
+        if state_id:
+            instance = get_object_or_404(ActiveState, pk=state_id)
+            edit_state = instance
+
+        form = ActiveStateForm(request.POST, instance=instance)
+        if form.is_valid():
+            saved_state = form.save()
+            action = 'Updated' if state_id else 'Added'
+            messages.success(request, f"{action} {saved_state.state_code} successfully.")
+            return redirect('core:manage_active_states')
+    else:
+        edit_id = request.GET.get('edit')
+        if edit_id:
+            edit_state = get_object_or_404(ActiveState, pk=edit_id)
+            form = ActiveStateForm(instance=edit_state)
+
+    if form is None:
+        form = ActiveStateForm()
+
+    context = {
+        'form': form,
+        'states': states,
+        'totals': totals,
+        'editing_state': edit_state,
+    }
+    return render(request, 'core/manage_active_states.html', context)
 
 @login_required
 def chart_of_accounts_view(request):
