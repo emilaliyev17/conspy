@@ -2778,7 +2778,7 @@ def export_report_excel(request):
             if field in ('toggler', 'account_code', 'account_name'):
                 continue
             # include only period data columns (company, total, budget)
-            if col_type in ('company', 'total', 'budget'):
+            if col_type in ('company', 'total', 'budget', 'grand_company', 'grand_overall', 'grand_budget'):
                 header.append(col.get('headerName', field))
                 period_fields.append(field)
 
