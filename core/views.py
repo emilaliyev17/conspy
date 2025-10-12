@@ -2986,7 +2986,16 @@ def export_for_stakeholders(request):
                 if col_info['type'] == 'grand_company':
                     ws.column_dimensions[col_letter].outline_level = 1
         
-        ws.sheet_properties.outlinePr.summaryBelow = False
+        for row_idx in range(3, ws.max_row + 1):
+            excel_row_idx = row_idx - 3
+            if excel_row_idx < len(excel_rows):
+                source_row = row_data[excel_row_idx]
+                row_type = source_row.get('rowType', '')
+                
+                if row_type == 'account':
+                    ws.row_dimensions[row_idx].outline_level = 1
+        
+        ws.sheet_properties.outlinePr.summaryBelow = True
         ws.sheet_properties.outlinePr.summaryRight = True
         
         ws.column_dimensions['A'].width = 35
