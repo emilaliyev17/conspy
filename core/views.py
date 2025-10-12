@@ -2810,11 +2810,6 @@ def export_for_stakeholders(request):
     period_company_map = {}
     grand_total_fields = []
     
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info("=== STAKEHOLDER EXPORT DEBUG START ===")
-    logger.info(f"Total column_defs received: {len(column_defs)}")
-    
     for col in column_defs:
         field = col.get('field')
         col_type = col.get('colType')
@@ -2824,10 +2819,7 @@ def export_for_stakeholders(request):
         if field in ('toggler', 'account_code', 'account_name'):
             continue
         
-        logger.info(f"Column: field={field}, type={col_type}, hide={hide_flag}, header={header_name}")
-        
         if hide_flag:
-            logger.info(f"  -> SKIPPING column {field} due to hide=True")
             continue
         
         if col_type in ('company', 'total', 'budget'):
@@ -2851,9 +2843,7 @@ def export_for_stakeholders(request):
         
         elif col_type in ('grand_company', 'grand_overall', 'grand_budget'):
             if hide_flag:
-                logger.info(f"  -> SKIPPING grand column {field} due to hide=True")
                 continue
-            logger.info(f"  -> ADDING to grand_total_fields")
             grand_total_fields.append({
                 'field': field,
                 'name': header_name,
@@ -2864,18 +2854,6 @@ def export_for_stakeholders(request):
                 company_code = '_'.join(parts[2:])
                 if company_code not in companies and col_type == 'grand_company':
                     companies.append(company_code)
-    
-    logger.info(f"=== FINAL STRUCTURE ===")
-    logger.info(f"Periods: {periods}")
-    logger.info(f"Companies found: {companies}")
-    for period, cols in period_company_map.items():
-        logger.info(f"Period {period}: {len(cols)} columns")
-        for col in cols:
-            logger.info(f"  - {col['name']} (type={col['type']}, field={col['field']})")
-    logger.info(f"Grand total fields: {len(grand_total_fields)}")
-    for col in grand_total_fields:
-        logger.info(f"  - {col['name']} (type={col['type']}, field={col['field']})")
-    logger.info("=== STAKEHOLDER EXPORT DEBUG END ===")
     
     header_row1 = ['Account Name']
     header_row2 = ['']
@@ -2989,32 +2967,24 @@ def export_for_stakeholders(request):
                         if row_type == 'total':
                             cell.fill = total_fill
         
-        current_col = 2
+        excel_col = 2
         for period in periods:
             period_cols = period_company_map.get(period, [])
-            company_cols = [c for c in period_cols if c['type'] == 'company']
             
-            if company_cols:
-                start_col = current_col
-                end_col = current_col + len(company_cols) - 1
+            for i, col_info in enumerate(period_cols):
+                col_letter = get_column_letter(excel_col + i)
                 
-                start_letter = get_column_letter(start_col)
-                end_letter = get_column_letter(end_col)
-                
-                ws.column_dimensions.group(start_letter, end_letter, outline_level=1, hidden=False)
+                if col_info['type'] == 'company':
+                    ws.column_dimensions[col_letter].outline_level = 1
             
-            current_col += len(period_cols)
+            excel_col += len(period_cols)
         
         if grand_total_fields:
-            company_grand_cols = [c for c in grand_total_fields if c['type'] == 'grand_company']
-            if company_grand_cols:
-                start_col = current_col
-                end_col = current_col + len(company_grand_cols) - 1
+            for i, col_info in enumerate(grand_total_fields):
+                col_letter = get_column_letter(excel_col + i)
                 
-                start_letter = get_column_letter(start_col)
-                end_letter = get_column_letter(end_col)
-                
-                ws.column_dimensions.group(start_letter, end_letter, outline_level=1, hidden=False)
+                if col_info['type'] == 'grand_company':
+                    ws.column_dimensions[col_letter].outline_level = 1
         
         ws.sheet_properties.outlinePr.summaryBelow = False
         ws.sheet_properties.outlinePr.summaryRight = True

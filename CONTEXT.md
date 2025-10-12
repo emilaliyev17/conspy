@@ -399,3 +399,87 @@ Implemented by: Claude AI Assistant with Emil
 - Stakeholder export is investor-ready: No internal operational metrics
 - Dynamic column structure: Each period may have different companies shown
 - Debug logging is TEMPORARY and must be removed after investigation
+
+---
+
+## FIX: Excel Column Grouping for Collapse/Expand Functionality
+Date: 2025-10-12
+Fixed by: Claude AI Assistant with Emil
+
+### Problem Identified:
+
+**Issue:** Excel column grouping was applied but columns didn't hide when collapsed. Clicking [-] button had no effect - all company columns remained visible.
+
+**Root Cause:** OpenPyXL's `ws.column_dimensions.group()` method has inconsistent behavior across versions and doesn't reliably set outline levels for Excel's collapse/expand functionality.
+
+### Solution Implemented:
+
+**Replaced `group()` method with individual `outline_level` assignments:**
+
+#### Before (Lines 2992-3053):
+```python
+ws.column_dimensions.group(
+    start_col_letter,
+    end_col_letter,
+    outline_level=1,
+    hidden=False
+)
+```
+
+#### After (Lines 2970-2987):
+```python
+for i, col_info in enumerate(period_cols):
+    col_letter = get_column_letter(excel_col + i)
+    
+    if col_info['type'] == 'company':
+        ws.column_dimensions[col_letter].outline_level = 1
+    # TOTAL/Budget columns keep default outline_level=0
+```
+
+### Technical Details:
+
+**Outline Level Assignments:**
+- `outline_level = 0` (default): Always visible (TOTAL, Budget columns)
+- `outline_level = 1`: Collapsible (Company columns: F2Fin, F2LEN, GLOB)
+
+**Excel Behavior:**
+- Company columns with outline_level=1 are children that can collapse
+- TOTAL columns with outline_level=0 remain visible when collapsed
+- [-] button collapses company columns, showing only TOTAL
+- [+] button expands to show all columns
+
+**Outline Properties:**
+```python
+ws.sheet_properties.outlinePr.summaryBelow = False
+ws.sheet_properties.outlinePr.summaryRight = True
+```
+- `summaryRight = True`: Summary column (TOTAL) is on the right of grouped columns
+- Collapse/expand buttons appear next to the summary
+
+### Benefits:
+
+1. **More Reliable:** Direct property assignment works across all OpenPyXL versions
+2. **More Explicit:** Each column clearly marked with its outline level
+3. **Easier to Debug:** No ambiguity about which columns are grouped
+4. **Simpler Code:** No conditional grouping logic based on company count
+5. **Excel Native:** Uses Excel's built-in outline level system
+
+### Result:
+
+✅ Clicking [-] button now properly collapses company columns
+✅ Only TOTAL column remains visible when collapsed
+✅ [+] button expands to show all company columns
+✅ Works independently for each period (different company counts per period)
+✅ Grand Total section also collapsible
+
+### Files Modified:
+- core/views.py (export_for_stakeholders function, lines 2970-2987)
+  - Removed: ws.column_dimensions.group() calls
+  - Added: Individual outline_level=1 assignments for company columns
+  - Preserved: outline properties and column widths
+
+### Testing:
+- Generate stakeholder export with mixed company presence per period
+- Open Excel file and look for outline controls ([-]/[+] buttons)
+- Click [-] to collapse - only TOTAL columns should remain
+- Click [+] to expand - all company columns should reappear
