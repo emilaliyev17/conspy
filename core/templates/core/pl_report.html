@@ -888,6 +888,7 @@
                 <div class="export-dropdown-content">
                     <a onclick="exportToExcel('formatted')">📊 Formatted (with totals)</a>
                     <a onclick="exportToExcel('raw')">📋 Raw Data (accounts only)</a>
+                    <a onclick="exportToExcel('stakeholder')">📑 For External Stakeholders</a>
                 </div>
             </div>
             <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
@@ -1180,7 +1181,12 @@
         });
 
         function exportToExcel(exportType = 'raw') {
-            const exportBaseUrl = "{% url 'core:export_report_excel' %}";
+            let exportBaseUrl;
+            if (exportType === 'stakeholder') {
+                exportBaseUrl = "{% url 'core:export_for_stakeholders' %}";
+            } else {
+                exportBaseUrl = "{% url 'core:export_report_excel' %}";
+            }
             const params = new URLSearchParams({
                 type: 'pl',
                 from_month: (document.getElementById('from_month') || {}).value || '',

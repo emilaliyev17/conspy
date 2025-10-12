@@ -654,8 +654,6 @@ def pl_report_data(request):
 
     # Get feature flag status
     salary_module_enabled = getattr(settings, 'ENABLE_SALARY_MODULE', False)
-    print(f"DEBUG: salary_module_enabled = {salary_module_enabled}")
-    logger.info("--- P&L Report Data Generation Started ---")
     from_month = request.GET.get('from_month', '')
     from_year = request.GET.get('from_year', '')
     to_month = request.GET.get('to_month', '')
@@ -664,23 +662,6 @@ def pl_report_data(request):
     # Normalize to match database: actual->Actual, budget->Budget
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
-    # CRITICAL DIAGNOSTICS (feature flags and data types)
-    try:
-        import os
-        from django.conf import settings as _dj_settings
-        print(f"[FEATURE FLAG] PL_BUDGET_PARALLEL setting: {getattr(_dj_settings, 'PL_BUDGET_PARALLEL', 'NOT_FOUND')}")
-        print(f"[FEATURE FLAG] Environment var: {os.environ.get('PL_BUDGET_PARALLEL', 'NOT_SET')}")
-        print(f"[FEATURE FLAG] is_enabled result: {is_enabled('PL_BUDGET_PARALLEL')}")
-        print(f"[DATA TYPE] Received raw: '{data_type_raw}'")
-        print(f"[DATA TYPE] Normalized: '{data_type}'")
-    except Exception:
-        pass
-    # Execution flow diagnostics
-    try:
-        use_dual_streams = is_enabled('PL_BUDGET_PARALLEL') and data_type and data_type.lower() in ['budget', 'forecast']
-        print(f"[EXECUTION] Will use dual streams: {use_dual_streams}")
-    except Exception:
-        pass
     # Budget map for dual-streams (period -> account_code -> amount)
     budget_values = {}
 
@@ -867,8 +848,6 @@ def pl_report_data(request):
         all_report_companies = pl_companies + ([budget_company] if budget_company else [])
 
     # Индексация: period -> company_code -> account_code -> amount
-    logger.info(f"DEBUG: Loading financial data for companies: {[c.code for c in companies]}")
-    logger.info(f"DEBUG: Data type: {data_type}, Periods: {periods}")
     financial_data = {}
     # Define a soft, readable palette (no reds) and map companies deterministically
     palette = ['#E6F3FF', '#E8F5E9', '#F0F4FF', '#E6F7F7', '#F6F8E7', '#F0E6FF', '#F5F5F5']
@@ -880,20 +859,9 @@ def pl_report_data(request):
             # Initialize keys for both actual companies and budget-only company
             for c in all_report_companies:
                 financial_data[p][c.code] = {}
-                try:
-                    print(f"[INIT] Created financial_data[{p}][{c.code}]")
-                except Exception:
-                    pass
         else:
             for c in pl_companies:  # Используем компании для P&L расчета
                 financial_data[p][c.code] = {}
-        # Diagnostic: confirm initialized company keys for this period
-        try:
-            logger.info(
-                f"INITIALIZED financial_data for period {p}: companies={list(financial_data[p].keys()) if p in financial_data else 'NONE'}"
-            )
-        except Exception:
-            pass
     
     # Заполняем financial_data с проверками (dual streams under feature flag)
     if is_enabled('PL_BUDGET_PARALLEL'):
@@ -905,17 +873,8 @@ def pl_report_data(request):
             # Fallback protection for missing keys
             if p not in financial_data:
                 financial_data[p] = {}
-                try:
-                    print(f"[FALLBACK] Created missing period {p}")
-                except Exception:
-                    pass
             if ccode not in financial_data[p]:
                 financial_data[p][ccode] = {}
-                try:
-                    print(f"[FALLBACK] Created missing {p}/{ccode}")
-                except Exception:
-                    pass
-            logger.info(f"STORING: financial_data[{p}][{ccode}][{fd.account_code}] = {fd.amount}")
             financial_data[p][ccode][fd.account_code] = fd.amount
 
         # Build budget-only mapping per period/account (do not mix into financial_data)
@@ -955,36 +914,12 @@ def pl_report_data(request):
             if any(amount for amount in accounts_map.values()):
                 non_zero_company_periods.add((period_key, company_code))
 
-    # Проверяем что получилось в financial_data
-    if periods:
-        p0 = periods[0]
-        logger.info(f"Financial data structure for period {p0}:")
-        for ccode in financial_data[p0]:
-            account_count = len(financial_data[p0][ccode])
-            logger.info(f"  Company {ccode}: {account_count} accounts")
-            if account_count > 0:
-                sample_accounts = list(financial_data[p0][ccode].keys())[:3]
-                logger.info(f"    Sample accounts: {sample_accounts}")
-
-    # Лог первого периода
-    if periods:
-        p0 = periods[0]
-        for c in companies[:2]:
-            logger.info(f"DEBUG: Checking company {c.code} in period {p0}")
-            logger.info(f"DEBUG: Available companies in financial_data[{p0}]: {list(financial_data[p0].keys())}")
-            if c.code in financial_data[p0]:
-                sample_accounts = list(financial_data[p0][c.code].keys())[:3]
-            else:
-                logger.warning(f"Company {c.code} not found in financial_data for period {p0}")
-                sample_accounts = []
-            logger.info(f"Period {p0}, Company {c.code}, P&L accounts sample: {sample_accounts}")
 
     # Группировка COA по sub_category для структуры
     grouped_data = {}
     for acc in chart_accounts_all:
         sub_category = acc.sub_category or 'UNCATEGORIZED'
         grouped_data.setdefault(sub_category, []).append(acc)
-    logger.info(f"Grouped P&L sub_categories: {list(grouped_data.keys())[:10]}")
 
     # Get P&L subcategories ordered by sort_order from database
     pl_subcategories = ChartOfAccounts.objects.filter(
@@ -1087,26 +1022,6 @@ def pl_report_data(request):
                 row['periods'][p] = {}
                 period_total = Decimal('0')
                 for c in companies_with_data:  # Используем только компании с данными
-                    # Diagnostic logging for key formats
-                    try:
-                        period_key = p
-                        company_key = c.code
-                        account_code = acc.account_code
-                        logger.info(
-                            f"SEARCHING: period_key='{period_key}', company_key='{company_key}', account='{account_code}'"
-                        )
-                        logger.info(f"AVAILABLE_PERIODS: {list(financial_data.keys())}")
-                    
-                        if period_key in financial_data:
-                            logger.info(
-                                f"AVAILABLE_COMPANIES: {list(financial_data.get(period_key, {}).keys())}"
-                            )
-                        else:
-                            logger.info("AVAILABLE_COMPANIES: PERIOD_NOT_FOUND")
-                        found_val = financial_data.get(period_key, {}).get(company_key, {}).get(account_code, 'NOT_FOUND')
-                        logger.info(f"FOUND_VALUE: {found_val}")
-                    except Exception:
-                        pass
                     amount = financial_data[p][c.code].get(acc.account_code, Decimal('0'))
                     row['periods'][p][c.code] = float(amount or Decimal('0'))
                     period_total += amount or Decimal('0')
@@ -1307,24 +1222,6 @@ def pl_report_data(request):
                 period_total = Decimal('0')
                 for c in pl_companies:
                     # Diagnostic logging for key formats during lookup (expense section)
-                    try:
-                        period_key = p
-                        company_key = c.code
-                        account_code = acc.account_code
-                        logger.info(
-                            f"SEARCHING: period_key='{period_key}', company_key='{company_key}', account='{account_code}'"
-                        )
-                        logger.info(f"AVAILABLE_PERIODS: {list(financial_data.keys())}")
-                        if period_key in financial_data:
-                            logger.info(
-                                f"AVAILABLE_COMPANIES: {list(financial_data.get(period_key, {}).keys())}"
-                            )
-                        else:
-                            logger.info("AVAILABLE_COMPANIES: PERIOD_NOT_FOUND")
-                        found_val = financial_data.get(period_key, {}).get(company_key, {}).get(account_code, 'NOT_FOUND')
-                        logger.info(f"FOUND_VALUE: {found_val}")
-                    except Exception:
-                        pass
                     amount = financial_data[p][c.code].get(acc.account_code, 0)
                     row['periods'][p][c.code] = float(amount or 0)
                     period_total += amount or 0
@@ -1896,21 +1793,6 @@ def pl_report_data(request):
         row_type = grid_row.get('rowType')
         account_name = grid_row.get('account_name')
 
-        if sort_order_str == '1100':
-            logger.info(
-                "SALARY DEBUG: sort_order=1100 row=%s rowType=%s salary_module_enabled=%s",
-                account_name,
-                row_type,
-                salary_module_enabled,
-            )
-        if account_name and 'TOTAL' in account_name.upper():
-            logger.info(
-                "SALARY DEBUG: TOTAL row detected name=%s rowType=%s sort_order=%s",
-                account_name,
-                row_type,
-                sort_order_str,
-            )
-
         condition_met = (
             salary_module_enabled
             and sort_order_str == '1100'
@@ -1919,20 +1801,6 @@ def pl_report_data(request):
         if condition_met:
             grid_row['is_salary'] = True
             grid_row['can_view_details'] = request.user.has_perm('core.view_salary_details')
-            logger.info(
-                "SALARY DEBUG: Flagged row for salary link name=%s rowType=%s sort_order=%s can_view_details=%s",
-                account_name,
-                row_type,
-                sort_order_str,
-                grid_row['can_view_details'],
-            )
-        elif sort_order_str == '1100':
-            logger.info(
-                "SALARY DEBUG: Row matched sort_order but was NOT flagged name=%s rowType=%s salary_module_enabled=%s",
-                account_name,
-                row_type,
-                salary_module_enabled,
-            )
         for p in periods:
             for c in non_budget_companies:
                 field = f'{p.strftime("%b-%y")}_{c.code}'
@@ -2057,9 +1925,6 @@ def pl_report_data(request):
                 updated_iso = comment.updated_at.isoformat()
                 if not entry['latest'] or updated_iso > entry['latest']:
                     entry['latest'] = updated_iso
-
-    logger.info(f"Final P&L report data count: {len(report_data)}")
-    logger.info("--- P&L Report Data Generation Finished ---")
 
     debug_info['ping'] = 'pl_report_data v4 - Fixed indexing and Decimal types'
 
@@ -2903,16 +2768,274 @@ def export_report_excel(request):
     return response
 
 
+@login_required
+def export_for_stakeholders(request):
+    import json
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from decimal import Decimal
+    
+    screen_response = pl_report_data(request)
+    try:
+        screen_json = json.loads(screen_response.content.decode('utf-8'))
+    except Exception:
+        df = pd.DataFrame([["No data"]], columns=["P&L Report"])
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="pl_report_stakeholders.xlsx"'
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='P&L Report', index=False)
+        return response
+    
+    row_data = screen_json.get('rowData', [])
+    column_defs = screen_json.get('columnDefs', [])
+    
+    row_data = [
+        row for row in row_data 
+        if not row.get('is_cf_dashboard') 
+        and not row.get('is_separator')
+        and row.get('rowType') != 'cf_metric'
+        and row.get('section') != 'cf_dashboard'
+    ]
+    
+    if not row_data or not column_defs:
+        df = pd.DataFrame([["No data available"]], columns=["P&L Report"])
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="pl_report_stakeholders.xlsx"'
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='P&L Report', index=False)
+        return response
+    
+    periods = []
+    companies = []
+    period_company_map = {}
+    grand_total_fields = []
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("=== STAKEHOLDER EXPORT DEBUG START ===")
+    logger.info(f"Total column_defs received: {len(column_defs)}")
+    
+    for col in column_defs:
+        field = col.get('field')
+        col_type = col.get('colType')
+        header_name = col.get('headerName', '')
+        hide_flag = col.get('hide', False)
+        
+        if field in ('toggler', 'account_code', 'account_name'):
+            continue
+        
+        logger.info(f"Column: field={field}, type={col_type}, hide={hide_flag}, header={header_name}")
+        
+        if hide_flag:
+            logger.info(f"  -> SKIPPING column {field} due to hide=True")
+            continue
+        
+        if col_type in ('company', 'total', 'budget'):
+            parts = field.split('_')
+            if len(parts) >= 2:
+                period = parts[0]
+                company_or_type = '_'.join(parts[1:])
+                
+                if period not in period_company_map:
+                    period_company_map[period] = []
+                    periods.append(period)
+                
+                period_company_map[period].append({
+                    'field': field,
+                    'name': header_name,
+                    'type': col_type
+                })
+                
+                if company_or_type not in companies and col_type == 'company':
+                    companies.append(company_or_type)
+        
+        elif col_type in ('grand_company', 'grand_overall', 'grand_budget'):
+            if hide_flag:
+                logger.info(f"  -> SKIPPING grand column {field} due to hide=True")
+                continue
+            logger.info(f"  -> ADDING to grand_total_fields")
+            grand_total_fields.append({
+                'field': field,
+                'name': header_name,
+                'type': col_type
+            })
+            parts = field.split('_')
+            if len(parts) >= 3:
+                company_code = '_'.join(parts[2:])
+                if company_code not in companies and col_type == 'grand_company':
+                    companies.append(company_code)
+    
+    logger.info(f"=== FINAL STRUCTURE ===")
+    logger.info(f"Periods: {periods}")
+    logger.info(f"Companies found: {companies}")
+    for period, cols in period_company_map.items():
+        logger.info(f"Period {period}: {len(cols)} columns")
+        for col in cols:
+            logger.info(f"  - {col['name']} (type={col['type']}, field={col['field']})")
+    logger.info(f"Grand total fields: {len(grand_total_fields)}")
+    for col in grand_total_fields:
+        logger.info(f"  - {col['name']} (type={col['type']}, field={col['field']})")
+    logger.info("=== STAKEHOLDER EXPORT DEBUG END ===")
+    
+    header_row1 = ['Account Name']
+    header_row2 = ['']
+    
+    for period in periods:
+        period_cols = period_company_map.get(period, [])
+        num_cols = len(period_cols)
+        header_row1.append(period)
+        for i in range(num_cols - 1):
+            header_row1.append('')
+        
+        for col_info in period_cols:
+            header_row2.append(col_info['name'])
+    
+    if grand_total_fields:
+        num_grand_cols = len(grand_total_fields)
+        header_row1.append('Grand Total')
+        for i in range(num_grand_cols - 1):
+            header_row1.append('')
+        
+        for col_info in grand_total_fields:
+            header_row2.append(col_info['name'])
+    
+    excel_rows = []
+    for row in row_data:
+        account_name = row.get('account_name', '')
+        row_type = row.get('rowType', '')
+        
+        excel_row = [account_name]
+        
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            for col_info in period_cols:
+                field = col_info['field']
+                value = row.get(field, 0)
+                if value == '-':
+                    value = ''
+                elif value is not None:
+                    try:
+                        value = float(value)
+                    except:
+                        value = ''
+                excel_row.append(value)
+        
+        for col_info in grand_total_fields:
+            field = col_info['field']
+            value = row.get(field, 0)
+            if value == '-':
+                value = ''
+            elif value is not None:
+                try:
+                    value = float(value)
+                except:
+                    value = ''
+            excel_row.append(value)
+        
+        excel_rows.append(excel_row)
+    
+    all_data = [header_row2] + excel_rows
+    df = pd.DataFrame(all_data[1:], columns=all_data[0])
+    
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="pl_report_stakeholders.xlsx"'
+    
+    with pd.ExcelWriter(response, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='P&L Report', index=False, startrow=1)
+        ws = writer.sheets['P&L Report']
+        
+        for col_idx, value in enumerate(header_row1, start=1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.value = value
+            cell.font = Font(bold=True, size=11)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+        
+        current_col = 2
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            num_cols = len(period_cols)
+            
+            if num_cols > 1:
+                ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_cols - 1)
+            
+            current_col += num_cols
+        
+        if grand_total_fields:
+            num_grand = len(grand_total_fields)
+            if num_grand > 1:
+                ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_grand - 1)
+        
+        for col_idx in range(1, len(header_row2) + 1):
+            cell = ws.cell(row=2, column=col_idx)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color='E7E6E6', end_color='E7E6E6', fill_type='solid')
+        
+        bold_types = {'sub_total', 'parent_total', 'total', 'section_header', 'parent_header', 'net_income'}
+        total_fill = PatternFill(start_color='E8F4FD', end_color='E8F4FD', fill_type='solid')
+        bold_font = Font(bold=True)
+        
+        for row_idx in range(3, ws.max_row + 1):
+            excel_row_idx = row_idx - 3
+            if excel_row_idx < len(excel_rows):
+                source_row = row_data[excel_row_idx]
+                row_type = source_row.get('rowType', '')
+                
+                if row_type in bold_types:
+                    for col_idx in range(1, ws.max_column + 1):
+                        cell = ws.cell(row=row_idx, column=col_idx)
+                        cell.font = bold_font
+                        if row_type == 'total':
+                            cell.fill = total_fill
+        
+        current_col = 2
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            company_cols = [c for c in period_cols if c['type'] == 'company']
+            
+            if company_cols:
+                start_col = current_col
+                end_col = current_col + len(company_cols) - 1
+                
+                start_letter = get_column_letter(start_col)
+                end_letter = get_column_letter(end_col)
+                
+                ws.column_dimensions.group(start_letter, end_letter, outline_level=1, hidden=False)
+            
+            current_col += len(period_cols)
+        
+        if grand_total_fields:
+            company_grand_cols = [c for c in grand_total_fields if c['type'] == 'grand_company']
+            if company_grand_cols:
+                start_col = current_col
+                end_col = current_col + len(company_grand_cols) - 1
+                
+                start_letter = get_column_letter(start_col)
+                end_letter = get_column_letter(end_col)
+                
+                ws.column_dimensions.group(start_letter, end_letter, outline_level=1, hidden=False)
+        
+        ws.sheet_properties.outlinePr.summaryBelow = False
+        ws.sheet_properties.outlinePr.summaryRight = True
+        
+        ws.column_dimensions['A'].width = 35
+        for col_idx in range(2, ws.max_column + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 12
+        
+        ws.freeze_panes = 'B3'
+    
+    return response
+
+
 @csrf_exempt
 @login_required
 def update_cf_dashboard(request):
     """API endpoint for updating CF Dashboard values from inline editing"""
-    print(f"Request method: {request.method}")
     if request.method == 'POST':
         try:
             import json
             data = json.loads(request.body)
-            print(f"Received data: {data}")
             
             # Handle consolidated Budget/Forecast updates (no company dimension)
             if data.get('is_budget'):

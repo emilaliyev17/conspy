@@ -17,6 +17,7 @@ urlpatterns = [
         path('reports/bs/', views.bs_report, name='bs_report'),
     path('reports/bs/data/', views.bs_report_data, name='bs_report_data'),
     path('reports/export/', views.export_report_excel, name='export_report_excel'),
+    path('reports/export/stakeholders/', views.export_for_stakeholders, name='export_for_stakeholders'),
     path('reports/pl/comments/', views.pl_comment_list, name='pl_comment_list'),
     path('reports/pl/comments/<int:pk>/', views.pl_comment_detail, name='pl_comment_detail'),
     path('api/cf-dashboard/update/', views.update_cf_dashboard, name='update_cf_dashboard'),
