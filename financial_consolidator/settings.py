@@ -198,6 +198,10 @@ if USE_SPACES:
     AWS_DEFAULT_ACL = 'private'
     AWS_S3_FILE_OVERWRITE = False
     AWS_S3_VERIFY = True
+    AWS_S3_ADDRESSING_STYLE = 'virtual'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_S3_USE_SSL = True
+    AWS_LOCATION = ''
     
     # Update STORAGES for Django 5.x with S3
     STORAGES = {
