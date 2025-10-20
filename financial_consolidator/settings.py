@@ -185,6 +185,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # DigitalOcean Spaces configuration
 USE_SPACES = os.environ.get('USE_SPACES', 'False').lower() in ('1', 'true', 'yes', 'on')
 
+print(f"DEBUG: USE_SPACES={USE_SPACES}, env value={os.environ.get('USE_SPACES')}")
+print(f"DEBUG: AWS_ACCESS_KEY_ID={os.environ.get('AWS_ACCESS_KEY_ID')[:10] if os.environ.get('AWS_ACCESS_KEY_ID') else None}...")
+
 if USE_SPACES:
     # DigitalOcean Spaces settings
     AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
