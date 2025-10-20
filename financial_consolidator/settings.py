@@ -187,8 +187,8 @@ USE_SPACES = os.environ.get('USE_SPACES', 'False').lower() in ('1', 'true', 'yes
 
 if USE_SPACES:
     # DigitalOcean Spaces settings
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', 'DO00VDYFEU7NAXGPQMVL')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', 'IrF/GBDdn/YDsujUc9Dob6xjZIXsnfIdZVXPJz80/7M')
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'faesstorage')
     AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', 'https://nyc3.digitaloceanspaces.com')
     AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'nyc3')
@@ -196,9 +196,15 @@ if USE_SPACES:
     AWS_S3_FILE_OVERWRITE = False
     AWS_S3_VERIFY = True
     
-    # File storage settings
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
+    # Update STORAGES for Django 5.x with S3
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "core.storage.StaticStorage",
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
