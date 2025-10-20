@@ -344,6 +344,113 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+        
+        /* File attachment styles */
+        .comment-input-container {
+            position: relative;
+        }
+        
+        .comment-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .attach-file-btn {
+            background: #f8f9fa;
+            border: 1px solid #d0d7e2;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            height: 40px;
+        }
+        
+        .attach-file-btn:hover {
+            background: #e9ecef;
+            border-color: #2563eb;
+        }
+        
+        .attached-files {
+            margin-top: 10px;
+            padding: 8px 0;
+        }
+        
+        .attached-file {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .attached-file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .attached-file-name {
+            font-weight: 500;
+            color: #1e3a8a;
+        }
+        
+        .attached-file-size {
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+        
+        .remove-file-btn {
+            background: none;
+            border: none;
+            color: #dc2626;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .remove-file-btn:hover {
+            background: #fee2e2;
+        }
+        
+        /* File display in existing comments */
+        .comment-files {
+            margin-top: 8px;
+        }
+        
+        .comment-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 4px 8px;
+            margin: 2px 4px 2px 0;
+            font-size: 0.8rem;
+            text-decoration: none;
+            color: #1e40af;
+        }
+        
+        .comment-file:hover {
+            background: #e2e8f0;
+            color: #1e40af;
+        }
+        
+        .comment-file-icon {
+            font-size: 12px;
+        }
 
         
         /* Thicker borders for TOTAL columns */
@@ -924,8 +1031,17 @@
             <div class="comment-modal-body" id="commentList"></div>
             <div class="comment-modal-footer">
                 <form id="commentForm" class="comment-form">
-                    <textarea id="commentMessage" placeholder="Add a comment..." required></textarea>
-                    <button type="submit" id="commentSubmitBtn" disabled>Post Comment</button>
+                    <div class="comment-input-container">
+                        <textarea id="commentMessage" placeholder="Add a comment..." required></textarea>
+                        <div class="comment-actions">
+                            <input type="file" id="fileUpload" accept=".pdf,.xlsx,.xls,.xlsm" style="display: none;">
+                            <button type="button" id="attachFileBtn" class="attach-file-btn" title="Attach file">
+                                📎
+                            </button>
+                            <button type="submit" id="commentSubmitBtn" disabled>Post Comment</button>
+                        </div>
+                        <div id="attachedFiles" class="attached-files"></div>
+                    </div>
                 </form>
             </div>
         </div>
@@ -1006,9 +1122,39 @@
                 message.className = 'comment-message';
                 message.textContent = comment.message || '';
 
-                item.appendChild(author);
-                item.appendChild(meta);
-                item.appendChild(message);
+                // Add files if they exist
+                if (comment.files && comment.files.length > 0) {
+                    const filesContainer = document.createElement('div');
+                    filesContainer.className = 'comment-files';
+                    
+                    comment.files.forEach(file => {
+                        const fileLink = document.createElement('a');
+                        fileLink.className = 'comment-file';
+                        fileLink.href = file.download_url;
+                        fileLink.target = '_blank';
+                        fileLink.rel = 'noopener noreferrer';
+                        
+                        const fileIcon = document.createElement('span');
+                        fileIcon.className = 'comment-file-icon';
+                        fileIcon.textContent = file.file_type.includes('pdf') ? '📄' : '📊';
+                        
+                        const fileName = document.createElement('span');
+                        fileName.textContent = file.original_filename;
+                        
+                        fileLink.appendChild(fileIcon);
+                        fileLink.appendChild(fileName);
+                        filesContainer.appendChild(fileLink);
+                    });
+                    
+                    item.appendChild(author);
+                    item.appendChild(meta);
+                    item.appendChild(message);
+                    item.appendChild(filesContainer);
+                } else {
+                    item.appendChild(author);
+                    item.appendChild(meta);
+                    item.appendChild(message);
+                }
 
                 if (comment.can_edit) {
                     const actions = document.createElement('div');
@@ -1494,12 +1640,18 @@
             }
 
             if (commentFormEl && commentMessageEl && commentSubmitBtn) {
+                // Add file upload form handler
                 commentFormEl.addEventListener('submit', function(event) {
                     event.preventDefault();
+                    
                     if (!commentState.rowKey || !commentState.columnKey) return;
+                    
                     const message = commentMessageEl.value.trim();
-                    if (!message) return;
+                    if (!message && attachedFiles.length === 0) return;
+                    
                     commentSubmitBtn.disabled = true;
+                    
+                    // First create the comment
                     fetch('/reports/pl/comments/', {
                         method: 'POST',
                         headers: {
@@ -1513,14 +1665,21 @@
                             column_label: commentState.columnLabel,
                             message: message
                         })
-                    }).then(response => {
-                        if (!response.ok) throw new Error('Failed to save comment');
-                        return response.json();
+            }).then(response => {
+                if (!response.ok) throw new Error('Failed to save comment');
+                return response.json();
+            }).then(data => {
+                // If comment was created and we have files, upload them
+                if (data && data.comment && data.comment.id && attachedFiles.length > 0) {
+                    return uploadFilesToComment(data.comment.id).then(() => data);
+                }
+                return data;
                     }).then(data => {
                         if (data && data.summary) {
                             updateCommentSummary(commentState.rowKey, commentState.columnKey, data.summary);
                         }
                         commentMessageEl.value = '';
+                        clearAttachedFiles();
                         commentSubmitBtn.disabled = true;
                         loadCommentsForCurrentCell();
                     }).catch(error => {
@@ -2000,6 +2159,139 @@
     const savedSize = localStorage.getItem('plFontSize') || '14';
     document.getElementById('plGrid').classList.add('font-' + savedSize);
     document.querySelector(`.font-size-btn[data-size="${savedSize}"]`).classList.add('active');
+    
+    // File attachment functionality
+    let attachedFiles = [];
+    
+    function initializeFileUpload() {
+        const attachBtn = document.getElementById('attachFileBtn');
+        const fileInput = document.getElementById('fileUpload');
+        const attachedFilesContainer = document.getElementById('attachedFiles');
+        
+        if (!attachBtn || !fileInput || !attachedFilesContainer) return;
+        
+        attachBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                addAttachedFile(file);
+            }
+        });
+    }
+    
+    function addAttachedFile(file) {
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'application/vnd.ms-excel', 
+                             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                             'application/vnd.ms-excel.sheet.macroEnabled.12'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Invalid file type. Only PDF and Excel files are allowed.');
+            return;
+        }
+        
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            alert('File too large. Maximum size is 10MB.');
+            return;
+        }
+        
+        attachedFiles.push(file);
+        renderAttachedFiles();
+    }
+    
+    function removeAttachedFile(index) {
+        attachedFiles.splice(index, 1);
+        renderAttachedFiles();
+    }
+    
+    function renderAttachedFiles() {
+        const container = document.getElementById('attachedFiles');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        attachedFiles.forEach((file, index) => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'attached-file';
+            
+            const fileInfo = document.createElement('div');
+            fileInfo.className = 'attached-file-info';
+            
+            const fileIcon = document.createElement('span');
+            fileIcon.textContent = file.type.includes('pdf') ? '📄' : '📊';
+            
+            const fileName = document.createElement('span');
+            fileName.className = 'attached-file-name';
+            fileName.textContent = file.name;
+            
+            const fileSize = document.createElement('span');
+            fileSize.className = 'attached-file-size';
+            fileSize.textContent = formatFileSize(file.size);
+            
+            fileInfo.appendChild(fileIcon);
+            fileInfo.appendChild(fileName);
+            fileInfo.appendChild(fileSize);
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'remove-file-btn';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = () => removeAttachedFile(index);
+            
+            fileDiv.appendChild(fileInfo);
+            fileDiv.appendChild(removeBtn);
+            container.appendChild(fileDiv);
+        });
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+    
+    function uploadFilesToComment(commentId) {
+        if (attachedFiles.length === 0) return Promise.resolve();
+        
+        const uploadPromises = attachedFiles.map(file => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('comment_id', commentId);
+            
+            return fetch('/reports/pl/comments/files/upload/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to upload file');
+                }
+                return response.json();
+            });
+        });
+        
+        return Promise.all(uploadPromises);
+    }
+    
+    function clearAttachedFiles() {
+        attachedFiles = [];
+        renderAttachedFiles();
+        const fileInput = document.getElementById('fileUpload');
+        if (fileInput) fileInput.value = '';
+    }
+    
+    // Initialize file upload when DOM is ready
+    document.addEventListener('DOMContentLoaded', initializeFileUpload);
+    
+    // Comment form handler moved to initialization section above
     </script>
 </body>
 </html>

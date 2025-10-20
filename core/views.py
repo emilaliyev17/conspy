@@ -18,6 +18,7 @@ from .models import (
     ActiveState,
     SalaryData,
     PLComment,
+    PLCommentFile,
     HubSpotData,
     HubSpotSyncLog,
 )
@@ -1940,6 +1941,11 @@ def _serialize_pl_comment(comment, current_user=None):
     creator = comment.created_by
     display_name = creator.get_full_name() or creator.get_username()
     initials = ''.join([part[0] for part in (creator.get_full_name() or creator.get_username()).split() if part])[:2].upper()
+    
+    # Get files for this comment
+    files = comment.files.all()
+    serialized_files = [_serialize_pl_comment_file(file_obj, current_user) for file_obj in files] if current_user else []
+    
     return {
         'id': comment.id,
         'parent_id': comment.parent_id,
@@ -1957,6 +1963,7 @@ def _serialize_pl_comment(comment, current_user=None):
             'initials': initials or display_name[:2].upper(),
         },
         'can_edit': bool(current_user and (current_user.is_staff or creator_id_matches(current_user, creator))),
+        'files': serialized_files,
     }
 
 
@@ -2068,6 +2075,101 @@ def pl_comment_detail(request, pk):
         return JsonResponse({'status': 'deleted', 'summary': summary})
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def _serialize_pl_comment_file(file_obj, user):
+    """Serialize a PLCommentFile object for JSON response."""
+    return {
+        'id': file_obj.id,
+        'original_filename': file_obj.original_filename,
+        'file_size': file_obj.file_size,
+        'file_size_human': file_obj.file_size_human,
+        'file_type': file_obj.file_type,
+        'uploaded_by': {
+            'id': file_obj.uploaded_by.id,
+            'username': file_obj.uploaded_by.username,
+            'first_name': file_obj.uploaded_by.first_name,
+            'last_name': file_obj.uploaded_by.last_name,
+        },
+        'uploaded_at': file_obj.uploaded_at.isoformat(),
+        'download_url': file_obj.file.url if file_obj.file else None,
+        'can_delete': user.is_staff or user == file_obj.uploaded_by,
+    }
+
+
+@login_required
+def pl_comment_file_upload(request):
+    """Upload a file to a P&L comment."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        comment_id = request.POST.get('comment_id')
+        if not comment_id:
+            return JsonResponse({'error': 'comment_id is required'}, status=400)
+        
+        comment = get_object_or_404(PLComment, pk=comment_id)
+        
+        # Check permissions
+        if not (request.user.is_staff or request.user == comment.created_by):
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+        
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({'error': 'No file provided'}, status=400)
+        
+        # Validate file type
+        allowed_types = ['application/pdf', 'application/vnd.ms-excel', 
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-excel.sheet.macroEnabled.12']
+        if uploaded_file.content_type not in allowed_types:
+            return JsonResponse({
+                'error': 'Invalid file type. Only PDF and Excel files are allowed.'
+            }, status=400)
+        
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if uploaded_file.size > max_size:
+            return JsonResponse({
+                'error': 'File too large. Maximum size is 10MB.'
+            }, status=400)
+        
+        # Create the file record
+        comment_file = PLCommentFile.objects.create(
+            comment=comment,
+            file=uploaded_file,
+            original_filename=uploaded_file.name,
+            file_size=uploaded_file.size,
+            file_type=uploaded_file.content_type,
+            uploaded_by=request.user
+        )
+        
+        return JsonResponse({
+            'file': _serialize_pl_comment_file(comment_file, request.user)
+        }, status=201)
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error uploading file: {error_details}")
+        return JsonResponse({'error': str(e), 'details': error_details}, status=500)
+
+
+@login_required
+def pl_comment_file_delete(request, file_id):
+    """Delete a file from a P&L comment."""
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    comment_file = get_object_or_404(PLCommentFile, pk=file_id)
+    
+    # Check permissions
+    if not (request.user.is_staff or request.user == comment_file.uploaded_by):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    comment_file.delete()
+    return JsonResponse({'status': 'deleted'})
+
 
 @login_required
 def bs_report_data(request):

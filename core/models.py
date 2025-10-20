@@ -199,6 +199,37 @@ class PLComment(models.Model):
         return self.parent.root if self.parent else self
 
 
+class PLCommentFile(models.Model):
+    """Files attached to P&L comments."""
+    
+    comment = models.ForeignKey(PLComment, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(upload_to='comment_files/%Y/%m/%d/')
+    original_filename = models.CharField(max_length=255)
+    file_size = models.BigIntegerField()
+    file_type = models.CharField(max_length=100)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='uploaded_comment_files')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['uploaded_at']
+        indexes = [
+            models.Index(fields=['comment', 'uploaded_at']),
+        ]
+    
+    def __str__(self):
+        return f"File {self.original_filename} for comment {self.comment.id}"
+    
+    @property
+    def file_size_human(self):
+        """Return human readable file size."""
+        size = self.file_size
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+
+
 class HubSpotData(models.Model):
     """Stores HubSpot CRM objects that have been synced into the platform."""
 

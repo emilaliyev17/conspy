@@ -107,15 +107,18 @@ if DATABASE_URL:
         'default': dj_database_url.parse(DATABASE_URL)
     }
 else:
-    # Local development - use existing PostgreSQL config
+    # Local development - use Digital Ocean PostgreSQL config
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'consolidator_db',
-            'USER': 'emil.aliyev',
-            'PASSWORD': '',
-            'HOST': 'localhost',
-            'PORT': '5432',
+            'NAME': os.environ.get('DB_NAME', 'financial_consolidator'),
+            'USER': os.environ.get('DB_USER', 'doadmin'),
+            'PASSWORD': os.environ.get('DB_PASSWORD'),
+            'HOST': os.environ.get('DB_HOST', 'app-2918ed8a-0d1e-4c36-b8ec-961630fb78c0-do-user-16968811-0.c.db.ondigitalocean.com'),
+            'PORT': os.environ.get('DB_PORT', '25060'),
+            'OPTIONS': {
+                'sslmode': 'require',
+            },
         }
     }
 
@@ -178,6 +181,24 @@ STATICFILES_DIRS = [
 # Media files (if needed)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# DigitalOcean Spaces configuration
+USE_SPACES = os.environ.get('USE_SPACES', 'False').lower() in ('1', 'true', 'yes', 'on')
+
+if USE_SPACES:
+    # DigitalOcean Spaces settings
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', 'DO00VDYFEU7NAXGPQMVL')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', 'IrF/GBDdn/YDsujUc9Dob6xjZIXsnfIdZVXPJz80/7M')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'faesstorage')
+    AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', 'https://nyc3.digitaloceanspaces.com')
+    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'nyc3')
+    AWS_DEFAULT_ACL = 'private'
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_VERIFY = True
+    
+    # File storage settings
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
