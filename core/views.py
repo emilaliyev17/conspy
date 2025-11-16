@@ -662,7 +662,12 @@ def pl_report_data(request):
     data_type_raw = request.GET.get('data_type', 'actual')
     # Normalize to match database: actual->Actual, budget->Budget
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
-    logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}")
+    
+    # New parameters for Display Mode and YTD
+    display_mode = request.GET.get('display_mode', 'grand_total')  # 'grand_total' or 'ytd'
+    ytd_compare_year = request.GET.get('ytd_compare_year', '')  # Year for comparison in YTD mode
+    
+    logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}, display_mode={display_mode}, ytd_compare_year={ytd_compare_year}")
     # Budget map for dual-streams (period -> account_code -> amount)
     budget_values = {}
 
@@ -1554,53 +1559,89 @@ def pl_report_data(request):
     non_budget_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
     budget_only_companies = [c for c in companies if getattr(c, 'is_budget_only', False)]
 
-    # Grand totals for regular companies
-    for c in non_budget_companies:
-        column_defs.append({
-            'field': f'grand_total_{c.code}',
-            'headerName': f'Grand Total {c.code}',
-            'colType': 'grand_company',
-            'width': 120,
-            'type': 'numberColumnWithCommas',
-            'cellStyle': {
-                'textAlign': 'right',
-                'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
-            }
-        })
-
-    # Overall Grand Total (TOTAL) column
-    column_defs.append({
-        'field': 'grand_total_TOTAL',
-        'headerName': 'Grand Total',
-        'colType': 'grand_overall',
-        'headerComponent': 'grandTotalsToggleHeader',
-        'width': 120,
-        'type': 'numberColumnWithCommas',
-        'cellStyle': {
-            'textAlign': 'right',
-            'backgroundColor': '#FFF9E6'
-        }
-    })
-
-    # Grand Total Budget column (only in Budget/Forecast views) — ensure added only once
-    if data_type and data_type.lower() in ['budget', 'forecast']:
-        if not any(col.get('field') == 'grand_total_Budget' for col in column_defs):
+    # Display Mode: Grand Total or Year to Date
+    if display_mode == 'ytd':
+        # YTD Mode: Year to Date columns
+        # TODO: Full YTD calculation will be implemented in next phase
+        # For now, adding column structure as placeholder
+        
+        # YTD for current year (to_year)
+        if to_year:
             column_defs.append({
-                'field': 'grand_total_Budget',
-                'headerName': 'Grand Total Budget',
-                'colType': 'grand_budget',
+                'field': f'ytd_{to_year}',
+                'headerName': f'YTD {to_year}',
+                'colType': 'ytd_current',
                 'width': 120,
                 'type': 'numberColumnWithCommas',
                 'cellStyle': {
                     'textAlign': 'right',
-                    'backgroundColor': '#F0F0FF'
+                    'backgroundColor': '#E6F7FF'
+                }
+            })
+        
+        # YTD for comparison year (if selected)
+        if ytd_compare_year:
+            column_defs.append({
+                'field': f'ytd_{ytd_compare_year}',
+                'headerName': f'YTD {ytd_compare_year}',
+                'colType': 'ytd_compare',
+                'width': 120,
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': '#FFF7E6'
+                }
+            })
+    else:
+        # Grand Total Mode (default): Sum of selected periods
+        
+        # Grand totals for regular companies
+        for c in non_budget_companies:
+            column_defs.append({
+                'field': f'grand_total_{c.code}',
+                'headerName': f'Grand Total {c.code}',
+                'colType': 'grand_company',
+                'width': 120,
+                'type': 'numberColumnWithCommas',
+                'cellStyle': {
+                    'textAlign': 'right',
+                    'backgroundColor': color_by_company.get(getattr(c, 'id', None), '#F5F5F5')
                 }
             })
 
-    # Grand total for budget-only company (if present) is skipped to avoid field name collision
-    # with the overall 'grand_total_Budget' column. This per-company column is unused/empty.
-    for c in budget_only_companies:
-        pass
+        # Overall Grand Total (TOTAL) column
+        column_defs.append({
+            'field': 'grand_total_TOTAL',
+            'headerName': 'Grand Total',
+            'colType': 'grand_overall',
+            'headerComponent': 'grandTotalsToggleHeader',
+            'width': 120,
+            'type': 'numberColumnWithCommas',
+            'cellStyle': {
+                'textAlign': 'right',
+                'backgroundColor': '#FFF9E6'
+            }
+        })
+
+        # Grand Total Budget column (only in Budget/Forecast views) — ensure added only once
+        if data_type and data_type.lower() in ['budget', 'forecast']:
+            if not any(col.get('field') == 'grand_total_Budget' for col in column_defs):
+                column_defs.append({
+                    'field': 'grand_total_Budget',
+                    'headerName': 'Grand Total Budget',
+                    'colType': 'grand_budget',
+                    'width': 120,
+                    'type': 'numberColumnWithCommas',
+                    'cellStyle': {
+                        'textAlign': 'right',
+                        'backgroundColor': '#F0F0FF'
+                    }
+                })
+
+        # Grand total for budget-only company (if present) is skipped to avoid field name collision
+        # with the overall 'grand_total_Budget' column. This per-company column is unused/empty.
+        for c in budget_only_companies:
+            pass
 
     # CF Dashboard section - loan movements and funding metrics
     cf_metrics = CFDashboardMetric.objects.filter(is_active=True).order_by('display_order')
@@ -1709,7 +1750,8 @@ def pl_report_data(request):
                 row[period_budget_key] = float(budget_value) if budget_value is not None else None
         
         # CF: Sum per-period Budget values into grand_total_Budget (Budget/Forecast only)
-        if data_type and data_type.lower() in ['budget', 'forecast']:
+        # Only in Grand Total mode (not YTD)
+        if display_mode == 'grand_total' and data_type and data_type.lower() in ['budget', 'forecast']:
             total_budget_sum = 0
             for p in periods:
                 key = f"{p.strftime('%b-%y')}_Budget"
@@ -1835,17 +1877,28 @@ def pl_report_data(request):
                 if r['type'] in ['sub_total', 'total', 'net_income']:
                     # print(f"DEBUG GRID: Set grid_row[{field_budget}] = {grid_row[field_budget]} for row type {r['type']}")
                     pass
-        for c in non_budget_companies:
-            field = f'grand_total_{c.code}'
-            gt_val = r['grand_totals'].get(c.code, 0)
-            # Hide zero company grand totals by sending None
-            grid_row[field] = None if gt_val == 0 or gt_val is None else float(gt_val)
-        # Overall grand total: hide zero as empty
-        overall_total_value = r['grand_totals'].get('TOTAL', 0)
-        grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 or overall_total_value is None else float(overall_total_value)
+        # Populate Grand Total or YTD columns based on display_mode
+        if display_mode == 'ytd':
+            # YTD Mode: Placeholder values (will be calculated in next phase)
+            # TODO: Implement full YTD calculation
+            if to_year:
+                grid_row[f'ytd_{to_year}'] = None  # Placeholder
+            if ytd_compare_year:
+                grid_row[f'ytd_{ytd_compare_year}'] = None  # Placeholder
+        else:
+            # Grand Total Mode: Use existing grand_totals
+            for c in non_budget_companies:
+                field = f'grand_total_{c.code}'
+                gt_val = r['grand_totals'].get(c.code, 0)
+                # Hide zero company grand totals by sending None
+                grid_row[field] = None if gt_val == 0 or gt_val is None else float(gt_val)
+            # Overall grand total: hide zero as empty
+            overall_total_value = r['grand_totals'].get('TOTAL', 0)
+            grid_row['grand_total_TOTAL'] = None if overall_total_value == 0 or overall_total_value is None else float(overall_total_value)
 
         # P&L: Sum per-period Budget values into grand_total_Budget for all row types (Budget/Forecast only)
-        if is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
+        # Only in Grand Total mode (not YTD)
+        if display_mode == 'grand_total' and is_enabled('PL_BUDGET_PARALLEL') and data_type.lower() in ['budget', 'forecast']:
             total_budget_sum = 0
             # Only show debug for subtotal and total rows, not individual accounts
             if r['type'] in ['sub_total', 'total', 'net_income']:
@@ -2660,6 +2713,10 @@ def pl_report(request):
     data_type_raw = request.GET.get('data_type', 'actual')
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
+    # New parameters for Display Mode and YTD
+    display_mode = request.GET.get('display_mode', 'grand_total')
+    ytd_compare_year = request.GET.get('ytd_compare_year', '')
+    
     year_range = range(2024, 2031)
     
     context = {
@@ -2668,6 +2725,8 @@ def pl_report(request):
         'to_month': to_month,
         'to_year': to_year,
         'data_type': data_type,
+        'display_mode': display_mode,
+        'ytd_compare_year': ytd_compare_year,
         'report_type': 'pl',
         'year_range': year_range
     }

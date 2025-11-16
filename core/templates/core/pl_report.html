@@ -979,6 +979,20 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label for="display_mode">Display Mode:</label>
+                        <select id="display_mode" name="display_mode">
+                            <option value="grand_total" {% if display_mode == 'grand_total' or not display_mode %}selected{% endif %}>Grand Total</option>
+                            <option value="ytd" {% if display_mode == 'ytd' %}selected{% endif %}>Year to Date</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="ytd_compare_group" style="display: none;">
+                        <label for="ytd_compare_year">Compare to:</label>
+                        <select id="ytd_compare_year" name="ytd_compare_year" class="year-select">
+                            <option value="">No Comparison</option>
+                            <!-- Динамически заполняется JS -->
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>&nbsp;</label>
                         <button type="submit" class="btn">🔍 Apply Filters</button>
                     </div>
@@ -1308,6 +1322,49 @@
             }
         }
 
+        // --- Display Mode and YTD helpers ---
+        function initializeYtdCompareYears() {
+            const ytdCompareYearEl = document.getElementById('ytd_compare_year');
+            if (!ytdCompareYearEl) return;
+            
+            const currentYear = new Date().getFullYear();
+            const startYear = 2023; // Start from 2023
+            
+            // Keep "No Comparison" option
+            const noComparisonOption = ytdCompareYearEl.querySelector('option[value=""]');
+            ytdCompareYearEl.innerHTML = '';
+            if (noComparisonOption) {
+                ytdCompareYearEl.appendChild(noComparisonOption);
+            } else {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No Comparison';
+                ytdCompareYearEl.appendChild(opt);
+            }
+            
+            // Add years from startYear to currentYear - 1
+            for (let year = startYear; year < currentYear; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                ytdCompareYearEl.appendChild(option);
+            }
+        }
+        
+        function toggleYtdCompareVisibility() {
+            const displayModeEl = document.getElementById('display_mode');
+            const ytdCompareGroup = document.getElementById('ytd_compare_group');
+            
+            if (!displayModeEl || !ytdCompareGroup) return;
+            
+            const displayMode = displayModeEl.value;
+            if (displayMode === 'ytd') {
+                ytdCompareGroup.style.display = 'flex';
+            } else {
+                ytdCompareGroup.style.display = 'none';
+            }
+        }
+
         // --- Export dropdown helpers ---
         function toggleExportDropdown(event) {
             event.stopPropagation();
@@ -1340,6 +1397,8 @@
                 to_month: (document.getElementById('to_month') || {}).value || '',
                 to_year: (document.getElementById('to_year') || {}).value || '',
                 data_type: (document.getElementById('data_type') || {}).value || 'actual',
+                display_mode: (document.getElementById('display_mode') || {}).value || 'grand_total',
+                ytd_compare_year: (document.getElementById('ytd_compare_year') || {}).value || '',
                 export_type: exportType
             });
             window.location.href = `${exportBaseUrl}?${params.toString()}`;
@@ -1620,7 +1679,29 @@
                 const dataType = urlParams.get('data_type') || 'actual';
                 const dt = document.getElementById('data_type');
                 if (dt) dt.value = dataType;
+                
+                // Initialize display_mode and ytd_compare_year from URL
+                const displayMode = urlParams.get('display_mode') || 'grand_total';
+                const displayModeEl = document.getElementById('display_mode');
+                if (displayModeEl) displayModeEl.value = displayMode;
+                
+                const ytdCompareYear = urlParams.get('ytd_compare_year') || '';
+                const ytdCompareYearEl = document.getElementById('ytd_compare_year');
+                if (ytdCompareYearEl) ytdCompareYearEl.value = ytdCompareYear;
             } catch (e) {}
+            
+            // Populate ytd_compare_year dropdown with years
+            initializeYtdCompareYears();
+            
+            // Show/hide YTD compare group based on display_mode
+            toggleYtdCompareVisibility();
+            
+            // Add event listener for display_mode changes
+            const displayModeEl = document.getElementById('display_mode');
+            if (displayModeEl) {
+                displayModeEl.addEventListener('change', toggleYtdCompareVisibility);
+            }
+            
             console.log('DOM loaded, initializing AG Grid...');
             
             const gridDiv = document.querySelector('#plGrid');
