@@ -874,6 +874,13 @@ def pl_report_data(request):
     if selected_company_codes:
         pl_companies = [c for c in pl_companies if c.code in selected_company_codes]
         logger.info(f"Filtered PL companies by user selection: {[c.code for c in pl_companies]}")
+    
+    # Include budget-only company for structure initialization (if using parallel budget feature)
+    if is_enabled('PL_BUDGET_PARALLEL'):
+        budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
+        all_report_companies = pl_companies + ([budget_company] if budget_company else [])
+    else:
+        all_report_companies = pl_companies
 
     # YTD data structures (if display_mode is 'ytd')
     ytd_data_current = {}  # YTD for current year (to_year)
