@@ -667,7 +667,11 @@ def pl_report_data(request):
     display_mode = request.GET.get('display_mode', 'grand_total')  # 'grand_total' or 'ytd'
     ytd_compare_year = request.GET.get('ytd_compare_year', '')  # Year for comparison in YTD mode
     
-    logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}, display_mode={display_mode}, ytd_compare_year={ytd_compare_year}")
+    # Company filter parameter
+    companies_param = request.GET.get('companies', '')  # Comma-separated company codes
+    selected_company_codes = [c.strip() for c in companies_param.split(',') if c.strip()] if companies_param else []
+    
+    logger.info(f"Parameters: from_month={from_month}, from_year={from_year}, to_month={to_month}, to_year={to_year}, data_type={data_type}, display_mode={display_mode}, ytd_compare_year={ytd_compare_year}, selected_companies={selected_company_codes}")
     # Budget map for dual-streams (period -> account_code -> amount)
     budget_values = {}
 
@@ -865,9 +869,11 @@ def pl_report_data(request):
     if is_enabled('PL_BUDGET_PARALLEL'):
         pl_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
         logger.info(f"PL companies for P&L calculations: {[c.code for c in pl_companies]}")
-        # Also include budget-only company for structure initialization
-        budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
-        all_report_companies = pl_companies + ([budget_company] if budget_company else [])
+    
+    # Filter by selected companies (from user dropdown selection)
+    if selected_company_codes:
+        pl_companies = [c for c in pl_companies if c.code in selected_company_codes]
+        logger.info(f"Filtered PL companies by user selection: {[c.code for c in pl_companies]}")
 
     # YTD data structures (if display_mode is 'ytd')
     ytd_data_current = {}  # YTD for current year (to_year)
@@ -912,6 +918,10 @@ def pl_report_data(request):
                     ytd_data_current[ccode][acc] += (fd.amount or Decimal('0'))
             
             logger.info(f"YTD current year ({to_year}): loaded {len(ytd_records_current)} records, {len(ytd_periods_current)} periods")
+            # Debug: show sample data
+            if ytd_records_current:
+                sample = ytd_records_current[0]
+                logger.info(f"YTD current sample: company={sample.company.code}, account={sample.account_code}, amount={sample.amount}")
         
         # Get YTD periods for comparison year (if selected)
         if ytd_compare_year:
@@ -950,6 +960,12 @@ def pl_report_data(request):
                         ytd_data_compare[ccode][acc] += (fd.amount or Decimal('0'))
                 
                 logger.info(f"YTD compare year ({ytd_compare_year}): loaded {len(ytd_records_compare)} records, {len(ytd_periods_compare)} periods")
+                # Debug: show counts by account type
+                income_codes = [a.account_code for a in chart_accounts if a.account_type == 'INCOME']
+                expense_codes = [a.account_code for a in chart_accounts if a.account_type == 'EXPENSE']
+                income_records = [r for r in ytd_records_compare if r.account_code in income_codes]
+                expense_records = [r for r in ytd_records_compare if r.account_code in expense_codes]
+                logger.info(f"YTD compare: Income records={len(income_records)}, Expense records={len(expense_records)}")
     
     # Индексация: period -> company_code -> account_code -> amount
     financial_data = {}
@@ -1398,6 +1414,23 @@ def pl_report_data(request):
                 for p in periods
             )
             row['grand_totals']['TOTAL'] = float(overall or 0)
+            
+            # YTD values (if display_mode is 'ytd')
+            if display_mode == 'ytd':
+                # YTD for current year
+                ytd_total_current = Decimal('0')
+                for c in pl_companies:
+                    ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_current += ytd_amount
+                row[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+                
+                # YTD for comparison year (if selected)
+                if ytd_compare_year:
+                    ytd_total_compare = Decimal('0')
+                    for c in pl_companies:
+                        ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                        ytd_total_compare += ytd_amount
+                    row[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
 
             if has_non_zero_value:
                 report_data.append(row)
@@ -1462,6 +1495,25 @@ def pl_report_data(request):
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or 0)
+        
+        # YTD values for subtotal (if display_mode is 'ytd')
+        if display_mode == 'ytd':
+            # YTD for current year
+            ytd_total_current = Decimal('0')
+            for c in pl_companies:
+                for acc in category_accounts:
+                    ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_current += ytd_amount
+            sub_total[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+            
+            # YTD for comparison year (if selected)
+            if ytd_compare_year:
+                ytd_total_compare = Decimal('0')
+                for c in pl_companies:
+                    for acc in category_accounts:
+                        ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                        ytd_total_compare += ytd_amount
+                sub_total[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
         
         # Debug: Show what's in the subtotal row before adding to report_data
         # print(f"DEBUG SUBTOTAL ROW: Final subtotal for '{sub_total['account_name']}':")
@@ -1532,6 +1584,21 @@ def pl_report_data(request):
                 gross_profit_row['grand_totals']['Budget'] = (
                     float(gross_budget_total) if gross_budget_total != 0 else None
                 )
+            
+            # YTD values for Gross Profit (if display_mode is 'ytd')
+            if display_mode == 'ytd':
+                # YTD for current year: Revenue YTD - Cost YTD
+                revenue_ytd_current = to_decimal(total_revenue_snapshot.get(f'ytd_{to_year}'))
+                cost_ytd_current = to_decimal(sub_total.get(f'ytd_{to_year}'))
+                gross_ytd_current = revenue_ytd_current - cost_ytd_current
+                gross_profit_row[f'ytd_{to_year}'] = float(gross_ytd_current) if gross_ytd_current != 0 else None
+                
+                # YTD for comparison year (if selected)
+                if ytd_compare_year:
+                    revenue_ytd_compare = to_decimal(total_revenue_snapshot.get(f'ytd_{ytd_compare_year}'))
+                    cost_ytd_compare = to_decimal(sub_total.get(f'ytd_{ytd_compare_year}'))
+                    gross_ytd_compare = revenue_ytd_compare - cost_ytd_compare
+                    gross_profit_row[f'ytd_{ytd_compare_year}'] = float(gross_ytd_compare) if gross_ytd_compare != 0 else None
 
             insert_index = len(report_data)
             report_data.insert(insert_index, gross_profit_row)
@@ -1746,7 +1813,8 @@ def pl_report_data(request):
         column_defs.extend(period_cols)
         # CF Dashboard TOTAL per period removed to avoid duplicate TOTAL columns
     # Ensure visual consistency: Non-budget company grand totals first, then overall TOTAL, then budget-only grand total
-    non_budget_companies = [c for c in companies if not getattr(c, 'is_budget_only', False)]
+    # Use filtered pl_companies for column definitions (respects company filter selection)
+    non_budget_companies = [c for c in pl_companies if not getattr(c, 'is_budget_only', False)]
     budget_only_companies = [c for c in companies if getattr(c, 'is_budget_only', False)]
 
     # Display Mode: Grand Total or Year to Date
@@ -2910,6 +2978,12 @@ def pl_report(request):
     
     year_range = range(2024, 2031)
     
+    # Get list of companies with data dynamically from DB
+    # Get all companies that have FinancialData records
+    available_companies = Company.objects.filter(
+        id__in=FinancialData.objects.values_list('company_id', flat=True).distinct()
+    ).order_by('code')
+    
     context = {
         'from_month': from_month,
         'from_year': from_year,
@@ -2919,7 +2993,8 @@ def pl_report(request):
         'display_mode': display_mode,
         'ytd_compare_year': ytd_compare_year,
         'report_type': 'pl',
-        'year_range': year_range
+        'year_range': year_range,
+        'available_companies': available_companies
     }
     
     return render(request, 'core/pl_report.html', context)

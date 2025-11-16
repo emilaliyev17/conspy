@@ -985,6 +985,31 @@
                             <option value="ytd" {% if display_mode == 'ytd' %}selected{% endif %}>Year to Date</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label for="company_filter">Companies:</label>
+                        <div class="company-filter-wrapper" style="position: relative;">
+                            <button type="button" id="company_filter_btn" class="company-filter-btn" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; width: 100%; text-align: left; display: flex; justify-content: space-between; align-items: center;">
+                                <span id="company_filter_label">All Companies</span>
+                                <span>▼</span>
+                            </button>
+                            <div id="company_filter_dropdown" class="company-filter-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; max-height: 300px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                <div style="padding: 8px; border-bottom: 1px solid #eee;">
+                                    <label style="display: flex; align-items: center; cursor: pointer; font-weight: bold;">
+                                        <input type="checkbox" id="company_select_all" style="margin-right: 8px;" checked>
+                                        <span>Select All</span>
+                                    </label>
+                                </div>
+                                <div style="padding: 8px;">
+                                    {% for company in available_companies %}
+                                    <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
+                                        <input type="checkbox" class="company-checkbox" value="{{ company.code }}" data-company-id="{{ company.id }}" style="margin-right: 8px;" checked>
+                                        <span>{{ company.code }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="filter-group" id="ytd_compare_group" style="display: none;">
                         <label for="ytd_compare_year">Compare to:</label>
                         <select id="ytd_compare_year" name="ytd_compare_year" class="year-select">
@@ -996,6 +1021,8 @@
                         <label>&nbsp;</label>
                         <button type="submit" class="btn">🔍 Apply Filters</button>
                     </div>
+                    <!-- Hidden input for selected companies -->
+                    <input type="hidden" id="selected_companies" name="companies" value="">
                 </div>
             </form>
         </div>
@@ -1365,6 +1392,143 @@
             }
         }
 
+        // --- Company Filter Functions ---
+        function initializeCompanyFilter() {
+            const filterBtn = document.getElementById('company_filter_btn');
+            const dropdown = document.getElementById('company_filter_dropdown');
+            const selectAllCheckbox = document.getElementById('company_select_all');
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            
+            if (!filterBtn || !dropdown) return;
+            
+            // Restore selection from localStorage or URL params
+            restoreCompanySelection();
+            
+            // Toggle dropdown on button click
+            filterBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isVisible = dropdown.style.display === 'block';
+                dropdown.style.display = isVisible ? 'none' : 'block';
+            });
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!dropdown.contains(e.target) && e.target !== filterBtn) {
+                    dropdown.style.display = 'none';
+                }
+            });
+            
+            // Prevent dropdown from closing when clicking inside
+            dropdown.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Select All functionality
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', handleSelectAllChange);
+            }
+            
+            // Individual checkbox changes
+            companyCheckboxes.forEach(cb => {
+                cb.addEventListener('change', handleCompanyCheckboxChange);
+            });
+            
+            // Update label on initialization
+            updateCompanyFilterLabel();
+        }
+        
+        function restoreCompanySelection() {
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            
+            // First, try to get from URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const companiesParam = urlParams.get('companies');
+            
+            if (companiesParam) {
+                const selectedCompanies = companiesParam.split(',');
+                companyCheckboxes.forEach(cb => {
+                    cb.checked = selectedCompanies.includes(cb.value);
+                });
+            } else {
+                // If not in URL, try localStorage
+                const savedCompanies = localStorage.getItem('plCompanyFilter');
+                if (savedCompanies) {
+                    try {
+                        const selectedCompanies = JSON.parse(savedCompanies);
+                        companyCheckboxes.forEach(cb => {
+                            cb.checked = selectedCompanies.includes(cb.value);
+                        });
+                    } catch (e) {
+                        // If parsing fails, keep all checked (default)
+                    }
+                }
+            }
+            
+            // Update Select All checkbox state
+            const allChecked = Array.from(companyCheckboxes).every(cb => cb.checked);
+            const selectAllCheckbox = document.getElementById('company_select_all');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allChecked;
+            }
+        }
+        
+        function saveCompanySelection() {
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            const selectedCompanies = Array.from(companyCheckboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+            localStorage.setItem('plCompanyFilter', JSON.stringify(selectedCompanies));
+        }
+        
+        function handleSelectAllChange() {
+            const selectAllCheckbox = document.getElementById('company_select_all');
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            
+            if (!selectAllCheckbox) return;
+            
+            const isChecked = selectAllCheckbox.checked;
+            companyCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+            });
+            
+            updateCompanyFilterLabel();
+            saveCompanySelection();
+        }
+        
+        function handleCompanyCheckboxChange() {
+            const selectAllCheckbox = document.getElementById('company_select_all');
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            
+            if (!selectAllCheckbox) return;
+            
+            // Check if all individual checkboxes are checked
+            const allChecked = Array.from(companyCheckboxes).every(cb => cb.checked);
+            const noneChecked = Array.from(companyCheckboxes).every(cb => !cb.checked);
+            
+            // Update Select All checkbox state
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = !allChecked && !noneChecked;
+            
+            updateCompanyFilterLabel();
+            saveCompanySelection();
+        }
+        
+        function updateCompanyFilterLabel() {
+            const label = document.getElementById('company_filter_label');
+            const checkboxes = document.querySelectorAll('.company-checkbox');
+            const checkedBoxes = Array.from(checkboxes).filter(cb => cb.checked);
+            
+            if (!label || checkboxes.length === 0) return;
+            
+            if (checkedBoxes.length === 0) {
+                label.textContent = 'No Companies Selected';
+            } else if (checkedBoxes.length === checkboxes.length) {
+                label.textContent = 'All Companies';
+            } else {
+                label.textContent = `${checkedBoxes.length} Companies`;
+            }
+        }
+
         // --- Export dropdown helpers ---
         function toggleExportDropdown(event) {
             event.stopPropagation();
@@ -1390,6 +1554,14 @@
             } else {
                 exportBaseUrl = "{% url 'core:export_report_excel' %}";
             }
+            
+            // Get selected companies
+            const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+            const selectedCompanies = Array.from(companyCheckboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value)
+                .join(',');
+            
             const params = new URLSearchParams({
                 type: 'pl',
                 from_month: (document.getElementById('from_month') || {}).value || '',
@@ -1399,6 +1571,7 @@
                 data_type: (document.getElementById('data_type') || {}).value || 'actual',
                 display_mode: (document.getElementById('display_mode') || {}).value || 'grand_total',
                 ytd_compare_year: (document.getElementById('ytd_compare_year') || {}).value || '',
+                companies: selectedCompanies,
                 export_type: exportType
             });
             window.location.href = `${exportBaseUrl}?${params.toString()}`;
@@ -1673,6 +1846,9 @@
         
         // AG Grid initialization
         document.addEventListener('DOMContentLoaded', function() {
+            // Populate ytd_compare_year dropdown with years FIRST (before setting value from URL)
+            initializeYtdCompareYears();
+            
             // Ensure data_type dropdown reflects URL param on load
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -1690,9 +1866,6 @@
                 if (ytdCompareYearEl) ytdCompareYearEl.value = ytdCompareYear;
             } catch (e) {}
             
-            // Populate ytd_compare_year dropdown with years
-            initializeYtdCompareYears();
-            
             // Show/hide YTD compare group based on display_mode
             toggleYtdCompareVisibility();
             
@@ -1701,6 +1874,9 @@
             if (displayModeEl) {
                 displayModeEl.addEventListener('change', toggleYtdCompareVisibility);
             }
+            
+            // Initialize company filter dropdown
+            initializeCompanyFilter();
             
             console.log('DOM loaded, initializing AG Grid...');
             
@@ -2186,12 +2362,24 @@
         const form = document.getElementById('filterForm');
         if (form) {
             form.addEventListener('submit', function() {
+                // Update hidden input with selected companies
+                const selectedCompaniesInput = document.getElementById('selected_companies');
+                const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+                const selectedCompanies = Array.from(companyCheckboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                
+                if (selectedCompaniesInput) {
+                    selectedCompaniesInput.value = selectedCompanies.join(',');
+                }
+                
                 localStorage.setItem('plFilters', JSON.stringify({
                     from_month: document.getElementById('from_month')?.value,
                     from_year: document.getElementById('from_year')?.value,
                     to_month: document.getElementById('to_month')?.value,
                     to_year: document.getElementById('to_year')?.value,
-                    data_type: document.getElementById('data_type')?.value
+                    data_type: document.getElementById('data_type')?.value,
+                    companies: selectedCompanies
                 }));
             });
         }
