@@ -1148,7 +1148,7 @@ def pl_report_data(request):
             for p in periods:
                 row['periods'][p] = {}
                 period_total = Decimal('0')
-                for c in companies_with_data:  # Используем только компании с данными
+                for c in pl_companies:  # Используем отфильтрованные компании
                     amount = financial_data[p][c.code].get(acc.account_code, Decimal('0'))
                     row['periods'][p][c.code] = float(amount or Decimal('0'))
                     period_total += amount or Decimal('0')
@@ -1157,11 +1157,11 @@ def pl_report_data(request):
                 row['periods'][p]['TOTAL'] = float(period_total or Decimal('0'))
 
             # Гранд тоталы
-            for c in companies_with_data:  # Используем только компании с данными
+            for c in pl_companies:  # Используем отфильтрованные компании
                 grand_total = sum(financial_data[p][c.code].get(acc.account_code, Decimal('0')) for p in periods)
                 row['grand_totals'][c.code] = float(grand_total or Decimal('0'))
             overall = sum(
-                sum(financial_data[p][c.code].get(acc.account_code, Decimal('0')) for c in companies_with_data)
+                sum(financial_data[p][c.code].get(acc.account_code, Decimal('0')) for c in pl_companies)
                 for p in periods
             )
             row['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
@@ -1170,7 +1170,7 @@ def pl_report_data(request):
             if display_mode == 'ytd':
                 # YTD for current year
                 ytd_total_current = Decimal('0')
-                for c in companies_with_data:
+                for c in pl_companies:
                     ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
                     ytd_total_current += ytd_amount
                 row[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
@@ -1178,7 +1178,7 @@ def pl_report_data(request):
                 # YTD for comparison year (if selected)
                 if ytd_compare_year:
                     ytd_total_compare = Decimal('0')
-                    for c in companies_with_data:
+                    for c in pl_companies:
                         ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
                         ytd_total_compare += ytd_amount
                     row[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
@@ -1201,7 +1201,7 @@ def pl_report_data(request):
         for p in periods:
             sub_total['periods'][p] = {}
             period_total = Decimal('0')
-            for c in companies_with_data:  # Используем только компании с данными
+            for c in pl_companies:  # Используем отфильтрованные компании
                 company_total = sum(
                     financial_data[p][c.code].get(a.account_code, Decimal('0'))
                     for a in category_accounts
@@ -1225,14 +1225,14 @@ def pl_report_data(request):
                     except Exception:
                         sub_total['periods'][p]['Budget'] = None
 
-        for c in companies_with_data:  # Используем только компании с данными
+        for c in pl_companies:  # Используем отфильтрованные компании
             gtot = sum(
                 sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in category_accounts)
                 for p in periods
             )
             sub_total['grand_totals'][c.code] = float(gtot or Decimal('0'))
         overall = sum(
-            sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in category_accounts) for c in companies_with_data)
+            sum(sum(financial_data[p][c.code].get(a.account_code, Decimal('0')) for a in category_accounts) for c in pl_companies)
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
@@ -1241,7 +1241,7 @@ def pl_report_data(request):
         if display_mode == 'ytd':
             # YTD for current year
             ytd_total_current = Decimal('0')
-            for c in companies_with_data:
+            for c in pl_companies:
                 for acc in category_accounts:
                     ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
                     ytd_total_current += ytd_amount
@@ -1250,7 +1250,7 @@ def pl_report_data(request):
             # YTD for comparison year (if selected)
             if ytd_compare_year:
                 ytd_total_compare = Decimal('0')
-                for c in companies_with_data:
+                for c in pl_companies:
                     for acc in category_accounts:
                         ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
                         ytd_total_compare += ytd_amount
