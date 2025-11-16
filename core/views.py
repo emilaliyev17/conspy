@@ -875,6 +875,9 @@ def pl_report_data(request):
         pl_companies = [c for c in pl_companies if c.code in selected_company_codes]
         logger.info(f"Filtered PL companies by user selection: {[c.code for c in pl_companies]}")
     
+    # Update display_companies to reflect user's company filter selection
+    display_companies = pl_companies
+    
     # Include budget-only company for structure initialization (if using parallel budget feature)
     if is_enabled('PL_BUDGET_PARALLEL'):
         budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
