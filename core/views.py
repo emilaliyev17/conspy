@@ -678,6 +678,22 @@ def pl_report_data(request):
         if d.month == 12:
             return date(d.year + 1, 1, 1)
         return date(d.year, d.month + 1, 1)
+    
+    def get_ytd_range(to_month_str: str, to_year_str: str):
+        """Calculate YTD range: January to to_month (inclusive) for the given year."""
+        if not to_month_str or not to_year_str:
+            return None, None
+        try:
+            to_month_int = int(to_month_str)
+            to_year_int = int(to_year_str)
+            # YTD starts from January 1st
+            ytd_start = date(to_year_int, 1, 1)
+            # YTD ends at last day of to_month
+            _, last_day = convert_month_year_to_date_range(to_month_str, to_year_str)
+            ytd_end_exclusive = next_month(last_day) if last_day else None
+            return ytd_start, ytd_end_exclusive
+        except (ValueError, TypeError):
+            return None, None
 
     # Превращаем выбор пользователя в месячный диапазон [start, end_exclusive)
     from_date_start, _ = convert_month_year_to_date_range(from_month, from_year)
@@ -853,6 +869,88 @@ def pl_report_data(request):
         budget_company = next((c for c in companies if getattr(c, 'is_budget_only', False)), None)
         all_report_companies = pl_companies + ([budget_company] if budget_company else [])
 
+    # YTD data structures (if display_mode is 'ytd')
+    ytd_data_current = {}  # YTD for current year (to_year)
+    ytd_data_compare = {}  # YTD for comparison year (if selected)
+    ytd_periods_current = []
+    ytd_periods_compare = []
+    
+    if display_mode == 'ytd':
+        # Get YTD periods for current year
+        ytd_start_current, ytd_end_current = get_ytd_range(to_month, to_year)
+        if ytd_start_current and ytd_end_current:
+            ytd_periods_current = list(
+                FinancialData.objects.filter(
+                    data_type=data_type,
+                    account_code__in=pl_account_codes,
+                    period__gte=ytd_start_current,
+                    period__lt=ytd_end_current
+                ).values_list('period', flat=True).distinct().order_by('period')
+            )
+            
+            # Load YTD data for current year
+            ytd_records_current = list(
+                FinancialData.objects.filter(
+                    data_type=data_type,
+                    period__in=ytd_periods_current,
+                    company_id__in=[c.id for c in pl_companies],
+                    account_code__in=pl_account_codes
+                ).select_related('company')
+            )
+            
+            # Structure: company_code -> account_code -> total_amount
+            for c in pl_companies:
+                ytd_data_current[c.code] = {}
+                for acc in pl_account_codes:
+                    ytd_data_current[c.code][acc] = Decimal('0')
+            
+            # Accumulate YTD amounts
+            for fd in ytd_records_current:
+                ccode = fd.company.code
+                acc = fd.account_code
+                if ccode in ytd_data_current and acc:
+                    ytd_data_current[ccode][acc] += (fd.amount or Decimal('0'))
+            
+            logger.info(f"YTD current year ({to_year}): loaded {len(ytd_records_current)} records, {len(ytd_periods_current)} periods")
+        
+        # Get YTD periods for comparison year (if selected)
+        if ytd_compare_year:
+            ytd_start_compare, ytd_end_compare = get_ytd_range(to_month, ytd_compare_year)
+            if ytd_start_compare and ytd_end_compare:
+                ytd_periods_compare = list(
+                    FinancialData.objects.filter(
+                        data_type=data_type,
+                        account_code__in=pl_account_codes,
+                        period__gte=ytd_start_compare,
+                        period__lt=ytd_end_compare
+                    ).values_list('period', flat=True).distinct().order_by('period')
+                )
+                
+                # Load YTD data for comparison year
+                ytd_records_compare = list(
+                    FinancialData.objects.filter(
+                        data_type=data_type,
+                        period__in=ytd_periods_compare,
+                        company_id__in=[c.id for c in pl_companies],
+                        account_code__in=pl_account_codes
+                    ).select_related('company')
+                )
+                
+                # Structure: company_code -> account_code -> total_amount
+                for c in pl_companies:
+                    ytd_data_compare[c.code] = {}
+                    for acc in pl_account_codes:
+                        ytd_data_compare[c.code][acc] = Decimal('0')
+                
+                # Accumulate YTD amounts
+                for fd in ytd_records_compare:
+                    ccode = fd.company.code
+                    acc = fd.account_code
+                    if ccode in ytd_data_compare and acc:
+                        ytd_data_compare[ccode][acc] += (fd.amount or Decimal('0'))
+                
+                logger.info(f"YTD compare year ({ytd_compare_year}): loaded {len(ytd_records_compare)} records, {len(ytd_periods_compare)} periods")
+    
     # Индексация: period -> company_code -> account_code -> amount
     financial_data = {}
     # Define a soft, readable palette (no reds) and map companies deterministically
@@ -1044,6 +1142,23 @@ def pl_report_data(request):
                 for p in periods
             )
             row['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
+            
+            # YTD values (if display_mode is 'ytd')
+            if display_mode == 'ytd':
+                # YTD for current year
+                ytd_total_current = Decimal('0')
+                for c in companies_with_data:
+                    ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_current += ytd_amount
+                row[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+                
+                # YTD for comparison year (if selected)
+                if ytd_compare_year:
+                    ytd_total_compare = Decimal('0')
+                    for c in companies_with_data:
+                        ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                        ytd_total_compare += ytd_amount
+                    row[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
 
             if has_non_zero_value:
                 report_data.append(row)
@@ -1098,6 +1213,25 @@ def pl_report_data(request):
             for p in periods
         )
         sub_total['grand_totals']['TOTAL'] = float(overall or Decimal('0'))
+        
+        # YTD values for subtotal (if display_mode is 'ytd')
+        if display_mode == 'ytd':
+            # YTD for current year
+            ytd_total_current = Decimal('0')
+            for c in companies_with_data:
+                for acc in category_accounts:
+                    ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_current += ytd_amount
+            sub_total[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+            
+            # YTD for comparison year (if selected)
+            if ytd_compare_year:
+                ytd_total_compare = Decimal('0')
+                for c in companies_with_data:
+                    for acc in category_accounts:
+                        ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                        ytd_total_compare += ytd_amount
+                sub_total[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
 
         report_data.append(sub_total)
 
@@ -1159,6 +1293,26 @@ def pl_report_data(request):
         for p in periods
     )
     total_revenue_row['grand_totals']['TOTAL'] = float(overall_revenue or Decimal('0'))
+    
+    # YTD values for Total Revenue (if display_mode is 'ytd')
+    if display_mode == 'ytd':
+        # YTD for current year
+        ytd_total_current = Decimal('0')
+        for c in pl_companies:
+            for acc in income_accounts:
+                ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                ytd_total_current += ytd_amount
+        total_revenue_row[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+        
+        # YTD for comparison year (if selected)
+        if ytd_compare_year:
+            ytd_total_compare = Decimal('0')
+            for c in pl_companies:
+                for acc in income_accounts:
+                    ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_compare += ytd_amount
+            total_revenue_row[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
+    
     total_revenue_snapshot = copy.deepcopy(total_revenue_row)
 
     report_data.append(total_revenue_row)
@@ -1442,6 +1596,26 @@ def pl_report_data(request):
         for p in periods
     )
     total_expense_row['grand_totals']['TOTAL'] = float(overall_expense or 0)
+    
+    # YTD values for Total Expenses (if display_mode is 'ytd')
+    if display_mode == 'ytd':
+        # YTD for current year
+        ytd_total_current = Decimal('0')
+        for c in pl_companies:
+            for acc in expense_accounts:
+                ytd_amount = ytd_data_current.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                ytd_total_current += ytd_amount
+        total_expense_row[f'ytd_{to_year}'] = float(ytd_total_current) if ytd_total_current else None
+        
+        # YTD for comparison year (if selected)
+        if ytd_compare_year:
+            ytd_total_compare = Decimal('0')
+            for c in pl_companies:
+                for acc in expense_accounts:
+                    ytd_amount = ytd_data_compare.get(c.code, {}).get(acc.account_code, Decimal('0'))
+                    ytd_total_compare += ytd_amount
+            total_expense_row[f'ytd_{ytd_compare_year}'] = float(ytd_total_compare) if ytd_total_compare else None
+    
     report_data.append(total_expense_row)
     
     # NET INCOME (Revenue - Expenses)
@@ -1482,6 +1656,22 @@ def pl_report_data(request):
         expense = Decimal(str(total_expense_row['grand_totals'][c.code]))
         net_income_row['grand_totals'][c.code] = float(revenue - expense)
     net_income_row['grand_totals']['TOTAL'] = float(Decimal(str(total_revenue_row['grand_totals']['TOTAL'])) - Decimal(str(total_expense_row['grand_totals']['TOTAL'])))
+    
+    # YTD values for Net Income (if display_mode is 'ytd')
+    if display_mode == 'ytd':
+        # YTD for current year: Revenue - Expenses
+        ytd_revenue_current = total_revenue_row.get(f'ytd_{to_year}', 0) or 0
+        ytd_expense_current = total_expense_row.get(f'ytd_{to_year}', 0) or 0
+        net_income_ytd_current = ytd_revenue_current - ytd_expense_current
+        net_income_row[f'ytd_{to_year}'] = float(net_income_ytd_current) if net_income_ytd_current else None
+        
+        # YTD for comparison year (if selected)
+        if ytd_compare_year:
+            ytd_revenue_compare = total_revenue_row.get(f'ytd_{ytd_compare_year}', 0) or 0
+            ytd_expense_compare = total_expense_row.get(f'ytd_{ytd_compare_year}', 0) or 0
+            net_income_ytd_compare = ytd_revenue_compare - ytd_expense_compare
+            net_income_row[f'ytd_{ytd_compare_year}'] = float(net_income_ytd_compare) if net_income_ytd_compare else None
+    
     report_data.append(net_income_row)
 
     # Колонки AG Grid
@@ -1879,12 +2069,13 @@ def pl_report_data(request):
                     pass
         # Populate Grand Total or YTD columns based on display_mode
         if display_mode == 'ytd':
-            # YTD Mode: Placeholder values (will be calculated in next phase)
-            # TODO: Implement full YTD calculation
+            # YTD Mode: Get real YTD values from row
             if to_year:
-                grid_row[f'ytd_{to_year}'] = None  # Placeholder
+                ytd_value_current = r.get(f'ytd_{to_year}', 0)
+                grid_row[f'ytd_{to_year}'] = None if ytd_value_current == 0 or ytd_value_current is None else float(ytd_value_current)
             if ytd_compare_year:
-                grid_row[f'ytd_{ytd_compare_year}'] = None  # Placeholder
+                ytd_value_compare = r.get(f'ytd_{ytd_compare_year}', 0)
+                grid_row[f'ytd_{ytd_compare_year}'] = None if ytd_value_compare == 0 or ytd_value_compare is None else float(ytd_value_compare)
         else:
             # Grand Total Mode: Use existing grand_totals
             for c in non_budget_companies:
