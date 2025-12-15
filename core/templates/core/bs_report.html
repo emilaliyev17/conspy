@@ -193,35 +193,6 @@
         #bsGrid ::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
-        
-        /* Custom dropdown styles for export */
-        .export-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-        .export-dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: white;
-            min-width: 200px;
-            box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
-            border: 1px solid #ddd;
-            z-index: 1000;
-            border-radius: 4px;
-        }
-        .export-dropdown-content a {
-            color: black;
-            padding: 12px 16px;
-            text-decoration: none;
-            display: block;
-            cursor: pointer;
-        }
-        .export-dropdown-content a:hover {
-            background-color: #f1f1f1;
-        }
-        .export-dropdown.show .export-dropdown-content {
-            display: block;
-        }
     </style>
 </head>
 <body>
@@ -316,17 +287,8 @@
         </div>
         
         <div class="actions">
-            <div class="export-dropdown">
-                <button class="btn btn-success" onclick="toggleExportDropdown(event)">
-                    📊 Export to Excel ▼
-                </button>
-                <div class="export-dropdown-content">
-                    <a onclick="exportToExcel('formatted')">📊 Formatted (with totals)</a>
-                    <a onclick="exportToExcel('raw')">📋 Raw Data (accounts only)</a>
-                    <a onclick="exportToExcel('stakeholder')">📑 For External Stakeholders</a>
-                </div>
-            </div>
-            <button onclick="window.print()" class="btn btn-secondary">🖨️ Print Report</button>
+            <a href="{% url 'core:export_report_excel' %}?type=bs&from_month={{ request.GET.from_month }}&from_year={{ request.GET.from_year }}&to_month={{ request.GET.to_month }}&to_year={{ request.GET.to_year }}&data_type={{ request.GET.data_type }}" class="btn btn-success">Export to Excel</a>
+            <button onclick="window.print()" class="btn btn-secondary">Print Report</button>
             <button onclick="collapseAllPeriods()" class="btn btn-secondary">➖ Collapse All</button>
             <button onclick="expandAllPeriods()" class="btn btn-secondary">➕ Expand All</button>
         </div>
@@ -747,47 +709,6 @@
                 }
             }
         };
-
-        // Export dropdown toggle
-        function toggleExportDropdown(event) {
-            event.stopPropagation();
-            const dd = document.querySelector('.export-dropdown');
-            if (dd) dd.classList.toggle('show');
-        }
-
-        // Close dropdown when clicking outside
-        window.addEventListener('click', function(event) {
-            const dropdown = document.querySelector('.export-dropdown');
-            if (!dropdown) return;
-            const isButton = event.target && event.target.closest && event.target.closest('.btn-success');
-            const clickedInside = event.target && event.target.closest && event.target.closest('.export-dropdown');
-            if (!isButton && dropdown.classList.contains('show') && !clickedInside) {
-                dropdown.classList.remove('show');
-            }
-        });
-
-        // Export to Excel function for Balance Sheet
-        function exportToExcel(exportType = 'raw') {
-            let exportBaseUrl;
-            if (exportType === 'stakeholder') {
-                exportBaseUrl = "{% url 'core:export_bs_for_stakeholders' %}";
-            } else {
-                exportBaseUrl = "{% url 'core:export_report_excel' %}";
-            }
-            
-            const params = new URLSearchParams({
-                type: 'bs',
-                from_month: (document.getElementById('from_month') || {}).value || '',
-                from_year: (document.getElementById('from_year') || {}).value || '',
-                to_month: (document.getElementById('to_month') || {}).value || '',
-                to_year: (document.getElementById('to_year') || {}).value || '',
-                data_type: (document.getElementById('data_type') || {}).value || 'actual',
-                export_type: exportType
-            });
-            window.location.href = `${exportBaseUrl}?${params.toString()}`;
-            const dd = document.querySelector('.export-dropdown');
-            if (dd) dd.classList.remove('show');
-        }
     </script>
 </body>
 </html>
