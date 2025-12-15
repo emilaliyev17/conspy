@@ -437,7 +437,7 @@ def upload_financial_data(request):
                     data_type=data_type
                 )
                 if existing_data.exists():
-                    existing_periods.append(col)
+                    existing_periods.append(str(col))
             
             # If there's existing data and no confirmation, ask for confirmation
             if existing_periods and not request.POST.get('confirm_overwrite'):
@@ -484,7 +484,7 @@ def upload_financial_data(request):
                     DataBackup.objects.create(
                         company=company,
                         data_type=data_type,
-                        periods=json.dumps([col for col, _ in period_columns if col in existing_periods]),
+                        periods=json.dumps([str(col) for col, _ in period_columns if str(col) in existing_periods]),
                         backup_data=backup_data,
                         user=request.user.username if request.user.is_authenticated else 'Anonymous',
                         description=f"Backup before upload on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
@@ -498,7 +498,7 @@ def upload_financial_data(request):
                 
                 # Delete ONLY data for account codes that are in the uploaded file
                 for col, period_date in period_columns:
-                    if col in existing_periods:
+                    if str(col) in existing_periods:
                         FinancialData.objects.filter(
                             company=company,
                             period=period_date,
@@ -3142,6 +3142,101 @@ def export_report_excel(request):
 
         return response
     
+    # Formatted export for Balance Sheet: reuse the same data structure as the screen
+    if export_type == 'formatted' and report_type == 'bs':
+        # Call bs_report_data to assemble hierarchical data
+        screen_response = bs_report_data(request)
+        try:
+            screen_json = json.loads(screen_response.content.decode('utf-8'))
+        except Exception:
+            # Fallback: return empty workbook with a note
+            df = pd.DataFrame([["No data"]], columns=["Balance Sheet"])
+            response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = 'attachment; filename="balance_sheet_formatted.xlsx"'
+            with pd.ExcelWriter(response, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Balance Sheet', index=False)
+            return response
+
+        row_data = screen_json.get('rowData', [])
+        column_defs = screen_json.get('columnDefs', [])
+
+        # Build header: Account Name | Type | period columns (company, TOTAL) in the same order as the grid
+        header = ['Account Name', 'Type']
+        period_fields = []
+        for col in column_defs:
+            field = col.get('field')
+            col_type = col.get('colType')
+            if not field:
+                continue
+            # skip non-data fields
+            if field in ('toggler', 'account_code', 'account_name'):
+                continue
+            # include only period data columns (company, total)
+            if col_type in ('company', 'total'):
+                header.append(col.get('headerName', field))
+                period_fields.append(field)
+
+        # Fallback if no column defs were found (use keys from first row excluding meta keys)
+        if not period_fields and row_data:
+            meta_keys = {'account_name', 'account_code', 'rowType', 'cellStyle'}
+            first_row = row_data[0]
+            for k in first_row.keys():
+                if k not in meta_keys:
+                    header.append(k)
+                    period_fields.append(k)
+
+        # Assemble rows
+        excel_rows = []
+        for r in row_data:
+            name = r.get('account_name', '')
+            rtype = r.get('rowType', '')
+            values = []
+            for f in period_fields:
+                v = r.get(f, 0)
+                if v == '-':
+                    v = 0
+                try:
+                    v = float(v)
+                except Exception:
+                    v = 0
+                values.append(v)
+            excel_rows.append([name, rtype] + values)
+
+        # Create DataFrame and export
+        df = pd.DataFrame(excel_rows, columns=header)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="balance_sheet_formatted.xlsx"'
+
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            sheet_name = 'Balance Sheet'
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            # Apply basic formatting: bold for subtotal/total/header rows, light fill for totals
+            ws = writer.sheets.get(sheet_name)
+            if ws is not None:
+                # Map row types we want bolded/fill
+                bold_types = {'sub_total', 'parent_total', 'sub_header', 'parent_header', 'check_row'}
+                total_fill = openpyxl.styles.PatternFill(start_color='E8F4FD', end_color='E8F4FD', fill_type='solid')
+                check_fill = openpyxl.styles.PatternFill(start_color='FFE6E6', end_color='FFE6E6', fill_type='solid')
+                bold_font = openpyxl.styles.Font(bold=True)
+
+                # Iterate DataFrame rows (1-based Excel, header at row 1)
+                type_col_idx = header.index('Type') + 1  # 1-based
+                max_col = ws.max_column
+                for row_idx in range(2, ws.max_row + 1):
+                    row_type_val = ws.cell(row=row_idx, column=type_col_idx).value
+                    if row_type_val in bold_types:
+                        for col_idx in range(1, max_col + 1):
+                            cell = ws.cell(row=row_idx, column=col_idx)
+                            cell.font = bold_font
+                            if row_type_val == 'parent_total':
+                                cell.fill = total_fill
+                            elif row_type_val == 'check_row':
+                                cell.fill = check_fill
+
+        return response
+    
     if report_type == 'pl':
         accounts = ChartOfAccounts.objects.filter(
             account_type__in=['INCOME', 'EXPENSE']
@@ -3439,6 +3534,206 @@ def export_for_stakeholders(request):
         for col_idx in range(2, ws.max_column + 1):
             ws.column_dimensions[get_column_letter(col_idx)].width = 12
         
+        ws.freeze_panes = 'B3'
+    
+    return response
+
+
+@login_required
+def export_bs_for_stakeholders(request):
+    """Export Balance Sheet for external stakeholders with Excel grouping."""
+    import json
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from decimal import Decimal
+    
+    screen_response = bs_report_data(request)
+    try:
+        screen_json = json.loads(screen_response.content.decode('utf-8'))
+    except Exception:
+        df = pd.DataFrame([["No data"]], columns=["Balance Sheet"])
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="balance_sheet_stakeholders.xlsx"'
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Balance Sheet', index=False)
+        return response
+    
+    row_data = screen_json.get('rowData', [])
+    column_defs = screen_json.get('columnDefs', [])
+    
+    # Filter out CHECK row (not needed for stakeholders)
+    row_data = [
+        row for row in row_data 
+        if row.get('rowType') != 'check_row'
+        and row.get('rowType') != 'spacer'
+    ]
+    
+    if not row_data or not column_defs:
+        df = pd.DataFrame([["No data available"]], columns=["Balance Sheet"])
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="balance_sheet_stakeholders.xlsx"'
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Balance Sheet', index=False)
+        return response
+    
+    periods = []
+    companies = []
+    period_company_map = {}
+    
+    for col in column_defs:
+        field = col.get('field')
+        col_type = col.get('colType')
+        header_name = col.get('headerName', '')
+        hide_flag = col.get('hide', False)
+        
+        if field in ('toggler', 'account_code', 'account_name'):
+            continue
+        
+        if hide_flag:
+            continue
+        
+        if col_type in ('company', 'total'):
+            parts = field.split('_')
+            if len(parts) >= 2:
+                period = parts[0]
+                company_or_type = '_'.join(parts[1:])
+                
+                if period not in period_company_map:
+                    period_company_map[period] = []
+                    periods.append(period)
+                
+                period_company_map[period].append({
+                    'field': field,
+                    'name': header_name,
+                    'type': col_type
+                })
+                
+                if company_or_type not in companies and col_type == 'company':
+                    companies.append(company_or_type)
+    
+    header_row1 = ['Account Name']
+    header_row2 = ['']
+    
+    for period in periods:
+        period_cols = period_company_map.get(period, [])
+        num_cols = len(period_cols)
+        header_row1.append(period)
+        for i in range(num_cols - 1):
+            header_row1.append('')
+        
+        for col_info in period_cols:
+            header_row2.append(col_info['name'])
+    
+    excel_rows = []
+    for row in row_data:
+        account_name = row.get('account_name', '')
+        row_type = row.get('rowType', '')
+        
+        excel_row = [account_name]
+        
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            for col_info in period_cols:
+                field = col_info['field']
+                value = row.get(field, 0)
+                if value == '-':
+                    value = ''
+                elif value is not None:
+                    try:
+                        value = float(value)
+                    except:
+                        value = ''
+                excel_row.append(value)
+        
+        excel_rows.append(excel_row)
+    
+    all_data = [header_row2] + excel_rows
+    df = pd.DataFrame(all_data[1:], columns=all_data[0])
+    
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="balance_sheet_stakeholders.xlsx"'
+    
+    with pd.ExcelWriter(response, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Balance Sheet', index=False, startrow=1)
+        ws = writer.sheets['Balance Sheet']
+        
+        # Write header row 1 (periods)
+        for col_idx, value in enumerate(header_row1, start=1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.value = value
+            cell.font = Font(bold=True, size=11)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+        
+        # Merge period header cells
+        current_col = 2
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            num_cols = len(period_cols)
+            
+            if num_cols > 1:
+                ws.merge_cells(start_row=1, start_column=current_col, end_row=1, end_column=current_col + num_cols - 1)
+            
+            current_col += num_cols
+        
+        # Style header row 2 (company names)
+        for col_idx in range(1, len(header_row2) + 1):
+            cell = ws.cell(row=2, column=col_idx)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color='E7E6E6', end_color='E7E6E6', fill_type='solid')
+        
+        # Apply row styling based on row type
+        bold_types = {'sub_total', 'parent_total', 'sub_header', 'parent_header'}
+        total_fill = PatternFill(start_color='E8F4FD', end_color='E8F4FD', fill_type='solid')
+        bold_font = Font(bold=True)
+        
+        for row_idx in range(3, ws.max_row + 1):
+            excel_row_idx = row_idx - 3
+            if excel_row_idx < len(excel_rows):
+                source_row = row_data[excel_row_idx]
+                row_type = source_row.get('rowType', '')
+                
+                if row_type in bold_types:
+                    for col_idx in range(1, ws.max_column + 1):
+                        cell = ws.cell(row=row_idx, column=col_idx)
+                        cell.font = bold_font
+                        if row_type == 'parent_total':
+                            cell.fill = total_fill
+        
+        # Apply column grouping (company columns collapse under TOTAL)
+        excel_col = 2
+        for period in periods:
+            period_cols = period_company_map.get(period, [])
+            
+            for i, col_info in enumerate(period_cols):
+                col_letter = get_column_letter(excel_col + i)
+                
+                if col_info['type'] == 'company':
+                    ws.column_dimensions[col_letter].outline_level = 1
+            
+            excel_col += len(period_cols)
+        
+        # Apply row grouping (account rows collapse under subtotals)
+        for row_idx in range(3, ws.max_row + 1):
+            excel_row_idx = row_idx - 3
+            if excel_row_idx < len(excel_rows):
+                source_row = row_data[excel_row_idx]
+                row_type = source_row.get('rowType', '')
+                
+                if row_type == 'account':
+                    ws.row_dimensions[row_idx].outline_level = 1
+        
+        # Set outline properties
+        ws.sheet_properties.outlinePr.summaryBelow = True
+        ws.sheet_properties.outlinePr.summaryRight = True
+        
+        # Set column widths
+        ws.column_dimensions['A'].width = 35
+        for col_idx in range(2, ws.max_column + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 12
+        
+        # Freeze panes
         ws.freeze_panes = 'B3'
     
     return response
