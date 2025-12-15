@@ -110,7 +110,7 @@ def parse_period_header(period_header):
     
     # Try different date formats
     formats_to_try = [
-        '%Y-%m', '%m/%Y', '%Y/%m', '%b-%y', '%y-%b', '%B %Y', '%Y %B'
+        '%Y-%m', '%m/%Y', '%Y/%m', '%b-%y', '%b-%Y', '%y-%b', '%B %Y', '%Y %B'
     ]
     
     for fmt in formats_to_try:
@@ -2503,11 +2503,20 @@ def bs_report_data(request):
     data_type_raw = request.GET.get('data_type', 'actual')
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
     
+    # Company filter parameter
+    companies_param = request.GET.get('companies', '')
+    selected_company_codes = [c.strip() for c in companies_param.split(',') if c.strip()] if companies_param else []
+    
     from_date_start, from_date_end = convert_month_year_to_date_range(from_month, from_year)
     to_date_start, to_date_end = convert_month_year_to_date_range(to_month, to_year)
     
     # Get all companies (exclude pseudo-companies like Budget)
     companies = list(Company.objects.filter(is_budget_only=False).order_by('name'))
+    
+    # Filter companies if user selected specific ones
+    if selected_company_codes:
+        companies = [c for c in companies if c.code in selected_company_codes]
+    
     company_codes = {c.code for c in companies}
     
     # Get ASSET, LIABILITY, EQUITY accounts from ChartOfAccounts
@@ -2579,7 +2588,8 @@ def bs_report_data(request):
                 non_zero_company_periods.add((period_key, company_code))
 
     # Get companies that actually have data (same logic as P&L report)
-    companies_with_data = list(set(fd.company for fd in all_financial_data))
+    # Filter to only include companies from our filtered list
+    companies_with_data = list(set(fd.company for fd in all_financial_data if fd.company.code in company_codes))
     if not companies_with_data:
         logger.warning("No companies with data found for Balance Sheet, using all companies as fallback")
         companies_with_data = companies
@@ -2797,40 +2807,47 @@ def bs_report_data(request):
     
     # Add CHECK row at bottom: TOTAL ASSETS - TOTAL LIABILITIES - TOTAL EQUITY (should equal 0)
     if 'ASSET' in grouped_data and ('LIABILITY' in grouped_data or 'EQUITY' in grouped_data):
-        # Calculate totals for each category
-        assets_total = 0
-        liabilities_total = 0
-        equity_total = 0
+        # Calculate CHECK for each period separately
+        check_periods = {}
+        grand_total_check = 0
         
-        if 'ASSET' in grouped_data:
-            assets_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['ASSET'].values())
-                for period in periods
-                for company in companies_with_data
-            )
-        
-        if 'LIABILITY' in grouped_data:
-            liabilities_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['LIABILITY'].values())
-                for period in periods
-                for company in companies_with_data
-            )
-        
-        if 'EQUITY' in grouped_data:
-            equity_total = sum(
-                sum(sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts) for sub_accounts in grouped_data['EQUITY'].values())
-                for period in periods
-                for company in companies_with_data
-            )
-        
-        check_value = assets_total - liabilities_total - equity_total
+        for period in periods:
+            # Calculate totals for each category for this specific period
+            period_assets = 0
+            period_liabilities = 0
+            period_equity = 0
+            
+            if 'ASSET' in grouped_data:
+                period_assets = sum(
+                    sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts)
+                    for sub_accounts in grouped_data['ASSET'].values()
+                    for company in companies_with_data
+                )
+            
+            if 'LIABILITY' in grouped_data:
+                period_liabilities = sum(
+                    sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts)
+                    for sub_accounts in grouped_data['LIABILITY'].values()
+                    for company in companies_with_data
+                )
+            
+            if 'EQUITY' in grouped_data:
+                period_equity = sum(
+                    sum(financial_data[period][company.code].get(account.account_code, 0) for account in sub_accounts)
+                    for sub_accounts in grouped_data['EQUITY'].values()
+                    for company in companies_with_data
+                )
+            
+            period_check = period_assets - period_liabilities - period_equity
+            check_periods[period] = {'TOTAL': float(period_check or 0)}
+            grand_total_check += period_check
         
         report_data.append({
             'type': 'check_row',
             'account_name': 'CHECK (Assets - Liabilities - Equity)',
             'account_code': '',
-            'periods': {period: {'TOTAL': float(check_value or 0)} for period in periods},
-            'grand_totals': {'TOTAL': float(check_value or 0)}
+            'periods': check_periods,
+            'grand_totals': {'TOTAL': float(grand_total_check or 0)}
         })
     
     # Prepare column definitions for AG Grid
@@ -3020,6 +3037,11 @@ def bs_report(request):
     data_type = data_type_raw.capitalize() if data_type_raw else 'Actual'
 
     year_range = range(2023, 2031)
+    
+    # Get list of companies with data dynamically from DB
+    available_companies = Company.objects.filter(
+        id__in=FinancialData.objects.values_list('company_id', flat=True).distinct()
+    ).order_by('code')
 
     context = {
         'from_month': from_month,
@@ -3028,7 +3050,8 @@ def bs_report(request):
         'to_year': to_year,
         'data_type': data_type,
         'report_type': 'bs',
-        'year_range': year_range
+        'year_range': year_range,
+        'available_companies': available_companies
     }
 
     return render(request, 'core/bs_report.html', context)
