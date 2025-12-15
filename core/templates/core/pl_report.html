@@ -2284,6 +2284,9 @@
                     }
                     window.plGridOptions = gridOptions;
                     console.log('AG Grid created successfully!');
+                    
+                    // Collapse by default
+                    setTimeout(function() { collapseAllPeriods(); }, 100);
                 })
                 .catch(error => {
                     console.error('Error loading data:', error);
